@@ -1,0 +1,73 @@
+name: Sync labels from labels.yml
+on:
+  push:
+    paths:
+      - .github/labels.yml
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install pyyaml requests
+
+      - name: Sync labels
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import os, yaml, requests
+          from urllib.parse import quote
+
+          token = os.environ['GITHUB_TOKEN']
+          repo = os.environ['REPO']
+          headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github+json'}
+
+          with open('.github/labels.yml', 'r') as f:
+            data = yaml.safe_load(f) or {}
+          labels = data.get('labels', [])
+
+          # Get existing labels
+          existing = []
+          page = 1
+          while True:
+            r = requests.get(f'https://api.github.com/repos/{repo}/labels?page={page}&per_page=100', headers=headers)
+            if not r.ok:
+              raise SystemExit(f'Failed to list labels: {r.status_code} {r.text}')
+            batch = r.json()
+            if not batch:
+              break
+            existing.extend([l['name'] for l in batch])
+            page += 1
+
+          new_names = [l['name'] for l in labels]
+
+          # Create or update labels
+          for lbl in labels:
+            name = lbl['name']
+            color = lbl.get('color', '').lstrip('#')
+            desc = lbl.get('description', '')
+            if name in existing:
+              name_enc = quote(name, safe='')
+              resp = requests.patch(f'https://api.github.com/repos/{repo}/labels/{name_enc}', headers=headers, json={'color': color, 'description': desc})
+            else:
+              resp = requests.post(f'https://api.github.com/repos/{repo}/labels', headers=headers, json={'name': name, 'color': color, 'description': desc})
+            if not resp.ok:
+              print('Warning: failed to create/update', name, resp.status_code, resp.text)
+
+          # Delete labels not in labels.yml (enabled)
+          to_delete = [n for n in existing if n not in new_names]
+          for name in to_delete:
+            name_enc = quote(name, safe='')
+            resp = requests.delete(f'https://api.github.com/repos/{repo}/labels/{name_enc}', headers=headers)
+            if not resp.ok:
+              print('Warning: failed to delete', name, resp.status_code, resp.text)
+          PY
