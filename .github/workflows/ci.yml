@@ -15,7 +15,11 @@ jobs:
       CI: true
 
     steps:
-    # 0) 어떤 패키지 매니저를 사용할지 감지 (yarn.lock 우선, 없으면 package-lock.json -> npm)
+    # 0) 코드 체크아웃 (캐시 설정을 위해 가장 먼저 실행)
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 1) 어떤 패키지 매니저를 사용할지 감지 (yarn.lock 우선, 없으면 package-lock.json -> npm)
     - name: Detect package manager
       id: detect
       run: |
@@ -28,7 +32,7 @@ jobs:
           echo "packageManager=npm" >> $GITHUB_OUTPUT
         fi
 
-    # 1) Node.js 설정 — yarn 용 (yarn.lock이 있을 때만 실행)
+    # 2) Node.js 설정 — yarn 용 (yarn.lock이 있을 때만 실행)
     - name: Setup Node.js (Yarn)
       if: steps.detect.outputs.packageManager == 'yarn'
       uses: actions/setup-node@v4
@@ -36,19 +40,14 @@ jobs:
         node-version: '20'
         cache: 'yarn'
 
-    # 2) Node.js 설정 — npm 용 (package-lock.json 있거나 기본일 때)
+    # 3) Node.js 설정 — npm 용 (package-lock.json 있거나 기본일 때)
     - name: Setup Node.js (npm)
       if: steps.detect.outputs.packageManager == 'npm'
       uses: actions/setup-node@v4
       with:
         node-version: '20'
         cache: 'npm'
-        # npm 캐시 키에 사용될 lockfile 경로
         cache-dependency-path: package-lock.json
-
-    # 3) 코드 체크아웃
-    - name: Checkout code
-      uses: actions/checkout@v4
 
     # 4) 의존성 설치 (감지된 패키지 매니저에 따라 분기)
     - name: Install dependencies
