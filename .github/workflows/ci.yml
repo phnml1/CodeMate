@@ -1,0 +1,161 @@
+name: CI Check
+
+# 언제 실행할지 정의 (main 브랜치에 푸시되거나 main 대상으로 PR이 열릴 때)
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    # CI 환경 변수 설정 (많은 툴들이 CI 환경에서 다르게 동작)
+    env:
+      CI: true
+
+    steps:
+    # 0) 어떤 패키지 매니저를 사용할지 감지 (yarn.lock 우선, 없으면 package-lock.json -> npm)
+    - name: Detect package manager
+      id: detect
+      run: |
+        if [ -f yarn.lock ]; then
+          echo "packageManager=yarn" >> $GITHUB_OUTPUT
+        elif [ -f package-lock.json ]; then
+          echo "packageManager=npm" >> $GITHUB_OUTPUT
+        else
+          # 기본값: npm (lockfile이 없을 때도 npm으로 시도)
+          echo "packageManager=npm" >> $GITHUB_OUTPUT
+        fi
+
+    # 1) Node.js 설정 — yarn 용 (yarn.lock이 있을 때만 실행)
+    - name: Setup Node.js (Yarn)
+      if: steps.detect.outputs.packageManager == 'yarn'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'yarn'
+
+    # 2) Node.js 설정 — npm 용 (package-lock.json 있거나 기본일 때)
+    - name: Setup Node.js (npm)
+      if: steps.detect.outputs.packageManager == 'npm'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        # npm 캐시 키에 사용될 lockfile 경로
+        cache-dependency-path: package-lock.json
+
+    # 3) 코드 체크아웃
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 4) 의존성 설치 (감지된 패키지 매니저에 따라 분기)
+    - name: Install dependencies
+      env:
+        PACKAGE_MANAGER: ${{ steps.detect.outputs.packageManager }}
+      run: |
+        echo "사용 패키지 매니저: $PACKAGE_MANAGER"
+        if [ "$PACKAGE_MANAGER" = "yarn" ]; then
+          echo "yarn.lock 발견 — yarn으로 의존성 설치"
+          # Yarn v2+ 와 v1 차이가 있으므로 가능한 안전한 설치 명령 사용
+          if yarn --version 2>/dev/null | grep -qE '^2|^3|^4'; then
+            yarn install --immutable
+          else
+            yarn install --frozen-lockfile
+          fi
+        else
+          # npm용 설치: package-lock.json이 있으면 npm ci, 없으면 npm install
+          if [ -f package-lock.json ]; then
+            echo "package-lock.json 발견 — npm ci 실행"
+            npm ci
+          else
+            echo "package-lock.json 없음 — npm install 실행"
+            npm install
+          fi
+        fi
+
+    # 5) 린트 검사 — package.json에 lint 스크립트가 정의되어 있을 때만 실행
+    - name: Lint check
+      env:
+        PACKAGE_MANAGER: ${{ steps.detect.outputs.packageManager }}
+      run: |
+        if [ ! -f package.json ]; then
+          echo "package.json 없음 — lint 스킵"
+          exit 0
+        fi
+        HAS_SCRIPT=$(node -e "process.stdout.write(String(Boolean(require('./package.json').scripts && require('./package.json').scripts.lint)))")
+        if [ "$HAS_SCRIPT" = "true" ]; then
+          echo "lint 스크립트 발견 — 실행"
+          if [ "$PACKAGE_MANAGER" = "yarn" ]; then
+            yarn lint
+          else
+            npm run lint
+          fi
+        else
+          echo "lint 스크립트 미정의 — lint 스킵"
+        fi
+
+    # 6) 타입 검사 (TypeScript 관련) — tsconfig.json이 있고 typescript 패키지가 deps/devDeps에 있을 때만 실행
+    - name: Type check
+      env:
+        PACKAGE_MANAGER: ${{ steps.detect.outputs.packageManager }}
+      run: |
+        if [ ! -f tsconfig.json ]; then
+          echo "tsconfig.json 없음 — 타입 검사 스���"
+          exit 0
+        fi
+        if [ ! -f package.json ]; then
+          echo "package.json 없음 — typescript 설치 여부 확인 불가, tsc 스킵"
+          exit 0
+        fi
+        # package.json의 dependencies/devDependencies에 typescript가 있는지 확인
+        node -e "if (!(require('./package.json').devDependencies?.typescript || require('./package.json').dependencies?.typescript)) process.exit(1)"
+        if [ $? -ne 0 ]; then
+          echo "typescript 패키지가 dependencies/devDependencies에 없음 — tsc 스킵 (원하면 npx로 실행 가능)"
+          exit 0
+        fi
+        echo "tsconfig.json 및 typescript 확인됨 — tsc 실행"
+        npx tsc --noEmit
+
+    # 7) 테스트 실행 — package.json에 test 스크립트가 정의되어 있을 때만 실행
+    - name: Run tests
+      env:
+        PACKAGE_MANAGER: ${{ steps.detect.outputs.packageManager }}
+      run: |
+        if [ ! -f package.json ]; then
+          echo "package.json 없음 — 테스트 스킵"
+          exit 0
+        fi
+        HAS_TEST=$(node -e "process.stdout.write(String(Boolean(require('./package.json').scripts && require('./package.json').scripts.test)))")
+        if [ "$HAS_TEST" = "true" ]; then
+          echo "test 스크립트 발견 — 실행"
+          if [ "$PACKAGE_MANAGER" = "yarn" ]; then
+            yarn test
+          else
+            npm run test
+          fi
+        else
+          echo "test 스크립트 미정의 — 테스트 스킵"
+        fi
+
+    # 8) 빌드 테스트 — package.json에 build 스크립트가 정의되어 있을 때만 실행
+    - name: Build test
+      env:
+        PACKAGE_MANAGER: ${{ steps.detect.outputs.packageManager }}
+      run: |
+        if [ ! -f package.json ]; then
+          echo "package.json 없음 — 빌드 스킵"
+          exit 0
+        fi
+        HAS_BUILD=$(node -e "process.stdout.write(String(Boolean(require('./package.json').scripts && require('./package.json').scripts.build)))")
+        if [ "$HAS_BUILD" = "true" ]; then
+          echo "build 스크립트 발견 — 실행"
+          if [ "$PACKAGE_MANAGER" = "yarn" ]; then
+            yarn build
+          else
+            npm run build
+          fi
+        else
+          echo "build 스크립트 미정의 — 빌드 스킵"
+        fi
