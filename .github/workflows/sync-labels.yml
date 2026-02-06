@@ -1,4 +1,7 @@
 name: Sync labels from labels.yml
+permissions:
+  contents: read
+  issues: write
 on:
   push:
     paths:
