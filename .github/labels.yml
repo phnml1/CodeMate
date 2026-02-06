@@ -1,7 +1,7 @@
 labels:
   - name: "feature"
     color: "0066ff"
-    description: "Feature or enhancement"
+    description: "Feature or enhancement."
   - name: "bug"
     color: "d73a4a"
     description: "Bug report"
