@@ -28,5 +28,5 @@ export interface Review {
   qualityScore: number;
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   issueCount: number;
-  aiSuggestions: any;
+  aiSuggestions: Record<string, unknown>;
 }
