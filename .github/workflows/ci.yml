@@ -94,6 +94,16 @@ jobs:
           echo "lint 스크립트 미정의 — lint 스킵"
         fi
 
+    # 5.5) Prisma Client 생성 — schema가 있으면 prisma generate 실행
+    - name: Generate Prisma Client
+      run: |
+        if [ -f prisma/schema.prisma ]; then
+          echo "Prisma 스키마 발견 — prisma generate 실행"
+          npx prisma generate
+        else
+          echo "Prisma 스키마 없음 — 스킵"
+        fi
+
     # 6) 타입 검사 (TypeScript 관련) — tsconfig.json이 있고 typescript 패키지가 deps/devDeps에 있을 때만 실행
     - name: Type check
       env:
