@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.73.0",
     "@auth/prisma-adapter": "^2.11.1",
     "@octokit/rest": "^22.0.1",
+    "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
