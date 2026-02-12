@@ -4,7 +4,7 @@ import { LoginCard } from "@/components/auth/LoginCard"
 import { BackToHomeButton } from "@/components/auth/LoginFooter"
 
 export default async function LoginPage() {
-  const session = await auth()
+  const session = await auth();
   // 이미 로그인되어 있으면 대시보드로
   if (session) {
     redirect("/dashboard")
