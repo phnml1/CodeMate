@@ -1001,49 +1001,6 @@ jobs:
           vercel-project-id: ${{ secrets.PROJECT_ID }}
 ```
 
----
-
-## 🐛 트러블슈팅
-
-### 자주 발생하는 문제
-
-#### 1. Prisma 연결 오류
-```
-Error: Can't reach database server
-```
-
-**해결:**
-```bash
-# DATABASE_URL 확인
-echo $DATABASE_URL
-
-# Prisma 재생성
-npx prisma generate
-npx prisma migrate reset
-```
-
-#### 2. GitHub Webhook 안 들어옴
-- Webhook URL 확인 (ngrok 사용 시)
-- Webhook Secret 일치 확인
-- GitHub에서 Recent Deliveries 확인
-
-#### 3. WebSocket 연결 안됨
-- CORS 설정 확인
-- Vercel에서는 WebSocket 제한 (별도 서버 필요)
-- 로컬에서는 Custom Server 사용
-
-#### 4. AI API 에러
-```
-Error: 429 Too Many Requests
-```
-
-**해결:**
-- Rate limiting 구현
-- 요청 큐잉
-- 캐싱 추가
-
----
-
 ## 📚 참고 자료
 
 ### 공식 문서
@@ -1058,26 +1015,6 @@ Error: 429 Too Many Requests
 - [shadcn/ui Components](https://ui.shadcn.com/)
 - [Tailwind CSS](https://tailwindcss.com/docs)
 
----
-
-## 📝 개발 일지
-
-### 개발 진행 상황 기록
-
-| 날짜 | 작업 내용 | 시간 | 상태 | 메모 |
-|------|----------|------|------|------|
-| 2025-01-29 | 프로젝트 셋업 | 2h | ✅ | Next.js 프로젝트 생성 |
-|  |  |  |  |  |
-|  |  |  |  |  |
-
-### 이슈 & 해결
-
-| 이슈 | 해결 방법 | 참고 링크 |
-|------|----------|----------|
-| Prisma migration 실패 | DATABASE_URL 수정 | [링크] |
-|  |  |  |
-
----
 
 ## 🎯 다음 단계
 
@@ -1117,9 +1054,9 @@ MIT License
 
 ## 📧 연락처
 
-프로젝트 관련 문의: [이메일 주소]
+프로젝트 관련 문의: [juyung0903@naver.com]
 
-GitHub: [@yourusername](https://github.com/yourusername)
+GitHub: [@phnml1](https://github.com/phnml1)
 
 ---
 
