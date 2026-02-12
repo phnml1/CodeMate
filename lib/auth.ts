@@ -17,12 +17,26 @@ export const authConfig = {
       },
     }),
   ],
+  events: {
+    async linkAccount({ user, account, profile }) {
+      // GitHub OAuth 연결 시 githubId, email, githubToken 저장
+      if (account.provider === 'github') {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            githubId: Number(profile.id),
+            githubToken: account.access_token,
+            email: profile.email as string | undefined,
+          },
+        })
+      }
+    },
+  },
   callbacks: {
     async session({ session, user }) {
       if (session.user) {
         session.user.id = user.id
 
-        // GitHub 정보 추가
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
           select: { githubId: true },
