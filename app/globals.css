@@ -122,4 +122,11 @@
   body {
     @apply bg-background text-foreground;
   }
+  button,
+  a,
+  [role="button"],
+  select,
+  summary {
+    @apply cursor-pointer;
+  }
 }

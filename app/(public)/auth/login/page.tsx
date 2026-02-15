@@ -1,5 +1,5 @@
 import { LoginCard } from "@/components/auth/LoginCard"
-import { BackToHomeButton } from "@/components/auth/LoginFooter"
+import { BackToHomeButton } from "@/components/auth/BackToHomeButton"
 
 export default function LoginPage() {
   return (
