@@ -1,6 +1,6 @@
 "use client"
 
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
 
 const data = [
   { name: "HIGH", value: 15, color: "#ef4444" },
@@ -14,7 +14,7 @@ export default function IssueDistributionChart() {
   return (
     <div className="flex flex-col items-center gap-6">
       <div className="relative w-55 h-55 sm:w-65 sm:h-65">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minHeight={200} minWidth={200}>
           <PieChart>
             <Pie
               data={data}
@@ -31,6 +31,21 @@ export default function IssueDistributionChart() {
                 <Cell key={entry.name} fill={entry.color} />
               ))}
             </Pie>
+            <Tooltip
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null
+                const { name, value, color } = payload[0].payload
+                return (
+                  <div className="rounded-lg border bg-white px-3 py-2 shadow-md">
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+                      <span className="text-sm font-semibold text-slate-700">{name}</span>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">{value}% ({Math.round(total * value / 100)}건)</p>
+                  </div>
+                )
+              }}
+            />
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
