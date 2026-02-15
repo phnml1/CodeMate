@@ -1,13 +1,12 @@
 "use client"
 
-import { LogOut } from "lucide-react"
-
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { LogoutButton } from "./LogoutButton"
 
 export function SidebarUser() {
   return (
@@ -22,10 +21,7 @@ export function SidebarUser() {
           </Avatar>
           <div className="flex flex-col gap-0.5 leading-none">
             <span className="text-sm font-semibold">홍길동</span>
-            <span className="flex items-center gap-1 text-xs text-sidebar-foreground/60">
-              <LogOut className="size-3" />
-              로그아웃
-            </span>
+            <LogoutButton />
           </div>
         </SidebarMenuButton>
       </SidebarMenuItem>
