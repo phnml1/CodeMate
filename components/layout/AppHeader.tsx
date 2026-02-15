@@ -8,8 +8,7 @@ export default function AppHeader() {
         <SidebarTrigger className="p-2 hover:bg-slate-100 rounded-lg transition-colors" />
         <div className="flex items-center gap-2 text-sm">
           <span className="text-slate-900 font-bold">대시보드</span>
-          <span className="text-slate-400 hidden sm:inline">›</span>
-          <span className="text-slate-600 hidden sm:inline">myproject/awesome-app</span>
+          
         </div>
       </div>
       <div className="flex items-center gap-2 md:gap-4">
