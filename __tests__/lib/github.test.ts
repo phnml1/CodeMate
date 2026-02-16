@@ -22,8 +22,8 @@ jest.mock("@/lib/auth", () => ({
 }))
 
 const mockedOctokit = jest.mocked(Octokit)
-const mockedFindUnique = jest.mocked(prisma.user.findUnique)
-const mockedAuth = jest.mocked(auth)
+const mockedFindUnique = prisma.user.findUnique as jest.Mock
+const mockedAuth = auth as jest.Mock
 
 describe("getOctokit", () => {
   afterEach(() => {
