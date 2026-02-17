@@ -2,7 +2,10 @@ import { DELETE } from "@/app/api/repositories/[id]/route"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-jest.mock("@/lib/auth", () => ({ auth: jest.fn() }) as jest.Mock)
+jest.mock("@/lib/auth", () => ({
+  auth: jest.fn(),
+}))
+
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     repository: {
@@ -10,7 +13,7 @@ jest.mock("@/lib/prisma", () => ({
       delete: jest.fn(),
     },
   },
-}) as jest.Mock)
+}))
 
 const mockedAuth = auth as jest.Mock
 const mockedFindUnique = prisma.repository.findUnique as jest.Mock

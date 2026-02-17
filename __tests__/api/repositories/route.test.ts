@@ -2,7 +2,10 @@ import { POST } from "@/app/api/repositories/route"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-jest.mock("@/lib/auth", () => ({ auth: jest.fn() }) as jest.Mock)
+jest.mock("@/lib/auth", () => ({
+  auth: jest.fn(),
+}))
+
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     repository: {
@@ -10,7 +13,7 @@ jest.mock("@/lib/prisma", () => ({
       create: jest.fn(),
     },
   },
-}) as jest.Mock)
+}))
 
 const mockedAuth = auth as jest.Mock
 const mockedFindFirst = prisma.repository.findFirst as jest.Mock
