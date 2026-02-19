@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth"
+import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 
@@ -78,6 +79,20 @@ export async function DELETE(
         { error: "해당 Repository에 대한 권한이 없습니다" },
         { status: 403 }
       )
+    }
+
+    if (repository.webhookId) {
+      try {
+        const [owner, repo] = repository.fullName.split("/")
+        const octokit = await getOctokit(session.user.id)
+        await octokit.rest.repos.deleteWebhook({
+          owner,
+          repo,
+          hook_id: repository.webhookId,
+        })
+      } catch {
+        // Webhook 삭제 실패해도 DB 삭제는 계속 진행
+      }
     }
 
     await prisma.repository.delete({ where: { id } })

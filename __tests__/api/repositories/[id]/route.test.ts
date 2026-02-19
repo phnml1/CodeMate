@@ -6,6 +6,10 @@ jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
 }))
 
+jest.mock("@/lib/github", () => ({
+  getOctokit: jest.fn(),
+}))
+
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     repository: {
