@@ -22,11 +22,11 @@ import {
 
 const navItems = [
   { label: "대시보드", icon: LayoutDashboard, href: "/dashboard" },
-  { label: "저장소", icon: FolderGit2, href: "/dashboard/repositories" },
-  { label: "Pull Requests", icon: GitPullRequest, href: "/dashboard/pulls" },
-  { label: "댓글", icon: MessageSquare, href: "/dashboard/comments" },
-  { label: "통계", icon: BarChart3, href: "/dashboard/stats" },
-  { label: "설정", icon: Settings, href: "/dashboard/settings" },
+  { label: "저장소", icon: FolderGit2, href: "/repositories" },
+  { label: "Pull Requests", icon: GitPullRequest, href: "/pulls" },
+  { label: "댓글", icon: MessageSquare, href: "/comments" },
+  { label: "통계", icon: BarChart3, href: "/stats" },
+  { label: "설정", icon: Settings, href: "/settings" },
 ]
 
 export function SidebarNav() {
