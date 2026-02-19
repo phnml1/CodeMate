@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth"
+import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 
@@ -110,6 +111,29 @@ export async function POST(request: Request) {
         userId: session.user.id,
       },
     })
+
+    try {
+      const [owner, repo] = fullName.split("/")
+      const octokit = await getOctokit(session.user.id)
+      const { data: hook } = await octokit.rest.repos.createWebhook({
+        owner,
+        repo,
+        config: {
+          url: `${process.env.NEXTAUTH_URL}/api/webhook/github`,
+          content_type: "json",
+          secret: process.env.GITHUB_WEBHOOK_SECRET,
+        },
+        events: ["pull_request"],
+        active: true,
+      })
+      await prisma.repository.update({
+        where: { id: repository.id },
+        data: { webhookId: hook.id },
+      })
+      repository.webhookId = hook.id
+    } catch {
+      // Webhook 생성 실패해도 repository 연동은 유지
+    }
 
     return NextResponse.json({ repository }, { status: 201 })
   } catch {
