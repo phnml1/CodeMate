@@ -2,14 +2,14 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 
-const protectedPaths = ['/dashboard']
+const publicPaths = ['/auth', '/api-docs']
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const session = await auth()
   const isLoggedIn = !!session
 
-  const isProtected = protectedPaths.some((path) => pathname.startsWith(path))
+  const isProtected = !publicPaths.some((path) => pathname.startsWith(path))
 
   // 미인증 사용자가 보호 페이지 접근 → 로그인으로 리다이렉트
   if (isProtected && !isLoggedIn) {
