@@ -1,4 +1,6 @@
 import { ArrowUp, ArrowDown, Minus } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { textStyles } from "@/lib/styles"
 import {
   Table,
   TableBody,
@@ -45,19 +47,19 @@ export default function RecentPRTable() {
     <Table>
       <TableHeader>
         <TableRow className="bg-slate-50 border-b border-slate-200 hover:bg-slate-50">
-          <TableHead className="px-4 sm:px-6 md:px-8 py-3 sm:py-4 text-xs font-bold text-slate-700 uppercase tracking-wider">
+          <TableHead className={cn(textStyles.tableHeader, "px-4 sm:px-6 md:px-8 py-3 sm:py-4")}>
             PR 번호
           </TableHead>
-          <TableHead className="px-4 sm:px-6 md:px-8 py-3 sm:py-4 text-xs font-bold text-slate-700 uppercase tracking-wider">
+          <TableHead className={cn(textStyles.tableHeader, "px-4 sm:px-6 md:px-8 py-3 sm:py-4")}>
             제목
           </TableHead>
-          <TableHead className="px-4 sm:px-6 md:px-8 py-3 sm:py-4 text-xs font-bold text-slate-700 uppercase tracking-wider hidden md:table-cell">
+          <TableHead className={cn(textStyles.tableHeader, "px-4 sm:px-6 md:px-8 py-3 sm:py-4 hidden md:table-cell")}>
             작성자
           </TableHead>
-          <TableHead className="px-4 sm:px-6 md:px-8 py-3 sm:py-4 text-xs font-bold text-slate-700 uppercase tracking-wider">
+          <TableHead className={cn(textStyles.tableHeader, "px-4 sm:px-6 md:px-8 py-3 sm:py-4")}>
             점수
           </TableHead>
-          <TableHead className="px-4 sm:px-6 md:px-8 py-3 sm:py-4 text-xs font-bold text-slate-700 uppercase tracking-wider hidden sm:table-cell">
+          <TableHead className={cn(textStyles.tableHeader, "px-4 sm:px-6 md:px-8 py-3 sm:py-4 hidden sm:table-cell")}>
             상태
           </TableHead>
         </TableRow>
