@@ -12,6 +12,14 @@ export const PR_STATUS_TABS: PRFilterTab[] = [
   "Draft",
 ];
 
+/** UI 필터 탭 → API status 변환 (All은 undefined → 필터 없음) */
+export const FILTER_TAB_TO_STATUS: Partial<Record<PRFilterTab, PRStatus>> = {
+  Open: "OPEN",
+  Merged: "MERGED",
+  Closed: "CLOSED",
+  Draft: "DRAFT",
+};
+
 /** PRStatusBadge 스타일 매핑 */
 export const PR_STATUS_CONFIG: Record<
   PRStatus,

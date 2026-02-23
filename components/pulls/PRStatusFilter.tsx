@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Search } from "lucide-react";
 
@@ -9,8 +10,20 @@ import { cn } from "@/lib/utils";
 import { PR_STATUS_TABS, type PRFilterTab } from "@/constants";
 
 export default function PRStatusFilter() {
-  const [active, setActive] = useState<PRFilterTab>("All");
-  const [search, setSearch] = useState("");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const active = (searchParams.get("status") as PRFilterTab) ?? "All";
+  const [search, setSearch] = useState(searchParams.get("search") ?? "");
+
+  const handleTabChange = (tab: PRFilterTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "All") {
+      params.delete("status");
+    } else {
+      params.set("status", tab);
+    }
+    router.push(`?${params.toString()}`);
+  };
 
   return (
     <>
@@ -18,7 +31,7 @@ export default function PRStatusFilter() {
         {PR_STATUS_TABS.map((tab) => (
           <Button
             key={tab}
-            onClick={() => setActive(tab)}
+            onClick={() => handleTabChange(tab)}
             className={cn(
               "flex-1 md:flex-none md:px-6 py-2 rounded-[14px] text-xs sm:text-sm font-bold transition-all whitespace-nowrap",
               active === tab

@@ -26,6 +26,14 @@ export interface PullRequest {
   updatedAt: string;
 }
 
+export interface PullRequestPagination {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface PullRequestListResponse {
   pullRequests: PullRequest[];
+  pagination: PullRequestPagination;
 }
