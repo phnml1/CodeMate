@@ -1,5 +1,6 @@
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import AppHeader from "@/components/layout/AppHeader"
 import { AppSidebar } from "@/components/layout/sidebar/AppSidebar"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
 export default function ProtectedLayout({
   children,
@@ -10,7 +11,10 @@ export default function ProtectedLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        {children}
+        <AppHeader />
+        <main className="flex-1 p-6">
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   )

@@ -16,7 +16,14 @@
       "Bash(npx prisma db push:*)",
       "Bash(npm ls:*)",
       "WebFetch(domain:pris.ly)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git branch:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx jest --verbose)",
+      "Bash(gh issue:*)",
+      "Bash(npx jest:*)",
+      "Bash(git pull:*)"
     ]
   }
 }

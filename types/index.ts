@@ -15,13 +15,7 @@ export interface Repository {
   isActive: boolean;
 }
 
-export interface PullRequest {
-  id: string;
-  number: number;
-  title: string;
-  status: 'OPEN' | 'CLOSED' | 'MERGED';
-  createdAt: Date;
-}
+export type { PRStatus, PullRequestRepo, PullRequest, PullRequestListResponse } from "./pulls";
 
 export interface Review {
   id: string;
