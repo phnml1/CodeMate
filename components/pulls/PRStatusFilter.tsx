@@ -1,23 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { Search } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-type PRStatus = "All" | "Open" | "Merged" | "Closed" | "Draft";
-
-const tabs: PRStatus[] = ["All", "Open", "Merged", "Closed", "Draft"];
+import { PR_STATUS_TABS, type PRFilterTab } from "@/constants";
 
 export default function PRStatusFilter() {
-  const [active, setActive] = useState<PRStatus>("All");
+  const [active, setActive] = useState<PRFilterTab>("All");
   const [search, setSearch] = useState("");
 
   return (
     <>
       <div className="flex items-center p-1 bg-slate-50 rounded-[18px] w-full md:w-auto">
-        {tabs.map((tab) => (
+        {PR_STATUS_TABS.map((tab) => (
           <Button
             key={tab}
             onClick={() => setActive(tab)}
