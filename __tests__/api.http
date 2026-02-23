@@ -31,3 +31,24 @@ Cookie: next-auth.session-token={{SESSION_TOKEN}}
 ### Repository 연동 목록 (repoId 확인용)
 GET http://localhost:3000/api/repositories
 Cookie: next-auth.session-token={{SESSION_TOKEN}}
+
+###
+
+### [Backfill 테스트] 저장소 연동 → 기존 PR 자동 동기화
+# githubId: GitHub 저장소 숫자 ID (github.com/{owner}/{repo} → API로 확인)
+# fullName: "owner/repo" 형식
+POST http://localhost:3000/api/repositories
+Content-Type: application/json
+Cookie: next-auth.session-token={{SESSION_TOKEN}}
+
+{
+  "githubId": {{GITHUB_REPO_ID}},
+  "name": "{{REPO_NAME}}",
+  "fullName": "{{REPO_FULL_NAME}}"
+}
+
+###
+
+### [Backfill 확인] 연동 직후 PR 목록 조회 → 데이터 있으면 backfill 성공
+GET http://localhost:3000/api/pulls
+Cookie: next-auth.session-token={{SESSION_TOKEN}}

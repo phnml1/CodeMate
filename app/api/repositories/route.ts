@@ -112,9 +112,11 @@ export async function POST(request: Request) {
       },
     })
 
+    const [owner, repo] = fullName.split("/")
+    const octokit = await getOctokit(session.user.id)
+
+    // Webhook 등록
     try {
-      const [owner, repo] = fullName.split("/")
-      const octokit = await getOctokit(session.user.id)
       const { data: hook } = await octokit.rest.repos.createWebhook({
         owner,
         repo,
@@ -133,6 +135,47 @@ export async function POST(request: Request) {
       repository.webhookId = hook.id
     } catch {
       // Webhook 생성 실패해도 repository 연동은 유지
+    }
+
+    // 기존 PR Backfill: 연동 시점 이전에 생성된 PR을 DB에 동기화
+    try {
+      const { data: prs } = await octokit.rest.pulls.list({
+        owner,
+        repo,
+        state: "all",
+        per_page: 100,
+        sort: "updated",
+        direction: "desc",
+      })
+
+      if (prs.length > 0) {
+        await prisma.pullRequest.createMany({
+          data: prs.map((pr) => ({
+            githubId: pr.id,
+            number: pr.number,
+            title: pr.title,
+            description: pr.body ?? null,
+            // PR 목록 API는 merged 필드가 없으므로 merged_at으로 판단
+            status: pr.draft
+              ? "DRAFT"
+              : pr.state === "closed"
+                ? pr.merged_at ? "MERGED" : "CLOSED"
+                : "OPEN",
+            baseBranch: pr.base.ref,
+            headBranch: pr.head.ref,
+            // 목록 API는 additions/deletions 미제공 → 0으로 초기화
+            additions: 0,
+            deletions: 0,
+            changedFiles: 0,
+            mergedAt: pr.merged_at ? new Date(pr.merged_at) : null,
+            closedAt: pr.closed_at ? new Date(pr.closed_at) : null,
+            repoId: repository.id,
+          })),
+          skipDuplicates: true,
+        })
+      }
+    } catch {
+      // Backfill 실패해도 repository 연동은 유지
     }
 
     return NextResponse.json({ repository }, { status: 201 })
