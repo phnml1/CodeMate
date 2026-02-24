@@ -12,7 +12,7 @@ export default function ProtectedLayout({
       <AppSidebar />
       <SidebarInset>
         <AppHeader />
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4 md:p-8 lg:p-10">
           {children}
         </main>
       </SidebarInset>
