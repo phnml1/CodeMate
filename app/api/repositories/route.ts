@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     }
 
     const existing = await prisma.repository.findFirst({
-      where: { githubId, userId: session.user.id },
+      where: { githubId: BigInt(githubId), userId: session.user.id },
     })
 
     if (existing) {
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
 
     const repository = await prisma.repository.create({
       data: {
-        githubId,
+        githubId: BigInt(githubId),
         name,
         fullName,
         description: description ?? null,
@@ -133,8 +133,8 @@ export async function POST(request: Request) {
         data: { webhookId: hook.id },
       })
       repository.webhookId = hook.id
-    } catch {
-      // Webhook 생성 실패해도 repository 연동은 유지
+    } catch (err) {
+      console.warn("[Webhook] 등록 실패 (로컬 환경에서는 정상):", err)
     }
 
     // 기존 PR Backfill: 연동 시점 이전에 생성된 PR을 DB에 동기화
@@ -149,10 +149,12 @@ export async function POST(request: Request) {
         direction: "desc",
       })
 
+      console.log(`[Backfill] ${fullName}: GitHub에서 PR ${prs.length}개 조회됨`)
+
       if (prs.length > 0) {
-        await prisma.pullRequest.createMany({
+        const result = await prisma.pullRequest.createMany({
           data: prs.map((pr) => ({
-            githubId: pr.id,
+            githubId: BigInt(pr.id),
             number: pr.number,
             title: pr.title,
             description: pr.body ?? null,
@@ -174,9 +176,10 @@ export async function POST(request: Request) {
           })),
           skipDuplicates: true,
         })
+        console.log(`[Backfill] DB에 PR ${result.count}개 저장됨`)
       }
-    } catch {
-      // Backfill 실패해도 repository 연동은 유지
+    } catch (err) {
+      console.error("[Backfill] PR 동기화 실패:", err)
     }
 
     return NextResponse.json({ repository }, { status: 201 })

@@ -129,7 +129,10 @@ export async function GET(request: Request) {
     ])
 
     return NextResponse.json({
-      pullRequests,
+      pullRequests: pullRequests.map(({ githubId, ...pr }) => ({
+        ...pr,
+        githubId: Number(githubId),
+      })),
       pagination: {
         total,
         page,

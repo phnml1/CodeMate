@@ -82,8 +82,8 @@ export async function GET(req: NextRequest) {
       name: repo.name,
       fullName: repo.full_name,
       language: repo.language,
-      isConnected: connectedMap.has(repo.id),
-      repositoryId: connectedMap.get(repo.id),
+      isConnected: connectedMap.has(BigInt(repo.id)),
+      repositoryId: connectedMap.get(BigInt(repo.id)),
     }))
 
     return NextResponse.json({
