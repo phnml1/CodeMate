@@ -51,7 +51,7 @@ export const authConfig = {
         })
 
         if (dbUser) {
-          session.user.githubId = dbUser.githubId
+          session.user.githubId = dbUser.githubId !== null ? Number(dbUser.githubId) : null
         }
       }
       return session
