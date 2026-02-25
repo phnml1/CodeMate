@@ -18,14 +18,22 @@ export const authConfig = {
     }),
   ],
   events: {
+    async signIn({ user, account }) {
+      // 매 로그인마다 최신 access_token으로 갱신
+      if (account?.provider === 'github' && account.access_token) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { githubToken: account.access_token },
+        })
+      }
+    },
     async linkAccount({ user, account, profile }) {
-      // GitHub OAuth 연결 시 githubId, email, githubToken 저장
+      // 최초 연동 시 githubId, email 초기 세팅
       if (account.provider === 'github') {
         await prisma.user.update({
           where: { id: user.id },
           data: {
             githubId: Number(profile.id),
-            githubToken: account.access_token,
             email: profile.email as string | undefined,
           },
         })
