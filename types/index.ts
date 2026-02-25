@@ -16,6 +16,7 @@ export interface Repository {
 }
 
 export type { PRStatus, PullRequestRepo, PullRequest, PullRequestListResponse } from "./pulls";
+export type { GitHubRepo, RepoPagination, RepoListResponse } from "./repos";
 
 export interface Review {
   id: string;
