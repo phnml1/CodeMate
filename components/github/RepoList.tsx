@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useRef } from "react"
-
 import { useRepositories } from "@/hooks/useRepositories"
 import RepoCard from "@/components/github/RepoCard"
 import RepoCardSkeleton from "@/components/github/RepoCardSkeleton"
+import RepoListHeader from "@/components/github/RepoListHeader"
+import { InfiniteScrollTrigger } from "@/components/ui/InfiniteScrollTrigger"
 
 interface RepoListProps {
   search?: string
@@ -19,25 +19,6 @@ export default function RepoList({ search = "" }: RepoListProps) {
     isLoading,
     isError,
   } = useRepositories()
-
-  const sentinelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const sentinel = sentinelRef.current
-    if (!sentinel) return
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage()
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage])
 
   if (isLoading) {
     return (
@@ -72,12 +53,7 @@ export default function RepoList({ search = "" }: RepoListProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between px-2">
-        <h2 className="text-lg font-bold text-slate-900">저장소 목록</h2>
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-          {filtered.length} Repositories Found
-        </span>
-      </div>
+      <RepoListHeader count={filtered.length} />
       <div className="space-y-4">
         {filtered.map((repo) => (
           <RepoCard
@@ -93,15 +69,17 @@ export default function RepoList({ search = "" }: RepoListProps) {
         ))}
       </div>
 
-      {/* 무한스크롤 감지 센티넬 */}
-      <div ref={sentinelRef} className="h-1" />
-
-      {isFetchingNextPage && (
-        <div className="space-y-4">
-          <RepoCardSkeleton />
-          <RepoCardSkeleton />
-        </div>
-      )}
+      <InfiniteScrollTrigger
+        onLoadMore={fetchNextPage}
+        hasNextPage={hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        loadingFallback={
+          <div className="space-y-4">
+            <RepoCardSkeleton />
+            <RepoCardSkeleton />
+          </div>
+        }
+      />
     </div>
   )
 }
