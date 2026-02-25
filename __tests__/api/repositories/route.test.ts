@@ -1,5 +1,6 @@
 import { POST } from "@/app/api/repositories/route"
 import { auth } from "@/lib/auth"
+import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
 
 jest.mock("@/lib/auth", () => ({
@@ -15,11 +16,13 @@ jest.mock("@/lib/prisma", () => ({
     repository: {
       findFirst: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
     },
   },
 }))
 
 const mockedAuth = auth as jest.Mock
+const mockedGetOctokit = getOctokit as jest.Mock
 const mockedFindFirst = prisma.repository.findFirst as jest.Mock
 const mockedCreate = prisma.repository.create as jest.Mock
 
@@ -39,10 +42,20 @@ describe("POST /api/repositories", () => {
   it("Repository 연동에 성공하면 201을 반환한다", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
     mockedFindFirst.mockResolvedValue(null)
+    mockedGetOctokit.mockResolvedValue({
+      rest: {
+        repos: {
+          createWebhook: jest.fn().mockResolvedValue({ data: { id: 9999 } }),
+        },
+        pulls: {
+          list: jest.fn().mockResolvedValue({ data: [] }),
+        },
+      },
+    })
 
     const created = {
       id: "repo-1",
-      githubId: 12345,
+      githubId: BigInt(12345),
       name: "my-repo",
       fullName: "user/my-repo",
       description: null,
@@ -74,7 +87,7 @@ describe("POST /api/repositories", () => {
     }))
     expect(mockedCreate).toHaveBeenCalledWith({
       data: {
-        githubId: 12345,
+        githubId: BigInt(12345),
         name: "my-repo",
         fullName: "user/my-repo",
         description: null,
@@ -108,7 +121,7 @@ describe("POST /api/repositories", () => {
 
   it("이미 연동된 Repository는 409를 반환한다", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
-    mockedFindFirst.mockResolvedValue({ id: "existing-repo", githubId: 12345 })
+    mockedFindFirst.mockResolvedValue({ id: "existing-repo", githubId: BigInt(12345) })
 
     const response = await POST(
       createRequest({ githubId: 12345, name: "repo", fullName: "user/repo" })

@@ -19,7 +19,7 @@ model User {
   emailVerified DateTime?
 
   // GitHub 연동
-  githubId      Int?      @unique
+  githubId      BigInt?   @unique
   githubToken   String?   @db.Text
 
   // Relations
@@ -81,7 +81,7 @@ model VerificationToken {
 
 model Repository {
   id           String    @id @default(cuid())
-  githubId     Int       @unique
+  githubId     BigInt    @unique
   name         String
   fullName     String    // "username/repo-name"
   description  String?
@@ -103,7 +103,7 @@ model Repository {
 
 model PullRequest {
   id          String    @id @default(cuid())
-  githubId    Int       @unique
+  githubId    BigInt    @unique
   number      Int
   title       String
   description String?   @db.Text

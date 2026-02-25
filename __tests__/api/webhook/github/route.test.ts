@@ -82,7 +82,7 @@ describe("POST /api/webhook/github", () => {
     expect(body.message).toBe("PR processed")
     expect(mockedUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { githubId: 1001 },
+        where: { githubId: BigInt(1001) },
         create: expect.objectContaining({ number: 42, title: "Fix bug", status: "OPEN" }),
       })
     )

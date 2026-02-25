@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     }
 
     const repository = await prisma.repository.findFirst({
-      where: { githubId: repo.id },
+      where: { githubId: BigInt(repo.id) },
     })
 
     if (!repository) {
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
 
     await prisma.pullRequest.upsert({
-      where: { githubId: pr.id },
+      where: { githubId: BigInt(pr.id) },
       update: {
         title: pr.title,
         description: pr.body ?? null,
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
         closedAt: pr.closed_at ? new Date(pr.closed_at) : null,
       },
       create: {
-        githubId: pr.id,
+        githubId: BigInt(pr.id),
         number: pr.number,
         title: pr.title,
         description: pr.body ?? null,
