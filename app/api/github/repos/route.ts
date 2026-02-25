@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth"
 import { getAuthenticatedOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
 /**
  * @swagger
@@ -11,6 +11,17 @@ import { NextResponse } from "next/server"
  *     description: 인증된 사용자의 GitHub Repository 목록을 반환하며, CodeMate 연동 여부를 포함합니다.
  *     tags:
  *       - GitHub
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: per_page
+ *         schema:
+ *           type: integer
+ *           default: 20
  *     responses:
  *       200:
  *         description: Repository 목록 반환 성공
@@ -23,6 +34,8 @@ import { NextResponse } from "next/server"
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/GitHubRepo'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/RepoPagination'
  *       401:
  *         description: 인증되지 않은 사용자
  *         content:
@@ -36,7 +49,7 @@ import { NextResponse } from "next/server"
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await auth()
 
@@ -44,12 +57,19 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { searchParams } = req.nextUrl
+    const page = Math.max(1, Number(searchParams.get("page") ?? 1))
+    const perPage = Math.min(100, Math.max(1, Number(searchParams.get("per_page") ?? 20)))
+
     const octokit = await getAuthenticatedOctokit()
 
-    const { data } = await octokit.rest.repos.listForAuthenticatedUser({
+    const { data, headers } = await octokit.rest.repos.listForAuthenticatedUser({
       sort: "updated",
-      per_page: 100,
+      per_page: perPage,
+      page,
     })
+
+    const hasNextPage = !!headers.link?.includes('rel="next"')
 
     const connectedRepos = await prisma.repository.findMany({
       where: { userId: session.user.id },
@@ -65,7 +85,10 @@ export async function GET() {
       isConnected: connectedIds.has(repo.id),
     }))
 
-    return NextResponse.json({ repos })
+    return NextResponse.json({
+      repos,
+      pagination: { page, perPage, hasNextPage },
+    })
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },
