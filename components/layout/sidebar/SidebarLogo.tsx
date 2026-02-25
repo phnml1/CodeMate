@@ -20,7 +20,7 @@ export function SidebarLogo() {
             size="lg"
             className="justify-center hover:bg-transparent active:bg-transparent data-[active=true]:bg-transparent group-data-[collapsible=icon]:mx-auto"
           >
-            <div className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/50">
+            <div className="flex size-8 items-center justify-center rounded-xl bg-linear-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/50">
               <span className="text-lg">🤖</span>
             </div>
             <span className="text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden">
