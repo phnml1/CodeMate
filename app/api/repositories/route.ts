@@ -182,7 +182,10 @@ export async function POST(request: Request) {
       console.error("[Backfill] PR 동기화 실패:", err)
     }
 
-    return NextResponse.json({ repository }, { status: 201 })
+    return NextResponse.json(
+      { repository: { ...repository, githubId: Number(repository.githubId) } },
+      { status: 201 }
+    )
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },
