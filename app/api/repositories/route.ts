@@ -113,10 +113,10 @@ export async function POST(request: Request) {
     })
 
     const [owner, repo] = fullName.split("/")
-    const octokit = await getOctokit(session.user.id)
 
     // Webhook 등록
     try {
+      const octokit = await getOctokit(session.user.id)
       const { data: hook } = await octokit.rest.repos.createWebhook({
         owner,
         repo,
@@ -139,6 +139,7 @@ export async function POST(request: Request) {
 
     // 기존 PR Backfill: 연동 시점 이전에 생성된 PR을 DB에 동기화
     try {
+      const octokit = await getOctokit(session.user.id)
       const { data: prs } = await octokit.rest.pulls.list({
         owner,
         repo,
