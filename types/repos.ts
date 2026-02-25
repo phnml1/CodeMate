@@ -4,6 +4,7 @@ export interface GitHubRepo {
   fullName: string;
   language: string | null;
   isConnected: boolean;
+  repositoryId?: string;
 }
 
 export interface RepoPagination {

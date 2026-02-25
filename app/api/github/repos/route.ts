@@ -73,16 +73,17 @@ export async function GET(req: NextRequest) {
 
     const connectedRepos = await prisma.repository.findMany({
       where: { userId: session.user.id },
-      select: { githubId: true },
+      select: { githubId: true, id: true },
     })
-    const connectedIds = new Set(connectedRepos.map((r) => r.githubId))
+    const connectedMap = new Map(connectedRepos.map((r) => [r.githubId, r.id]))
 
     const repos = data.map((repo) => ({
       id: repo.id,
       name: repo.name,
       fullName: repo.full_name,
       language: repo.language,
-      isConnected: connectedIds.has(repo.id),
+      isConnected: connectedMap.has(repo.id),
+      repositoryId: connectedMap.get(repo.id),
     }))
 
     return NextResponse.json({
