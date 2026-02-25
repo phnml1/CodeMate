@@ -1,5 +1,7 @@
 "use client"
 
+import { useConnectRepository } from "@/hooks/useConnectRepository"
+import { useDisconnectRepository } from "@/hooks/useDisconnectRepository"
 import { useRepositories } from "@/hooks/useRepositories"
 import RepoCard from "@/components/github/RepoCard"
 import RepoCardSkeleton from "@/components/github/RepoCardSkeleton"
@@ -19,6 +21,9 @@ export default function RepoList({ search = "" }: RepoListProps) {
     isLoading,
     isError,
   } = useRepositories()
+
+  const { mutate: connect } = useConnectRepository()
+  const { mutate: disconnect } = useDisconnectRepository()
 
   if (isLoading) {
     return (
@@ -63,8 +68,14 @@ export default function RepoList({ search = "" }: RepoListProps) {
             fullName={repo.fullName}
             language={repo.language}
             isConnected={repo.isConnected}
-            onConnect={() => console.log("connect", repo)}
-            onDisconnect={() => console.log("disconnect", repo)}
+            repositoryId={repo.repositoryId}
+            onConnect={() => connect({
+              githubId: repo.id,
+              name: repo.name,
+              fullName: repo.fullName,
+              language: repo.language,
+            })}
+            onDisconnect={() => repo.repositoryId && disconnect(repo.repositoryId)}
           />
         ))}
       </div>
