@@ -33,7 +33,7 @@ export const authConfig = {
         await prisma.user.update({
           where: { id: user.id },
           data: {
-            githubId: Number(profile.id),
+            githubId: BigInt(profile.id as string | number),
             email: profile.email as string | undefined,
           },
         })
