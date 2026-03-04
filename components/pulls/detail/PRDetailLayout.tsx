@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import PRFileList from "./PRFileList";
 import PRDetailHeader from "./PRDetailHeader";
 import PRDiffViewer from "./PRDiffViewer";
 import FileIcon from "./FileIcon";
+import { usePRDetailStore } from "@/stores/prDetailStore";
 import type { PRFile, PullRequest } from "@/types/pulls";
 
 interface PRDetailLayoutProps {
@@ -14,13 +15,20 @@ interface PRDetailLayoutProps {
 }
 
 export default function PRDetailLayout({ pr, files }: PRDetailLayoutProps) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<string | undefined>(files[0]?.filename);
-  const [mobileFileOpen, setMobileFileOpen] = useState(false);
+  const selectedFile = usePRDetailStore((s) => s.selectedFile);
+  const sidebarCollapsed = usePRDetailStore((s) => s.sidebarCollapsed);
+  const mobileFileOpen = usePRDetailStore((s) => s.mobileFileOpen);
+  const selectFile = usePRDetailStore((s) => s.selectFile);
+  const setSidebarCollapsed = usePRDetailStore((s) => s.setSidebarCollapsed);
+  const setMobileFileOpen = usePRDetailStore((s) => s.setMobileFileOpen);
+  const reset = usePRDetailStore((s) => s.reset);
+
+  useEffect(() => {
+    reset(files[0]?.filename);
+  }, [pr.id]);
 
   const handleSelectFile = (filename: string) => {
-    setSelectedFile(filename);
-    setMobileFileOpen(false);
+    selectFile(filename);
     requestAnimationFrame(() => {
       document.getElementById(`diff-${filename}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     });

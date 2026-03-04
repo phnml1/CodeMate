@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { parsePatch } from "@/lib/diff";
 import type { PRFile } from "@/types/pulls";
 import DiffHeader from "./DiffHeader";
 import DiffTable from "./DiffTable";
+import { usePRDetailStore } from "@/stores/prDetailStore";
 
 interface PRDiffViewerProps {
   file: PRFile;
@@ -12,7 +12,8 @@ interface PRDiffViewerProps {
 }
 
 export default function PRDiffViewer({ file, isActive = false }: PRDiffViewerProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const collapsed = usePRDetailStore((s) => s.collapsedDiffs[file.filename] ?? false);
+  const toggleDiff = usePRDetailStore((s) => s.toggleDiff);
   const lines = file.patch ? parsePatch(file.patch) : [];
 
   return (
@@ -27,7 +28,7 @@ export default function PRDiffViewer({ file, isActive = false }: PRDiffViewerPro
       <DiffHeader
         file={file}
         collapsed={collapsed}
-        onToggle={() => setCollapsed(!collapsed)}
+        onToggle={() => toggleDiff(file.filename)}
         isActive={isActive}
       />
       {!collapsed && (
