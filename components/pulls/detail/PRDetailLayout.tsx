@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import PRFileList from "./PRFileList";
 import PRDetailHeader from "./PRDetailHeader";
+import PRDiffViewer from "./PRDiffViewer";
 import type { PRFile, PullRequest } from "@/types/pulls";
 
 interface PRDetailLayoutProps {
@@ -34,6 +35,11 @@ export default function PRDetailLayout({ pr, files }: PRDetailLayoutProps) {
           </button>
         )}
         <PRDetailHeader pr={pr} />
+        <div className="p-4 space-y-4 overflow-y-auto">
+          {files.map((file) => (
+            <PRDiffViewer key={file.filename} file={file} />
+          ))}
+        </div>
       </div>
     </div>
   );
