@@ -6,13 +6,21 @@ interface DiffHeaderProps {
   file: PRFile;
   collapsed: boolean;
   onToggle: () => void;
+  isActive?: boolean;
 }
 
-export default function DiffHeader({ file, collapsed, onToggle }: DiffHeaderProps) {
+export default function DiffHeader({ file, collapsed, onToggle, isActive = false }: DiffHeaderProps) {
   return (
-    <div
-      className="bg-slate-100 dark:bg-slate-800 px-5 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+    <button
+      type="button"
       onClick={onToggle}
+      aria-expanded={!collapsed}
+      aria-controls={`diff-body-${file.filename}`}
+      className={`w-full px-5 py-3 border-b flex items-center justify-between cursor-pointer transition-colors ${
+        isActive
+          ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+          : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700"
+      }`}
     >
       <div className="flex items-center gap-3">
         <span className="text-slate-400">
@@ -20,7 +28,9 @@ export default function DiffHeader({ file, collapsed, onToggle }: DiffHeaderProp
         </span>
         <div className="flex items-center gap-2">
           <FileIcon filename={file.filename} size={16} />
-          <span className="text-sm font-mono font-bold text-slate-800 dark:text-slate-200 break-all">
+          <span className={`text-sm font-mono font-bold break-all ${
+            isActive ? "text-blue-700 dark:text-blue-400" : "text-slate-800 dark:text-slate-200"
+          }`}>
             {file.filename}
           </span>
         </div>
@@ -29,6 +39,6 @@ export default function DiffHeader({ file, collapsed, onToggle }: DiffHeaderProp
         <span className="text-emerald-600">+{file.additions}</span>
         <span className="text-rose-500">-{file.deletions}</span>
       </div>
-    </div>
+    </button>
   );
 }
