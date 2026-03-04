@@ -37,3 +37,25 @@ export interface PullRequestListResponse {
   pullRequests: PullRequest[];
   pagination: PullRequestPagination;
 }
+
+export type PRFileStatus =
+  | "added"
+  | "modified"
+  | "removed"
+  | "renamed"
+  | "copied"
+  | "changed"
+  | "unchanged";
+
+export interface PRFile {
+  filename: string;
+  status: PRFileStatus;
+  additions: number;
+  deletions: number;
+  changes: number;
+  patch: string | null;
+}
+
+export interface PRFilesResponse {
+  files: PRFile[];
+}
