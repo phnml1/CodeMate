@@ -25,10 +25,13 @@ const STATUS_BADGE: Record<PRFileStatus, { label: string; className: string }> =
 
 export default function PRFileList({ files, selectedFile, onSelectFile, collapsed = false, onCollapse }: PRFileListProps) {
   return (
-    <div className={`
+    <nav
+      aria-label="변경된 파일 목록"
+      className={`
         shrink-0  flex-col transition-all duration-300 ease-in-out border-r border-slate-200 dark:border-slate-800 overflow-hidden
         hidden md:flex self-stretch relative
- ${collapsed ? "w-0" : "w-56"}`}>
+ ${collapsed ? "w-0" : "w-72"}`}
+    >
       {/* 헤더 */}
       <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
         <div className="flex items-center justify-between mb-1">
@@ -40,6 +43,7 @@ export default function PRFileList({ files, selectedFile, onSelectFile, collapse
           </div>
           <button
             onClick={() => onCollapse?.(true)}
+            aria-label="파일 목록 닫기"
             className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-400 transition-colors"
           >
             <ChevronLeft size={16} />
@@ -56,6 +60,8 @@ export default function PRFileList({ files, selectedFile, onSelectFile, collapse
             <button
               key={file.filename}
               onClick={() => onSelectFile?.(file.filename)}
+              aria-label={`${file.filename} 파일로 이동`}
+              aria-current={isSelected ? "true" : undefined}
               className={`w-full flex items-center justify-between p-2.5 rounded-xl transition-all text-left group border-l-2 ${
                 isSelected
                   ? "bg-blue-50 dark:bg-blue-900/30 border-blue-500 shadow-sm"
@@ -85,6 +91,6 @@ export default function PRFileList({ files, selectedFile, onSelectFile, collapse
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }

@@ -7,7 +7,7 @@ interface DiffTableProps {
 
 export default function DiffTable({ lines }: DiffTableProps) {
   return (
-    <table className="w-full border-collapse font-mono text-[11px] md:text-xs leading-relaxed table-fixed min-w-full">
+    <table aria-label="파일 변경 내용" className="w-full border-collapse font-mono text-[11px] md:text-xs leading-relaxed table-fixed min-w-full">
       <colgroup>
         <col className="w-10" />
         <col className="w-10" />
