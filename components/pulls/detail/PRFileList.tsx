@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronLeft, FileCode, FileBraces, FileText } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
+import FileIcon from "./FileIcon";
 import type { PRFile, PRFileStatus } from "@/types/pulls";
 
 interface PRFileListProps {
@@ -21,11 +22,6 @@ const STATUS_BADGE: Record<PRFileStatus, { label: string; className: string }> =
   unchanged: { label: "U", className: "bg-slate-100 dark:bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-500/30" },
 };
 
-function FileIcon({ filename }: { filename: string }) {
-  if (filename.endsWith(".json")) return <FileBraces size={14} className="text-amber-500" />;
-  if (/\.(ts|tsx|js|jsx)$/.test(filename)) return <FileCode size={14} className="text-blue-500" />;
-  return <FileText size={14} className="text-slate-400" />;
-}
 
 export default function PRFileList({ files, selectedFile, onSelectFile, collapsed = false, onCollapse }: PRFileListProps) {
   return (
@@ -71,7 +67,7 @@ export default function PRFileList({ files, selectedFile, onSelectFile, collapse
                   {badge.label}
                 </span>
                 <div className="flex items-center gap-2 min-w-0">
-                  <FileIcon filename={file.filename} />
+                  <FileIcon filename={file.filename} size={14} />
                   <span className={`text-xs font-bold truncate ${
                     isSelected
                       ? "text-blue-700 dark:text-blue-400"
