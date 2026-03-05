@@ -1,36 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ChevronLeft, GitBranch, FileText, Clock } from "lucide-react";
-import type { PullRequest, PRStatus } from "@/types/pulls";
+import { ChevronLeft, FileText, Clock } from "lucide-react";
+import { timeAgo } from "@/lib/date";
+import { PR_STATUS_STYLE } from "@/constants/pulls";
+import BranchChip from "./BranchChip";
+import type { PullRequest } from "@/types/pulls";
 
 interface PRDetailHeaderProps {
   pr: PullRequest;
   scrolled?: boolean;
-}
-
-const STATUS_STYLE: Record<PRStatus, string> = {
-  OPEN:   "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
-  MERGED: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20",
-  CLOSED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20",
-  DRAFT:  "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
-};
-
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days === 0) return "today";
-  if (days === 1) return "1 day ago";
-  return `${days} days ago`;
-}
-
-function BranchChip({ name }: { name: string }) {
-  return (
-    <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md font-mono text-[10px] md:text-xs font-bold text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700">
-      <GitBranch size={12} />
-      {name}
-    </div>
-  );
 }
 
 export default function PRDetailHeader({ pr, scrolled = false }: PRDetailHeaderProps) {
@@ -53,7 +32,7 @@ export default function PRDetailHeader({ pr, scrolled = false }: PRDetailHeaderP
             <ChevronLeft size={16} />
           </button>
 
-          <span className={`px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider shrink-0 ${STATUS_STYLE[pr.status]}`}>
+          <span className={`px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider shrink-0 ${PR_STATUS_STYLE[pr.status]}`}>
             {pr.status}
           </span>
 
@@ -99,7 +78,7 @@ export default function PRDetailHeader({ pr, scrolled = false }: PRDetailHeaderP
             </div>
 
             <div className="flex flex-wrap items-center gap-2 md:gap-3 text-sm">
-              <span className={`px-2.5 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${STATUS_STYLE[pr.status]}`}>
+              <span className={`px-2.5 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${PR_STATUS_STYLE[pr.status]}`}>
                 {pr.status}
               </span>
               <div className="flex flex-wrap items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium">

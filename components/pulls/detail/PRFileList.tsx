@@ -2,7 +2,8 @@
 
 import { ChevronLeft } from "lucide-react";
 import FileIcon from "./FileIcon";
-import type { PRFile, PRFileStatus } from "@/types/pulls";
+import { PR_FILE_STATUS_BADGE } from "@/constants/pulls";
+import type { PRFile } from "@/types/pulls";
 
 interface PRFileListProps {
   files: PRFile[];
@@ -11,16 +12,6 @@ interface PRFileListProps {
   collapsed?: boolean;
   onCollapse?: (collapsed: boolean) => void;
 }
-
-const STATUS_BADGE: Record<PRFileStatus, { label: string; className: string }> = {
-  added:     { label: "A", className: "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30" },
-  modified:  { label: "M", className: "bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30" },
-  removed:   { label: "D", className: "bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30" },
-  renamed:   { label: "R", className: "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/30" },
-  copied:    { label: "C", className: "bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-500/30" },
-  changed:   { label: "M", className: "bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30" },
-  unchanged: { label: "U", className: "bg-slate-100 dark:bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-500/30" },
-};
 
 
 export default function PRFileList({ files, selectedFile, onSelectFile, collapsed = false, onCollapse }: PRFileListProps) {
@@ -54,7 +45,7 @@ export default function PRFileList({ files, selectedFile, onSelectFile, collapse
       {/* 파일 목록 */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-slate-50 dark:bg-slate-950">
         {files.map((file) => {
-          const badge = STATUS_BADGE[file.status];
+          const badge = PR_FILE_STATUS_BADGE[file.status];
           const isSelected = file.filename === selectedFile;
           return (
             <button

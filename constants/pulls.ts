@@ -1,4 +1,4 @@
-import type { PRStatus, PullRequest } from "@/types/pulls";
+import type { PRStatus, PRFileStatus, PullRequest } from "@/types/pulls";
 
 /** PRStatusFilter 탭에서 사용하는 UI 전용 필터 타입 */
 export type PRFilterTab = "All" | "Open" | "Merged" | "Closed" | "Draft";
@@ -18,6 +18,25 @@ export const FILTER_TAB_TO_STATUS: Partial<Record<PRFilterTab, PRStatus>> = {
   Merged: "MERGED",
   Closed: "CLOSED",
   Draft: "DRAFT",
+};
+
+/** PRDetailHeader 상태 뱃지 스타일 */
+export const PR_STATUS_STYLE: Record<PRStatus, string> = {
+  OPEN:   "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
+  MERGED: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20",
+  CLOSED: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20",
+  DRAFT:  "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700",
+};
+
+/** PRFileList 파일 상태 뱃지 */
+export const PR_FILE_STATUS_BADGE: Record<PRFileStatus, { label: string; className: string }> = {
+  added:     { label: "A", className: "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30" },
+  modified:  { label: "M", className: "bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30" },
+  removed:   { label: "D", className: "bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30" },
+  renamed:   { label: "R", className: "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/30" },
+  copied:    { label: "C", className: "bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-500/30" },
+  changed:   { label: "M", className: "bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-500/30" },
+  unchanged: { label: "U", className: "bg-slate-100 dark:bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-500/30" },
 };
 
 /** PRStatusBadge 스타일 매핑 */
