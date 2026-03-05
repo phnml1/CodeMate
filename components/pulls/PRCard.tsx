@@ -1,5 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,6 +18,7 @@ interface PRCardProps extends PullRequest {
 }
 
 export default function PRCard({
+  id,
   number,
   title,
   status,
@@ -42,6 +44,7 @@ export default function PRCard({
       )}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
+      <Link href={`/pulls/${id}`} className="absolute inset-0 z-0 rounded-[24px]" aria-label={title} />
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6">
         {/* Left: PR info */}
         <div className="flex-1 min-w-0 space-y-2 sm:space-y-3">
@@ -70,9 +73,10 @@ export default function PRCard({
           <Button
             variant="ghost"
             size="sm"
-            className="px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-50 text-slate-600 rounded-xl text-xs sm:text-sm font-bold hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-100 h-auto whitespace-nowrap"
+            className="relative z-10 px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-50 text-slate-600 rounded-xl text-xs sm:text-sm font-bold hover:bg-blue-50 hover:text-blue-700 border border-transparent hover:border-blue-100 h-auto whitespace-nowrap"
+            asChild
           >
-            리뷰하기
+            <Link href={`/pulls/${id}`}>리뷰하기</Link>
           </Button>
         </div>
       </div>

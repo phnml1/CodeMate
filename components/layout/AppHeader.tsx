@@ -3,7 +3,7 @@ import { Search, Bell } from "lucide-react"
 
 export default function AppHeader() {
   return (
-    <header className="h-16 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between sticky top-0 z-10">
+    <header className="h-16 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between sticky top-0 z-40">
       <div className="flex items-center gap-4">
         <SidebarTrigger className="p-2 hover:bg-slate-100 rounded-lg transition-colors" />
         <div className="flex items-center gap-2 text-sm">
