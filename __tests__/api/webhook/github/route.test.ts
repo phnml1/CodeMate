@@ -11,11 +11,18 @@ jest.mock("@/lib/prisma", () => ({
     pullRequest: {
       upsert: jest.fn(),
     },
+    review: {
+      create: jest.fn(),
+    },
   },
 }))
 
 jest.mock("@/lib/webhook-validator", () => ({
   verifyWebhookSignature: jest.fn(),
+}))
+
+jest.mock("@/lib/ai/analyze", () => ({
+  analyzeReview: jest.fn().mockResolvedValue(undefined),
 }))
 
 const mockedVerify = webhookValidator.verifyWebhookSignature as jest.Mock
@@ -73,7 +80,7 @@ describe("POST /api/webhook/github", () => {
   it("유효한 서명과 PR opened 이벤트를 처리한다", async () => {
     mockedVerify.mockResolvedValue(true)
     mockedFindFirst.mockResolvedValue({ id: "repo-1" })
-    mockedUpsert.mockResolvedValue({})
+    mockedUpsert.mockResolvedValue({ id: "pr-1" })
 
     const response = await POST(createRequest(prPayload))
     const body = await response.json()
@@ -84,6 +91,11 @@ describe("POST /api/webhook/github", () => {
       expect.objectContaining({
         where: { githubId: BigInt(1001) },
         create: expect.objectContaining({ number: 42, title: "Fix bug", status: "OPEN" }),
+      })
+    )
+    expect(prisma.review.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ pullRequestId: "pr-1", status: "PENDING" }),
       })
     )
   })
