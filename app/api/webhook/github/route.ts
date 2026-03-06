@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { verifyWebhookSignature } from "@/lib/webhook-validator"
+import { analyzeReview } from "@/lib/ai/analyze"
 import { NextResponse } from "next/server"
 
 function getPRStatus(pr: {
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
       )
     }
 
-    await prisma.pullRequest.upsert({
+    const pullRequest = await prisma.pullRequest.upsert({
       where: { githubId: BigInt(pr.id) },
       update: {
         title: pr.title,
@@ -76,6 +77,23 @@ export async function POST(request: Request) {
         repoId: repository.id,
       },
     })
+
+    // Create PENDING review record and trigger analysis in background
+    await prisma.review.create({
+      data: {
+        pullRequestId: pullRequest.id,
+        status: "PENDING",
+        aiSuggestions: {},
+        qualityScore: 0,
+        severity: "LOW",
+        issueCount: 0,
+      },
+    })
+
+    // Fire-and-forget: respond immediately, analyze in background
+    analyzeReview(pullRequest.id).catch((err) =>
+      console.error("[webhook] analyzeReview failed:", err)
+    )
 
     return NextResponse.json({ message: "PR processed" })
   } catch {
