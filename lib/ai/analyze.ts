@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest"
 import { prisma } from "@/lib/prisma"
-import { anthropic, CLAUDE_MODEL } from "@/lib/ai/claude"
+import { getAnthropicClient, CLAUDE_MODEL } from "@/lib/ai/claude"
 import { SYSTEM_PROMPT, buildUserPrompt } from "@/lib/ai/prompts"
 import { parseAIReviewResponse } from "@/lib/ai/parsers"
 import { calculateScore } from "@/lib/scoring"
@@ -70,7 +70,7 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
       .join("\n\n")
 
     // Call Claude
-    const response = await anthropic.messages.create({
+    const response = await getAnthropicClient().messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
