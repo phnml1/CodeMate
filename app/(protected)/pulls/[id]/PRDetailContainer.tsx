@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { usePRDetail } from "@/hooks/usePRDetail";
 import { usePRFiles } from "@/hooks/usePRFiles";
+import { useReview } from "@/hooks/useReview";
+import { useQueryClient } from "@tanstack/react-query";
 import PRDetailLayout from "@/components/pulls/detail/PRDetailLayout";
 
 interface PRDetailContainerProps {
@@ -11,6 +14,23 @@ interface PRDetailContainerProps {
 export default function PRDetailContainer({ id }: PRDetailContainerProps) {
   const { data: pr, isPending: prPending, isError: prError } = usePRDetail(id);
   const { data: files, isPending: filesPending, isError: filesError } = usePRFiles(id);
+  const { data: review, isPending: reviewPending } = useReview(id);
+  const queryClient = useQueryClient();
+  const [isRequesting, setIsRequesting] = useState(false);
+
+  const handleRequestReview = async () => {
+    setIsRequesting(true);
+    try {
+      await fetch("/api/review/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pullRequestId: id }),
+      });
+      await queryClient.invalidateQueries({ queryKey: ["review", id] });
+    } finally {
+      setIsRequesting(false);
+    }
+  };
 
   if (prPending || filesPending) {
     return (
@@ -37,5 +57,14 @@ export default function PRDetailContainer({ id }: PRDetailContainerProps) {
     );
   }
 
-  return <PRDetailLayout pr={pr} files={files} />;
+  return (
+    <PRDetailLayout
+      pr={pr}
+      files={files}
+      review={review}
+      isReviewPending={reviewPending}
+      onRequestReview={handleRequestReview}
+      isRequesting={isRequesting}
+    />
+  );
 }
