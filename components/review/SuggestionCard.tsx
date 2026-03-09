@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Copy, Check, MapPin } from "lucide-react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import type { ReviewIssue } from "@/types/review";
 import ReviewBadge from "./ReviewBadge";
 
@@ -93,9 +95,14 @@ export default function SuggestionCard({ issue, onIssueClick }: SuggestionCardPr
                   )}
                 </button>
               </div>
-              <pre className="rounded-lg bg-slate-950 dark:bg-black text-slate-100 text-[12px] font-mono p-3 overflow-x-auto leading-relaxed whitespace-pre-wrap">
+              <SyntaxHighlighter
+                language="typescript"
+                style={oneDark}
+                customStyle={{ borderRadius: "0.5rem", fontSize: "12px", margin: 0, padding: "12px" }}
+                wrapLongLines
+              >
                 {issue.exampleCode}
-              </pre>
+              </SyntaxHighlighter>
             </div>
           )}
           {onIssueClick && (
