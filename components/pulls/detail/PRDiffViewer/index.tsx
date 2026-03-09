@@ -2,6 +2,7 @@
 
 import { parsePatch } from "@/lib/diff";
 import type { PRFile } from "@/types/pulls";
+import type { ReviewIssue } from "@/types/review";
 import DiffHeader from "./DiffHeader";
 import DiffTable from "./DiffTable";
 import { usePRDetailStore } from "@/stores/prDetailStore";
@@ -9,9 +10,16 @@ import { usePRDetailStore } from "@/stores/prDetailStore";
 interface PRDiffViewerProps {
   file: PRFile;
   isActive?: boolean;
+  issues?: ReviewIssue[];
+  onIssueClick?: (issue: ReviewIssue) => void;
 }
 
-export default function PRDiffViewer({ file, isActive = false }: PRDiffViewerProps) {
+export default function PRDiffViewer({
+  file,
+  isActive = false,
+  issues = [],
+  onIssueClick,
+}: PRDiffViewerProps) {
   const collapsed = usePRDetailStore((s) => s.collapsedDiffs[file.filename] ?? false);
   const toggleDiff = usePRDetailStore((s) => s.toggleDiff);
   const lines = file.patch ? parsePatch(file.patch) : [];
@@ -38,7 +46,7 @@ export default function PRDiffViewer({ file, isActive = false }: PRDiffViewerPro
               Binary file or no diff available
             </div>
           ) : (
-            <DiffTable lines={lines} />
+            <DiffTable lines={lines} issues={issues} onIssueClick={onIssueClick} />
           )}
         </div>
       )}

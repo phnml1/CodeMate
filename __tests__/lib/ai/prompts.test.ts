@@ -60,18 +60,18 @@ describe("buildUserPrompt", () => {
     expect(prompt).toContain(diff)
   })
 
-  it("description이 null이면 (none)을 표시한다", () => {
+  it("description이 null이면 (없음)을 표시한다", () => {
     const pr: PRMeta = { ...basePR, description: null }
     const prompt = buildUserPrompt(pr, "diff")
 
-    expect(prompt).toContain("(none)")
+    expect(prompt).toContain("(없음)")
   })
 
   it("빈 diff도 정상 처리된다", () => {
     const prompt = buildUserPrompt(basePR, "")
 
-    expect(prompt).toContain("PR Information")
-    expect(prompt).toContain("Code Diff")
+    expect(prompt).toContain("PR 정보")
+    expect(prompt).toContain("코드 변경사항")
   })
 
   it("diff가 길어도 전체 내용이 포함된다", () => {
