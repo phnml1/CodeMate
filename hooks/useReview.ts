@@ -11,5 +11,10 @@ export function useReview(prId: string) {
   return useQuery({
     queryKey: ["review", prId],
     queryFn: () => fetchReview(prId),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === "PENDING" || status === "IN_PROGRESS") return 3000;
+      return false;
+    },
   });
 }
