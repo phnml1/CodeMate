@@ -82,4 +82,16 @@ describe("POST /api/review/analyze", () => {
     expect(res.status).toBe(500)
     expect(body.error).toBe("Internal server error")
   })
+
+  it("ANTHROPIC_API_KEY 미설정으로 분석 실패 시 500을 반환한다", async () => {
+    mockedFindUnique.mockResolvedValue({ id: "pr-1" })
+    mockedReviewCreate.mockResolvedValue({ id: "review-1" })
+    mockedAnalyze.mockRejectedValue(new Error("ANTHROPIC_API_KEY is not set"))
+
+    const res = await POST(makeRequest({ pullRequestId: "pr-1" }))
+    const body = await res.json()
+
+    expect(res.status).toBe(500)
+    expect(body.error).toBe("Internal server error")
+  })
 })
