@@ -19,6 +19,7 @@ interface PRDetailLayoutProps {
   isReviewPending: boolean;
   onRequestReview: () => void;
   isRequesting?: boolean;
+  commentSlot: React.ReactNode;
 }
 
 export default function PRDetailLayout({
@@ -28,6 +29,7 @@ export default function PRDetailLayout({
   isReviewPending,
   onRequestReview,
   isRequesting = false,
+  commentSlot,
 }: PRDetailLayoutProps) {
   const selectedFile = usePRDetailStore((s) => s.selectedFile);
   const sidebarCollapsed = usePRDetailStore((s) => s.sidebarCollapsed);
@@ -206,6 +208,9 @@ export default function PRDetailLayout({
                 onIssueClick={setSelectedIssue}
               />
             ))}
+
+            {/* 댓글 섹션 */}
+            {commentSlot}
           </div>
         </div>
       </div>

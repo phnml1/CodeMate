@@ -23,7 +23,10 @@
       "Bash(npx jest --verbose)",
       "Bash(gh issue:*)",
       "Bash(npx jest:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(gh repo view --json nameWithOwner -q .nameWithOwner)",
+      "Bash(gh label list)",
+      "Bash(gh label create \"backend\" --color \"#0ea5e9\" --description \"Backend/server-side work\")"
     ]
   }
 }
