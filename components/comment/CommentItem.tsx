@@ -7,12 +7,13 @@ import { Pencil, Trash2, CheckCheck, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import ReactionBar from "./ReactionBar"
 import CommentInput from "./CommentInput"
-import type { CommentWithAuthor, ReactionEmoji } from "@/types/comment"
+import type { CommentWithAuthor, ReactionEmoji, MentionUser } from "@/types/comment"
 
 interface CommentItemProps {
   comment: CommentWithAuthor
   currentUserId: string
   isReply?: boolean
+  mentionUsers?: MentionUser[]
   onUpdate: (commentId: string, content: string) => void
   onDelete: (commentId: string) => void
   onReaction: (commentId: string, emoji: ReactionEmoji) => void
