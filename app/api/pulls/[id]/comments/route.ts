@@ -167,12 +167,14 @@ export async function POST(
         for (const userId of uniqueMentions) {
           emitNotification(userId, {
             id: comment.id,
-            userId,
-            type: "mention",
-            prId: id,
+            type: "MENTION",
+            title: "댓글에서 멘션되었습니다",
             message: mentionMessage,
-            createdAt: new Date().toISOString(),
             isRead: false,
+            userId,
+            prId: id,
+            commentId: comment.id,
+            createdAt: new Date().toISOString(),
           })
         }
       }

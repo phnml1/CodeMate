@@ -1,17 +1,25 @@
 "use client"
 
 import { useEffect, useCallback, useMemo } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import { useSocket } from "./useSocket"
-import type { NotificationPayload } from "@/lib/socket/types"
+import type { Notification, NotificationsResponse } from "@/types/notification"
 
 const isSocketMode = process.env.NEXT_PUBLIC_REALTIME_MODE === "socket"
 
-async function fetchNotifications(): Promise<NotificationPayload[]> {
+async function fetchNotifications(): Promise<Notification[]> {
   const res = await fetch("/api/notifications")
   if (!res.ok) return []
-  const data = await res.json()
+  const data: NotificationsResponse = await res.json()
   return data.notifications ?? []
+}
+
+async function markAsReadApi(ids?: string[]): Promise<void> {
+  await fetch("/api/notifications/read", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(ids ? { ids } : {}),
+  })
 }
 
 export function useNotifications() {
@@ -25,8 +33,8 @@ export function useNotifications() {
   })
 
   const handleNew = useCallback(
-    (notification: NotificationPayload) => {
-      queryClient.setQueryData<NotificationPayload[]>(
+    (notification: Notification) => {
+      queryClient.setQueryData<Notification[]>(
         ["notifications"],
         (old) => (old ? [notification, ...old] : [notification])
       )
@@ -48,5 +56,22 @@ export function useNotifications() {
     [notifications]
   )
 
-  return { notifications, unreadCount, isLoading }
+  const { mutate: markAsRead } = useMutation({
+    mutationFn: markAsReadApi,
+    onMutate: async (ids?: string[]) => {
+      await queryClient.cancelQueries({ queryKey: ["notifications"] })
+      queryClient.setQueryData<Notification[]>(
+        ["notifications"],
+        (old) =>
+          old?.map((n) =>
+            !ids || ids.includes(n.id) ? { ...n, isRead: true } : n
+          ) ?? []
+      )
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] })
+    },
+  })
+
+  return { notifications, unreadCount, isLoading, markAsRead }
 }
