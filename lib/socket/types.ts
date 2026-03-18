@@ -1,3 +1,5 @@
+import type { Server, Socket } from "socket.io"
+import type { Socket as ClientSocket } from "socket.io-client"
 import type { CommentWithAuthor } from "@/types/comment"
 
 export interface NotificationPayload {
@@ -6,14 +8,14 @@ export interface NotificationPayload {
   type: "mention" | "reply" | "review"
   prId: string
   message: string
-  createdAt: Date
+  createdAt: string
   isRead: boolean
 }
 
 export interface ServerToClientEvents {
   "comment:new": (comment: CommentWithAuthor) => void
   "comment:updated": (comment: CommentWithAuthor) => void
-  "comment:deleted": (commentId: string) => void
+  "comment:deleted": (data: { commentId: string; prId: string }) => void
   "typing:start": (data: { userId: string; userName: string }) => void
   "typing:stop": (data: { userId: string }) => void
   "notification:new": (notification: NotificationPayload) => void
@@ -31,5 +33,23 @@ export interface InterServerEvents {}
 export interface SocketData {
   userId: string
   userName: string
-  email: string
 }
+
+export type TypedServer = Server<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>
+
+export type TypedServerSocket = Socket<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>
+
+export type TypedClientSocket = ClientSocket<
+  ServerToClientEvents,
+  ClientToServerEvents
+>

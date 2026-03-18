@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
+import { emitCommentNew, emitNotification } from "@/lib/socket/emitter"
 
 /**
  * @swagger
@@ -141,21 +142,39 @@ export async function POST(
       },
     })
 
+    // 소켓 실시간 브로드캐스트
+    emitCommentNew(id, { ...comment, replies: [] })
+
     // 멘션 알림 생성
     if (mentions && mentions.length > 0) {
       const uniqueMentions = [...new Set(mentions)].filter((uid) => uid !== session.user.id)
       if (uniqueMentions.length > 0) {
+        const mentionMessage = `${session.user.name ?? "누군가"}님이 댓글에서 회원님을 멘션했습니다.`
+
         await prisma.notification.createMany({
           data: uniqueMentions.map((userId) => ({
             type: "MENTION" as const,
             title: "댓글에서 멘션되었습니다",
-            message: `${session.user.name ?? "누군가"}님이 댓글에서 회원님을 멘션했습니다.`,
+            message: mentionMessage,
             userId,
             prId: id,
             commentId: comment.id,
           })),
           skipDuplicates: true,
         })
+
+        // 멘션 대상에게 실시간 알림
+        for (const userId of uniqueMentions) {
+          emitNotification(userId, {
+            id: comment.id,
+            userId,
+            type: "mention",
+            prId: id,
+            message: mentionMessage,
+            createdAt: new Date().toISOString(),
+            isRead: false,
+          })
+        }
       }
     }
 

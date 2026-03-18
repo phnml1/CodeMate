@@ -1,57 +1,80 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { io, Socket } from "socket.io-client"
-import type { ClientToServerEvents, ServerToClientEvents } from "@/lib/socket/types"
+import { useEffect, useSyncExternalStore } from "react"
+import { io } from "socket.io-client"
+import type { TypedClientSocket } from "@/lib/socket/types"
 
-let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null
+// ── 외부 스토어 (모든 컴포넌트가 동일한 스냅샷을 구독) ────────────
+let socket: TypedClientSocket | null = null
+let connected = false
+const listeners = new Set<() => void>()
 
+function notify() {
+  listeners.forEach((l) => l())
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+function getSocketSnapshot() {
+  return socket
+}
+
+function getConnectedSnapshot() {
+  return connected
+}
+
+function getServerSnapshot(): null {
+  return null
+}
+
+function getServerConnectedSnapshot(): false {
+  return false as const
+}
+
+function connect() {
+  if (socket) return
+  if (process.env.NEXT_PUBLIC_REALTIME_MODE !== "socket") return
+
+  socket = io({
+    path: "/socket.io",
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: 10,
+  })
+
+  socket.on("connect", () => {
+    connected = true
+    notify()
+  })
+
+  socket.on("disconnect", () => {
+    connected = false
+    notify()
+  })
+
+  notify()
+}
+
+// ── Hook ────────────────────────────────────────────────
 export function useSocket() {
-  const [isConnected, setIsConnected] = useState(false)
-  const socketRef = useRef<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null)
+  useEffect(connect, [])
 
-  useEffect(() => {
-    // 소켓 모드가 아니면 반환
-    if (typeof window === "undefined" || process.env.NEXT_PUBLIC_REALTIME_MODE !== "socket") {
-      return
-    }
+  const s = useSyncExternalStore(
+    subscribe,
+    getSocketSnapshot,
+    getServerSnapshot
+  )
+  const isConnected = useSyncExternalStore(
+    subscribe,
+    getConnectedSnapshot,
+    getServerConnectedSnapshot
+  )
 
-    // 이미 연결됐으면 기존 소켓 사용
-    if (socket && socket.connected) {
-      socketRef.current = socket
-      setIsConnected(true)
-      return
-    }
-
-    // 새 소켓 연결
-    socket = io({
-      path: "/socket.io",
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
-    })
-
-    socket.on("connect", () => {
-      console.log("[Socket] Connected")
-      setIsConnected(true)
-    })
-
-    socket.on("disconnect", () => {
-      console.log("[Socket] Disconnected")
-      setIsConnected(false)
-    })
-
-    socket.on("connect_error", (error) => {
-      console.error("[Socket] Connection error:", error)
-    })
-
-    socketRef.current = socket
-
-    return () => {
-      // cleanup은 하지 않음 (싱글톤 유지)
-    }
-  }, [])
-
-  return socketRef.current
+  return { socket: s, isConnected }
 }

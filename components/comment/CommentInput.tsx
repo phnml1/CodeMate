@@ -8,8 +8,8 @@ import type { MentionUser } from "@/types/comment"
 interface CommentInputProps {
   onSubmit: (content: string, mentions: string[]) => void
   onCancel?: () => void
-  onFocus?: () => void
-  onBlur?: () => void
+  onTyping?: () => void
+  onTypingStop?: () => void
   initialValue?: string
   placeholder?: string
   submitLabel?: string
@@ -31,8 +31,8 @@ function extractMentions(content: string): string[] {
 export default function CommentInput({
   onSubmit,
   onCancel,
-  onFocus,
-  onBlur,
+  onTyping,
+  onTypingStop,
   initialValue = "",
   placeholder = "댓글을 입력하세요... (@로 멘션)",
   submitLabel = "댓글 작성",
@@ -52,6 +52,8 @@ export default function CommentInput({
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value
     setContent(val)
+
+    onTyping?.()
 
     const cursor = e.target.selectionStart ?? 0
     const textBeforeCursor = val.slice(0, cursor)
@@ -104,8 +106,7 @@ export default function CommentInput({
         value={content}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        onFocus={onFocus}
-        onBlur={onBlur}
+        onBlur={onTypingStop}
         placeholder={placeholder}
         rows={3}
         className="resize-none text-sm"

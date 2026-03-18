@@ -1,56 +1,52 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useCallback, useMemo } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useSocket } from "./useSocket"
 import type { NotificationPayload } from "@/lib/socket/types"
+
+const isSocketMode = process.env.NEXT_PUBLIC_REALTIME_MODE === "socket"
 
 async function fetchNotifications(): Promise<NotificationPayload[]> {
   const res = await fetch("/api/notifications")
   if (!res.ok) return []
   const data = await res.json()
-  return data.notifications || []
+  return data.notifications ?? []
 }
 
 export function useNotifications() {
-  const socket = useSocket()
-  const [notifications, setNotifications] = useState<NotificationPayload[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { socket } = useSocket()
+  const queryClient = useQueryClient()
 
-  // 초기 로드
+  const { data: notifications = [], isLoading } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: fetchNotifications,
+    refetchInterval: isSocketMode ? false : 10_000,
+  })
+
+  const handleNew = useCallback(
+    (notification: NotificationPayload) => {
+      queryClient.setQueryData<NotificationPayload[]>(
+        ["notifications"],
+        (old) => (old ? [notification, ...old] : [notification])
+      )
+    },
+    [queryClient]
+  )
+
   useEffect(() => {
-    fetchNotifications()
-      .then(setNotifications)
-      .finally(() => setIsLoading(false))
-  }, [])
+    if (!socket) return
 
-  // 소켓 이벤트 또는 폴링
-  useEffect(() => {
-    if (socket) {
-      // 소켓 모드
-      const handleNewNotification = (notification: NotificationPayload) => {
-        setNotifications((prev) => [notification, ...prev])
-      }
-
-      socket.on("notification:new", handleNewNotification)
-
-      return () => {
-        socket.off("notification:new", handleNewNotification)
-      }
-    } else {
-      // 폴링 모드
-      const interval = setInterval(() => {
-        fetchNotifications().then(setNotifications)
-      }, 10_000)
-
-      return () => clearInterval(interval)
+    socket.on("notification:new", handleNew)
+    return () => {
+      socket.off("notification:new", handleNew)
     }
-  }, [socket])
+  }, [socket, handleNew])
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => !n.isRead).length,
+    [notifications]
+  )
 
-  return {
-    notifications,
-    unreadCount,
-    isLoading,
-  }
+  return { notifications, unreadCount, isLoading }
 }

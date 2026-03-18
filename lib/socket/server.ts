@@ -1,31 +1,17 @@
 import { Server as HTTPServer } from "http"
+import type { TypedServer } from "./types"
 import { Server } from "socket.io"
-import type {
-  ServerToClientEvents,
-  ClientToServerEvents,
-  InterServerEvents,
-  SocketData,
-} from "./types"
 import { setupSocketHandlers } from "./handlers"
 
 declare global {
   // eslint-disable-next-line no-var
-  var __socketServer: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> | undefined
+  var __socketServer: TypedServer | undefined
 }
 
-let io: Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData> | null = null
+export function initSocketServer(httpServer: HTTPServer): TypedServer {
+  if (global.__socketServer) return global.__socketServer
 
-export function initSocketServer(httpServer: HTTPServer) {
-  if (io) {
-    return io
-  }
-
-  if (global.__socketServer) {
-    io = global.__socketServer
-    return io
-  }
-
-  io = new Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>(httpServer, {
+  const io: TypedServer = new Server(httpServer, {
     cors: {
       origin:
         process.env.NODE_ENV === "production"
@@ -36,12 +22,11 @@ export function initSocketServer(httpServer: HTTPServer) {
   })
 
   setupSocketHandlers(io)
-
   global.__socketServer = io
 
   return io
 }
 
-export function getSocketServer() {
-  return io
+export function getSocketServer(): TypedServer | null {
+  return global.__socketServer ?? null
 }
