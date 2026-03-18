@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useState } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { ko } from "date-fns/locale"
@@ -63,10 +64,12 @@ export default function CommentItem({
       {/* 아바타 */}
       <div className="shrink-0">
         {comment.author.image ? (
-          <img
+          <Image
             src={comment.author.image}
             alt={comment.author.name ?? ""}
-            className="w-8 h-8 rounded-full"
+            width={32}
+            height={32}
+            className="rounded-full"
           />
         ) : (
           <div className="w-8 h-8 rounded-full bg-slate-300 dark:bg-slate-600 flex items-center justify-center text-sm font-bold text-slate-600 dark:text-slate-300">

@@ -46,7 +46,7 @@ export default function PRDetailLayout({
 
   useEffect(() => {
     reset(files[0]?.filename);
-  }, [pr.id]);
+  }, [pr.id, files, reset]);
 
   const handleScroll = () => {
     const el = scrollContainerRef.current;

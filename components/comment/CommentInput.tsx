@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -8,6 +9,8 @@ import type { MentionUser } from "@/types/comment"
 interface CommentInputProps {
   onSubmit: (content: string, mentions: string[]) => void
   onCancel?: () => void
+  onTyping?: () => void
+  onTypingStop?: () => void
   initialValue?: string
   placeholder?: string
   submitLabel?: string
@@ -29,6 +32,8 @@ function extractMentions(content: string): string[] {
 export default function CommentInput({
   onSubmit,
   onCancel,
+  onTyping,
+  onTypingStop,
   initialValue = "",
   placeholder = "댓글을 입력하세요... (@로 멘션)",
   submitLabel = "댓글 작성",
@@ -48,6 +53,8 @@ export default function CommentInput({
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value
     setContent(val)
+
+    onTyping?.()
 
     const cursor = e.target.selectionStart ?? 0
     const textBeforeCursor = val.slice(0, cursor)
@@ -100,6 +107,7 @@ export default function CommentInput({
         value={content}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onBlur={onTypingStop}
         placeholder={placeholder}
         rows={3}
         className="resize-none text-sm"
@@ -115,7 +123,7 @@ export default function CommentInput({
               className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
             >
               {user.image ? (
-                <img src={user.image} alt={user.name ?? ""} className="w-6 h-6 rounded-full" />
+                <Image src={user.image} alt={user.name ?? ""} width={24} height={24} className="rounded-full" />
               ) : (
                 <div className="w-6 h-6 rounded-full bg-slate-300 dark:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300">
                   {user.name?.[0]?.toUpperCase() ?? "?"}
