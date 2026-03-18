@@ -11,8 +11,6 @@ interface ReactionBarProps {
 }
 
 export default function ReactionBar({ reactions, currentUserId, onToggle }: ReactionBarProps) {
-  const hasAnyReaction = EMOJIS.some((e) => (reactions[e]?.length ?? 0) > 0)
-
   return (
     <div className="flex items-center gap-1 flex-wrap mt-1">
       {EMOJIS.map((emoji) => {

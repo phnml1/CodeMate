@@ -28,7 +28,7 @@ export interface ClientToServerEvents {
   "typing:stop": (prId: string) => void
 }
 
-export interface InterServerEvents {}
+export type InterServerEvents = Record<string, never>
 
 export interface SocketData {
   userId: string

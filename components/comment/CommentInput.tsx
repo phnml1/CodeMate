@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
@@ -122,7 +123,7 @@ export default function CommentInput({
               className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
             >
               {user.image ? (
-                <img src={user.image} alt={user.name ?? ""} className="w-6 h-6 rounded-full" />
+                <Image src={user.image} alt={user.name ?? ""} width={24} height={24} className="rounded-full" />
               ) : (
                 <div className="w-6 h-6 rounded-full bg-slate-300 dark:bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300">
                   {user.name?.[0]?.toUpperCase() ?? "?"}

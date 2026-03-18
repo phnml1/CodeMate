@@ -4,7 +4,6 @@ import { Server } from "socket.io"
 import { setupSocketHandlers } from "./handlers"
 
 declare global {
-  // eslint-disable-next-line no-var
   var __socketServer: TypedServer | undefined
 }
 
