@@ -1,7 +1,9 @@
 "use client"
 
 import { MessageSquare } from "lucide-react"
-import { useComments, useCreateComment } from "@/hooks/useComments"
+import { useCreateComment } from "@/hooks/useComments"
+import { useRealtimeComments } from "@/hooks/useRealtimeComments"
+import { useTypingIndicator } from "@/hooks/useTypingIndicator"
 import CommentInput from "./CommentInput"
 import CommentThread from "./CommentThread"
 import TypingIndicator from "./TypingIndicator"
@@ -12,8 +14,9 @@ interface CommentListProps {
 }
 
 export default function CommentList({ prId, currentUserId }: CommentListProps) {
-  const { data: comments = [], isLoading } = useComments(prId)
+  const { data: comments = [], isLoading } = useRealtimeComments(prId)
   const createComment = useCreateComment(prId)
+  const { names: typingNames, onTypingStart, onTypingStop } = useTypingIndicator(prId)
 
   const handleCreate = (content: string, mentions: string[]) => {
     createComment.mutate({ content, mentions })
@@ -35,10 +38,12 @@ export default function CommentList({ prId, currentUserId }: CommentListProps) {
         <CommentInput
           onSubmit={handleCreate}
           isLoading={createComment.isPending}
+          onFocus={onTypingStart}
+          onBlur={onTypingStop}
         />
 
-        {/* TypingIndicator (추후 소켓 연동 시 names 전달) */}
-        <TypingIndicator names={[]} />
+        {/* TypingIndicator (소켓 연동) */}
+        <TypingIndicator names={typingNames} />
 
         {isLoading ? (
           <div className="py-8 text-center text-sm text-slate-400">댓글을 불러오는 중...</div>

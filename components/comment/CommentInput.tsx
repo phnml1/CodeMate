@@ -8,6 +8,8 @@ import type { MentionUser } from "@/types/comment"
 interface CommentInputProps {
   onSubmit: (content: string, mentions: string[]) => void
   onCancel?: () => void
+  onFocus?: () => void
+  onBlur?: () => void
   initialValue?: string
   placeholder?: string
   submitLabel?: string
@@ -29,6 +31,8 @@ function extractMentions(content: string): string[] {
 export default function CommentInput({
   onSubmit,
   onCancel,
+  onFocus,
+  onBlur,
   initialValue = "",
   placeholder = "댓글을 입력하세요... (@로 멘션)",
   submitLabel = "댓글 작성",
@@ -100,6 +104,8 @@ export default function CommentInput({
         value={content}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onFocus={onFocus}
+        onBlur={onBlur}
         placeholder={placeholder}
         rows={3}
         className="resize-none text-sm"
