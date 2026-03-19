@@ -1,6 +1,7 @@
 export type NotificationType = "MENTION" | "NEW_REVIEW" | "PR_MERGED" | "COMMENT_REPLY"
 
-export interface Notification {
+/** 소켓/DB에서 사용되는 기본 알림 타입 */
+export interface BaseNotification {
   id: string
   type: NotificationType
   title: string
@@ -12,7 +13,25 @@ export interface Notification {
   createdAt: string
 }
 
+/** API 응답에서 사용되는 확장 알림 타입 (PR 상세 정보 포함) */
+export interface Notification extends BaseNotification {
+  prTitle: string | null
+  prNumber: number | null
+  repoFullName: string | null
+}
+
 export interface NotificationsResponse {
   notifications: Notification[]
   unreadCount: number
+  total: number
 }
+
+export interface NotificationSetting {
+  mentionEnabled: boolean
+  newReviewEnabled: boolean
+  prMergedEnabled: boolean
+  commentReplyEnabled: boolean
+}
+
+export type NotificationFilterType = NotificationType | "ALL"
+export type NotificationFilterRead = "all" | "unread" | "read"

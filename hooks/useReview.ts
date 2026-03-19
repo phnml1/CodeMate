@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useSocket } from "./useSocket"
 import type { Review } from "@/types/review"
-import type { Notification } from "@/types/notification"
+import type { BaseNotification } from "@/types/notification"
 
 async function fetchReview(prId: string): Promise<Review | null> {
   const res = await fetch(`/api/pulls/${prId}/review`)
@@ -20,7 +20,7 @@ export function useReview(prId: string) {
   useEffect(() => {
     if (!socket) return
 
-    const handleNotification = (notification: Notification) => {
+    const handleNotification = (notification: BaseNotification) => {
       if (notification.type === "NEW_REVIEW" && notification.prId === prId) {
         queryClient.invalidateQueries({ queryKey: ["review", prId] })
       }
