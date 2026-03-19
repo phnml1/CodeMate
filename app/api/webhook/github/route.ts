@@ -114,9 +114,24 @@ export async function POST(request: Request) {
     })
 
     // Fire-and-forget: respond immediately, analyze in background
-    analyzeReview(pullRequest.id).catch((err) =>
-      console.error("[webhook] analyzeReview failed:", err)
-    )
+    analyzeReview(pullRequest.id)
+      .then(async () => {
+        const notification = await prisma.notification.create({
+          data: {
+            type: "NEW_REVIEW",
+            title: "AI 코드 리뷰가 완료되었습니다",
+            message: `"${pr.title}" PR의 AI 코드 리뷰가 완료되었습니다.`,
+            userId: repository.userId,
+            prId: pullRequest.id,
+          },
+        })
+        emitNotification(repository.userId, {
+          ...notification,
+          createdAt: notification.createdAt.toISOString(),
+        })
+      })
+      .catch((err) => console.error("[webhook] analyzeReview failed:", err)
+      )
 
     return NextResponse.json({ message: "PR processed" })
   } catch {
