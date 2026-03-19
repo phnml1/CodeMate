@@ -32,6 +32,10 @@ jest.mock("@/lib/socket/emitter", () => ({
   emitNotification: jest.fn(),
 }))
 
+jest.mock("@/lib/notification-settings", () => ({
+  isNotificationEnabled: jest.fn().mockResolvedValue(true),
+}))
+
 const mockedVerify = webhookValidator.verifyWebhookSignature as jest.Mock
 const mockedFindFirst = prisma.repository.findFirst as jest.Mock
 const mockedUpsert = prisma.pullRequest.upsert as jest.Mock

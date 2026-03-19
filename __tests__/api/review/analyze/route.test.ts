@@ -18,6 +18,10 @@ jest.mock("@/lib/socket/emitter", () => ({
   emitNotification: jest.fn(),
 }))
 
+jest.mock("@/lib/notification-settings", () => ({
+  isNotificationEnabled: jest.fn().mockResolvedValue(true),
+}))
+
 const mockedFindUnique = prisma.pullRequest.findUnique as jest.Mock
 const mockedReviewCreate = prisma.review.create as jest.Mock
 const mockedAnalyze = analyzeModule.analyzeReview as jest.Mock
