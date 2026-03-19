@@ -1,5 +1,5 @@
 import type { CommentWithAuthor } from "@/types/comment"
-import type { NotificationPayload } from "./types"
+import type { Notification } from "@/types/notification"
 import { getSocketServer } from "./server"
 
 // Prisma에서 반환된 Date 객체를 JSON 직렬화 (string으로 변환)
@@ -27,7 +27,7 @@ export function emitCommentDeleted(prId: string, commentId: string) {
 
 export function emitNotification(
   userId: string,
-  notification: NotificationPayload
+  notification: Notification
 ) {
   getSocketServer()?.to(`user:${userId}`).emit("notification:new", notification)
 }

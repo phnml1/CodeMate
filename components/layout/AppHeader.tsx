@@ -1,5 +1,6 @@
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Search, Bell } from "lucide-react"
+import { Search } from "lucide-react"
+import NotificationBell from "@/components/notification/NotificationBell"
 
 export default function AppHeader() {
   return (
@@ -8,7 +9,7 @@ export default function AppHeader() {
         <SidebarTrigger className="p-2 hover:bg-slate-100 rounded-lg transition-colors" />
         <div className="flex items-center gap-2 text-sm">
           <span className="text-slate-900 font-bold">대시보드</span>
-          
+
         </div>
       </div>
       <div className="flex items-center gap-2 md:gap-4">
@@ -23,12 +24,7 @@ export default function AppHeader() {
         <button className="md:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors">
           <Search className="w-5 h-5 text-slate-600" />
         </button>
-        <button className="relative p-2 hover:bg-slate-100 rounded-lg transition-colors">
-          <Bell className="w-5 h-5 text-slate-600" />
-          <div className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-sm">
-            <span className="text-white text-[10px] font-bold">3</span>
-          </div>
-        </button>
+        <NotificationBell />
         <div className="w-8 h-8 bg-linear-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center cursor-pointer hover:shadow-lg hover:scale-105 transition-all">
           <span className="text-white text-sm font-bold">홍</span>
         </div>
