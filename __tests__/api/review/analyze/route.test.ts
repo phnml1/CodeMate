@@ -6,6 +6,7 @@ jest.mock("@/lib/prisma", () => ({
   prisma: {
     pullRequest: { findUnique: jest.fn() },
     review: { create: jest.fn(), findUnique: jest.fn() },
+    notification: { create: jest.fn() },
   },
 }))
 
@@ -13,9 +14,12 @@ jest.mock("@/lib/ai/analyze", () => ({
   analyzeReview: jest.fn(),
 }))
 
+jest.mock("@/lib/socket/emitter", () => ({
+  emitNotification: jest.fn(),
+}))
+
 const mockedFindUnique = prisma.pullRequest.findUnique as jest.Mock
 const mockedReviewCreate = prisma.review.create as jest.Mock
-const mockedReviewFindUnique = prisma.review.findUnique as jest.Mock
 const mockedAnalyze = analyzeModule.analyzeReview as jest.Mock
 
 function makeRequest(body: object) {
@@ -26,31 +30,26 @@ function makeRequest(body: object) {
   })
 }
 
-const mockReview = {
-  id: "review-1",
-  pullRequestId: "pr-1",
-  status: "COMPLETED",
-  aiSuggestions: { issues: [], summary: "ok", overallAssessment: "APPROVE" },
-  qualityScore: 100,
-  severity: "LOW",
-  issueCount: 0,
-  reviewedAt: new Date(),
+const mockPR = {
+  id: "pr-1",
+  title: "Fix bug",
+  repo: { userId: "user-1" },
 }
 
 describe("POST /api/review/analyze", () => {
   afterEach(() => jest.clearAllMocks())
 
-  it("유효한 pullRequestId로 리뷰 분석을 실행하고 결과를 반환한다", async () => {
-    mockedFindUnique.mockResolvedValue({ id: "pr-1" })
+  it("유효한 pullRequestId로 리뷰 분석을 백그라운드에서 실행하고 PENDING을 반환한다", async () => {
+    mockedFindUnique.mockResolvedValue(mockPR)
     mockedReviewCreate.mockResolvedValue({ id: "review-1" })
     mockedAnalyze.mockResolvedValue(undefined)
-    mockedReviewFindUnique.mockResolvedValue(mockReview)
 
     const res = await POST(makeRequest({ pullRequestId: "pr-1" }))
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(body.id).toBe("review-1")
+    expect(body.reviewId).toBe("review-1")
+    expect(body.status).toBe("PENDING")
     expect(mockedAnalyze).toHaveBeenCalledWith("pr-1")
   })
 
@@ -75,18 +74,6 @@ describe("POST /api/review/analyze", () => {
 
   it("서버 에러 시 500을 반환한다", async () => {
     mockedFindUnique.mockRejectedValue(new Error("DB error"))
-
-    const res = await POST(makeRequest({ pullRequestId: "pr-1" }))
-    const body = await res.json()
-
-    expect(res.status).toBe(500)
-    expect(body.error).toBe("Internal server error")
-  })
-
-  it("ANTHROPIC_API_KEY 미설정으로 분석 실패 시 500을 반환한다", async () => {
-    mockedFindUnique.mockResolvedValue({ id: "pr-1" })
-    mockedReviewCreate.mockResolvedValue({ id: "review-1" })
-    mockedAnalyze.mockRejectedValue(new Error("ANTHROPIC_API_KEY is not set"))
 
     const res = await POST(makeRequest({ pullRequestId: "pr-1" }))
     const body = await res.json()
