@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { verifyWebhookSignature } from "@/lib/webhook-validator"
 import { analyzeReview } from "@/lib/ai/analyze"
 import { emitNotification } from "@/lib/socket/emitter"
+import { isNotificationEnabled } from "@/lib/notification-settings"
 import { NextResponse } from "next/server"
 
 function getPRStatus(pr: {
@@ -85,19 +86,22 @@ export async function POST(request: Request) {
     if (isStatusChange) {
       const newStatus = getPRStatus({ state: pr.state, draft: pr.draft, merged: pr.merged })
       const isMerged = newStatus === "MERGED"
-      const statusNotification = await prisma.notification.create({
-        data: {
-          type: "PR_MERGED",
-          title: isMerged ? "PR이 병합되었습니다" : "PR이 닫혔습니다",
-          message: `"${pr.title}" PR이 ${isMerged ? "병합" : "닫"}혔습니다.`,
-          userId: repository.userId,
-          prId: pullRequest.id,
-        },
-      })
-      emitNotification(repository.userId, {
-        ...statusNotification,
-        createdAt: statusNotification.createdAt.toISOString(),
-      })
+
+      if (await isNotificationEnabled(repository.userId, "PR_MERGED")) {
+        const statusNotification = await prisma.notification.create({
+          data: {
+            type: "PR_MERGED",
+            title: isMerged ? "PR이 병합되었습니다" : "PR이 닫혔습니다",
+            message: `"${pr.title}" PR이 ${isMerged ? "병합" : "닫"}혔습니다.`,
+            userId: repository.userId,
+            prId: pullRequest.id,
+          },
+        })
+        emitNotification(repository.userId, {
+          ...statusNotification,
+          createdAt: statusNotification.createdAt.toISOString(),
+        })
+      }
       return NextResponse.json({ message: "PR status processed" })
     }
 
@@ -116,6 +120,7 @@ export async function POST(request: Request) {
     // Fire-and-forget: respond immediately, analyze in background
     analyzeReview(pullRequest.id)
       .then(async () => {
+        if (!(await isNotificationEnabled(repository.userId, "NEW_REVIEW"))) return
         const notification = await prisma.notification.create({
           data: {
             type: "NEW_REVIEW",
