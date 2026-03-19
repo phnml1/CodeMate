@@ -1,15 +1,18 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Bell } from "lucide-react"
 import { useNotifications } from "@/hooks/useNotifications"
+import { getNotificationLink } from "@/lib/notification-link"
 import NotificationList from "./NotificationList"
 import type { Notification } from "@/types/notification"
 
 export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const { notifications, unreadCount, markAsRead } = useNotifications()
+  const router = useRouter()
+  const { notifications, unreadCount, markAsRead, deleteNotification } = useNotifications()
 
   // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
@@ -27,10 +30,19 @@ export default function NotificationBell() {
       markAsRead([notification.id])
     }
     setIsOpen(false)
+
+    const link = getNotificationLink(notification)
+    if (link) {
+      router.push(link)
+    }
   }
 
   const handleMarkAllRead = () => {
     markAsRead(undefined)
+  }
+
+  const handleDelete = (id: string) => {
+    deleteNotification(id)
   }
 
   return (
@@ -50,12 +62,24 @@ export default function NotificationBell() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50">
+        <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-lg shadow-lg border border-slate-200 z-50">
           <NotificationList
             notifications={notifications}
             onClickItem={handleClickItem}
             onMarkAllRead={handleMarkAllRead}
+            onDelete={handleDelete}
           />
+          <div className="px-4 py-2 border-t border-slate-100">
+            <button
+              onClick={() => {
+                setIsOpen(false)
+                router.push("/notifications")
+              }}
+              className="w-full text-center text-xs text-blue-500 hover:text-blue-700 transition-colors"
+            >
+              모든 알림 보기
+            </button>
+          </div>
         </div>
       )}
     </div>
