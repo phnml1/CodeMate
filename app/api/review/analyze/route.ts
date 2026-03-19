@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { analyzeReview } from "@/lib/ai/analyze"
 import { emitNotification } from "@/lib/socket/emitter"
+import { isNotificationEnabled } from "@/lib/notification-settings"
 
 export async function POST(request: Request) {
   try {
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
     // Fire-and-forget: respond immediately, notify when done
     analyzeReview(pullRequestId)
       .then(async () => {
+        if (!(await isNotificationEnabled(prOwnerId, "NEW_REVIEW"))) return
         const notification = await prisma.notification.create({
           data: {
             type: "NEW_REVIEW",

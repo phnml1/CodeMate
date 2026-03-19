@@ -1,7 +1,7 @@
 import type { Server, Socket } from "socket.io"
 import type { Socket as ClientSocket } from "socket.io-client"
 import type { CommentWithAuthor } from "@/types/comment"
-import type { Notification } from "@/types/notification"
+import type { BaseNotification } from "@/types/notification"
 
 export interface ServerToClientEvents {
   "comment:new": (comment: CommentWithAuthor) => void
@@ -9,7 +9,7 @@ export interface ServerToClientEvents {
   "comment:deleted": (data: { commentId: string; prId: string }) => void
   "typing:start": (data: { userId: string; userName: string }) => void
   "typing:stop": (data: { userId: string }) => void
-  "notification:new": (notification: Notification) => void
+  "notification:new": (notification: BaseNotification) => void
 }
 
 export interface ClientToServerEvents {

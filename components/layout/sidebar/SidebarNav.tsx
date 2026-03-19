@@ -7,6 +7,7 @@ import {
   FolderGit2,
   GitPullRequest,
   MessageSquare,
+  Bell,
   BarChart3,
   Settings,
 } from "lucide-react"
@@ -25,6 +26,7 @@ const navItems = [
   { label: "저장소", icon: FolderGit2, href: "/repositories" },
   { label: "Pull Requests", icon: GitPullRequest, href: "/pulls" },
   { label: "댓글", icon: MessageSquare, href: "/comments" },
+  { label: "알림", icon: Bell, href: "/notifications" },
   { label: "통계", icon: BarChart3, href: "/stats" },
   { label: "설정", icon: Settings, href: "/settings" },
 ]

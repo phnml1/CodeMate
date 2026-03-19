@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 import { emitCommentNew, emitNotification } from "@/lib/socket/emitter"
+import { isNotificationEnabled } from "@/lib/notification-settings"
 
 /**
  * @swagger
@@ -151,38 +152,47 @@ export async function POST(
       if (uniqueMentions.length > 0) {
         const mentionMessage = `${session.user.name ?? "누군가"}님이 댓글에서 회원님을 멘션했습니다.`
 
-        await prisma.notification.createMany({
-          data: uniqueMentions.map((userId) => ({
-            type: "MENTION" as const,
-            title: "댓글에서 멘션되었습니다",
-            message: mentionMessage,
-            userId,
-            prId: id,
-            commentId: comment.id,
-          })),
-          skipDuplicates: true,
-        })
-
-        // 멘션 대상에게 실시간 알림
+        // 구독 설정 확인 후 알림 생성
+        const enabledMentions: string[] = []
         for (const userId of uniqueMentions) {
-          emitNotification(userId, {
-            id: comment.id,
-            type: "MENTION",
-            title: "댓글에서 멘션되었습니다",
-            message: mentionMessage,
-            isRead: false,
-            userId,
-            prId: id,
-            commentId: comment.id,
-            createdAt: new Date().toISOString(),
+          if (await isNotificationEnabled(userId, "MENTION")) {
+            enabledMentions.push(userId)
+          }
+        }
+
+        if (enabledMentions.length > 0) {
+          await prisma.notification.createMany({
+            data: enabledMentions.map((userId) => ({
+              type: "MENTION" as const,
+              title: "댓글에서 멘션되었습니다",
+              message: mentionMessage,
+              userId,
+              prId: id,
+              commentId: comment.id,
+            })),
+            skipDuplicates: true,
           })
+
+          for (const userId of enabledMentions) {
+            emitNotification(userId, {
+              id: comment.id,
+              type: "MENTION",
+              title: "댓글에서 멘션되었습니다",
+              message: mentionMessage,
+              isRead: false,
+              userId,
+              prId: id,
+              commentId: comment.id,
+              createdAt: new Date().toISOString(),
+            })
+          }
         }
       }
     }
 
     // COMMENT 알림 - 댓글 작성자가 PR 소유자가 아닐 때
     const prOwnerId = pr.repo.userId
-    if (prOwnerId !== session.user.id) {
+    if (prOwnerId !== session.user.id && await isNotificationEnabled(prOwnerId, "COMMENT_REPLY")) {
       const commentNotification = await prisma.notification.create({
         data: {
           type: "COMMENT_REPLY",
