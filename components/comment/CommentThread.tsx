@@ -10,15 +10,16 @@ import {
 } from "@/hooks/useComments"
 import CommentItem from "./CommentItem"
 import CommentInput from "./CommentInput"
-import type { CommentWithAuthor, ReactionEmoji } from "@/types/comment"
+import type { CommentWithAuthor, ReactionEmoji, MentionUser } from "@/types/comment"
 
 interface CommentThreadProps {
   comment: CommentWithAuthor
   prId: string
   currentUserId: string
+  mentionUsers?: MentionUser[]
 }
 
-export default function CommentThread({ comment, prId, currentUserId }: CommentThreadProps) {
+export default function CommentThread({ comment, prId, currentUserId, mentionUsers = [] }: CommentThreadProps) {
   const [replyOpen, setReplyOpen] = useState(false)
   const [repliesCollapsed, setRepliesCollapsed] = useState(false)
 
@@ -54,6 +55,7 @@ export default function CommentThread({ comment, prId, currentUserId }: CommentT
       <CommentItem
         comment={comment}
         currentUserId={currentUserId}
+        mentionUsers={mentionUsers}
         onUpdate={handleUpdate}
         onDelete={handleDelete}
         onReaction={handleReaction}
@@ -97,6 +99,7 @@ export default function CommentThread({ comment, prId, currentUserId }: CommentT
               onSubmit={handleReply}
               onCancel={() => setReplyOpen(false)}
               isLoading={createComment.isPending}
+              mentionUsers={mentionUsers}
             />
           )}
         </div>

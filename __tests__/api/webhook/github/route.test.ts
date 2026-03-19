@@ -14,6 +14,9 @@ jest.mock("@/lib/prisma", () => ({
     review: {
       create: jest.fn(),
     },
+    notification: {
+      create: jest.fn(),
+    },
   },
 }))
 
@@ -23,6 +26,10 @@ jest.mock("@/lib/webhook-validator", () => ({
 
 jest.mock("@/lib/ai/analyze", () => ({
   analyzeReview: jest.fn().mockResolvedValue(undefined),
+}))
+
+jest.mock("@/lib/socket/emitter", () => ({
+  emitNotification: jest.fn(),
 }))
 
 const mockedVerify = webhookValidator.verifyWebhookSignature as jest.Mock
@@ -79,8 +86,9 @@ describe("POST /api/webhook/github", () => {
 
   it("유효한 서명과 PR opened 이벤트를 처리한다", async () => {
     mockedVerify.mockResolvedValue(true)
-    mockedFindFirst.mockResolvedValue({ id: "repo-1" })
+    mockedFindFirst.mockResolvedValue({ id: "repo-1", userId: "user-1" })
     mockedUpsert.mockResolvedValue({ id: "pr-1" })
+    ;(prisma.review.create as jest.Mock).mockResolvedValue({ id: "review-1" })
 
     const response = await POST(createRequest(prPayload))
     const body = await response.json()
@@ -121,17 +129,46 @@ describe("POST /api/webhook/github", () => {
     expect(mockedUpsert).not.toHaveBeenCalled()
   })
 
-  it("opened/synchronize 외 action은 무시한다", async () => {
+  it("opened/synchronize/closed 외 action은 무시한다", async () => {
     mockedVerify.mockResolvedValue(true)
 
     const response = await POST(
-      createRequest({ ...prPayload, action: "closed" })
+      createRequest({ ...prPayload, action: "labeled" })
     )
     const body = await response.json()
 
     expect(response.status).toBe(200)
     expect(body.message).toBe("Action ignored")
     expect(mockedUpsert).not.toHaveBeenCalled()
+  })
+
+  it("closed action은 PR 상태 변경을 처리하고 알림을 생성한다", async () => {
+    mockedVerify.mockResolvedValue(true)
+    mockedFindFirst.mockResolvedValue({ id: "repo-1", userId: "user-1" })
+    mockedUpsert.mockResolvedValue({ id: "pr-1" })
+    ;(prisma.notification.create as jest.Mock).mockResolvedValue({
+      id: "notif-1",
+      type: "PR_MERGED",
+      title: "PR이 닫혔습니다",
+      message: "...",
+      isRead: false,
+      userId: "user-1",
+      prId: "pr-1",
+      commentId: null,
+      createdAt: new Date(),
+    })
+
+    const closedPayload = {
+      ...prPayload,
+      action: "closed",
+      pull_request: { ...prPayload.pull_request, state: "closed", merged: false },
+    }
+
+    const response = await POST(createRequest(closedPayload))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.message).toBe("PR status processed")
   })
 
   it("연동되지 않은 Repository의 이벤트는 404를 반환한다", async () => {
@@ -147,8 +184,9 @@ describe("POST /api/webhook/github", () => {
 
   it("draft PR은 DRAFT 상태로 저장한다", async () => {
     mockedVerify.mockResolvedValue(true)
-    mockedFindFirst.mockResolvedValue({ id: "repo-1" })
+    mockedFindFirst.mockResolvedValue({ id: "repo-1", userId: "user-1" })
     mockedUpsert.mockResolvedValue({})
+    ;(prisma.review.create as jest.Mock).mockResolvedValue({ id: "review-1" })
 
     const draftPayload = {
       ...prPayload,

@@ -22,12 +22,15 @@ export default function PRDetailContainer({ id, commentSlot }: PRDetailContainer
   const handleRequestReview = async () => {
     setIsRequesting(true);
     try {
-      await fetch("/api/review/analyze", {
+      const res = await fetch("/api/review/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pullRequestId: id }),
       });
-      await queryClient.invalidateQueries({ queryKey: ["review", id] });
+      if (res.ok) {
+        // PENDING 상태로 즉시 반영 → polling + 소켓 알림이 완료 시 자동 갱신
+        await queryClient.invalidateQueries({ queryKey: ["review", id] });
+      }
     } finally {
       setIsRequesting(false);
     }

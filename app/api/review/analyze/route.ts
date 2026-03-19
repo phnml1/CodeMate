@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { analyzeReview } from "@/lib/ai/analyze"
+import { emitNotification } from "@/lib/socket/emitter"
 
 export async function POST(request: Request) {
   try {
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
 
     const pr = await prisma.pullRequest.findUnique({
       where: { id: pullRequestId },
+      include: { repo: { select: { userId: true } } },
     })
 
     if (!pr) {
@@ -37,14 +39,28 @@ export async function POST(request: Request) {
       },
     })
 
-    // Run analysis synchronously and return result
-    await analyzeReview(pullRequestId)
+    const prOwnerId = pr.repo.userId
 
-    const completed = await prisma.review.findUnique({
-      where: { id: review.id },
-    })
+    // Fire-and-forget: respond immediately, notify when done
+    analyzeReview(pullRequestId)
+      .then(async () => {
+        const notification = await prisma.notification.create({
+          data: {
+            type: "NEW_REVIEW",
+            title: "AI 코드 리뷰가 완료되었습니다",
+            message: `"${pr.title}" PR의 AI 코드 리뷰가 완료되었습니다.`,
+            userId: prOwnerId,
+            prId: pullRequestId,
+          },
+        })
+        emitNotification(prOwnerId, {
+          ...notification,
+          createdAt: notification.createdAt.toISOString(),
+        })
+      })
+      .catch((err) => console.error("[analyze] analyzeReview failed:", err))
 
-    return NextResponse.json(completed)
+    return NextResponse.json({ reviewId: review.id, status: "PENDING" })
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

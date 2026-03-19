@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { verifyWebhookSignature } from "@/lib/webhook-validator"
 import { analyzeReview } from "@/lib/ai/analyze"
+import { emitNotification } from "@/lib/socket/emitter"
 import { NextResponse } from "next/server"
 
 function getPRStatus(pr: {
@@ -34,12 +35,14 @@ export async function POST(request: Request) {
     const body = JSON.parse(payload)
     const { action, pull_request: pr, repository: repo } = body
 
-    if (action !== "opened" && action !== "synchronize") {
+    const isStatusChange = action === "closed"
+    if (action !== "opened" && action !== "synchronize" && !isStatusChange) {
       return NextResponse.json({ message: "Action ignored" })
     }
 
     const repository = await prisma.repository.findFirst({
       where: { githubId: BigInt(repo.id) },
+      select: { id: true, userId: true },
     })
 
     if (!repository) {
@@ -78,6 +81,26 @@ export async function POST(request: Request) {
       },
     })
 
+    // PR_STATUS 알림 - closed/merged 시 소유자에게
+    if (isStatusChange) {
+      const newStatus = getPRStatus({ state: pr.state, draft: pr.draft, merged: pr.merged })
+      const isMerged = newStatus === "MERGED"
+      const statusNotification = await prisma.notification.create({
+        data: {
+          type: "PR_MERGED",
+          title: isMerged ? "PR이 병합되었습니다" : "PR이 닫혔습니다",
+          message: `"${pr.title}" PR이 ${isMerged ? "병합" : "닫"}혔습니다.`,
+          userId: repository.userId,
+          prId: pullRequest.id,
+        },
+      })
+      emitNotification(repository.userId, {
+        ...statusNotification,
+        createdAt: statusNotification.createdAt.toISOString(),
+      })
+      return NextResponse.json({ message: "PR status processed" })
+    }
+
     // Create PENDING review record and trigger analysis in background
     await prisma.review.create({
       data: {
@@ -91,9 +114,24 @@ export async function POST(request: Request) {
     })
 
     // Fire-and-forget: respond immediately, analyze in background
-    analyzeReview(pullRequest.id).catch((err) =>
-      console.error("[webhook] analyzeReview failed:", err)
-    )
+    analyzeReview(pullRequest.id)
+      .then(async () => {
+        const notification = await prisma.notification.create({
+          data: {
+            type: "NEW_REVIEW",
+            title: "AI 코드 리뷰가 완료되었습니다",
+            message: `"${pr.title}" PR의 AI 코드 리뷰가 완료되었습니다.`,
+            userId: repository.userId,
+            prId: pullRequest.id,
+          },
+        })
+        emitNotification(repository.userId, {
+          ...notification,
+          createdAt: notification.createdAt.toISOString(),
+        })
+      })
+      .catch((err) => console.error("[webhook] analyzeReview failed:", err)
+      )
 
     return NextResponse.json({ message: "PR processed" })
   } catch {

@@ -106,7 +106,7 @@ export async function POST(
 
     const pr = await prisma.pullRequest.findFirst({
       where: { id, repo: { userId: session.user.id } },
-      select: { id: true },
+      select: { id: true, title: true, repo: { select: { userId: true } } },
     })
     if (!pr) {
       return NextResponse.json({ error: "PR을 찾을 수 없습니다." }, { status: 404 })
@@ -178,6 +178,25 @@ export async function POST(
           })
         }
       }
+    }
+
+    // COMMENT 알림 - 댓글 작성자가 PR 소유자가 아닐 때
+    const prOwnerId = pr.repo.userId
+    if (prOwnerId !== session.user.id) {
+      const commentNotification = await prisma.notification.create({
+        data: {
+          type: "COMMENT_REPLY",
+          title: "새 댓글이 달렸습니다",
+          message: `${session.user.name ?? "누군가"}님이 "${pr.title}"에 댓글을 남겼습니다.`,
+          userId: prOwnerId,
+          prId: id,
+          commentId: comment.id,
+        },
+      })
+      emitNotification(prOwnerId, {
+        ...commentNotification,
+        createdAt: commentNotification.createdAt.toISOString(),
+      })
     }
 
     return NextResponse.json({ comment }, { status: 201 })
