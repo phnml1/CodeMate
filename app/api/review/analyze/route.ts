@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { analyzeReview } from "@/lib/ai/analyze"
+import { emitNotification } from "@/lib/socket/emitter"
 
 export async function POST(request: Request) {
   try {
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
 
     const pr = await prisma.pullRequest.findUnique({
       where: { id: pullRequestId },
+      include: { repo: { select: { userId: true } } },
     })
 
     if (!pr) {
@@ -42,6 +44,22 @@ export async function POST(request: Request) {
 
     const completed = await prisma.review.findUnique({
       where: { id: review.id },
+    })
+
+    // REVIEW 알림 - PR 소유자에게
+    const prOwnerId = pr.repo.userId
+    const reviewNotification = await prisma.notification.create({
+      data: {
+        type: "NEW_REVIEW",
+        title: "AI 코드 리뷰가 완료되었습니다",
+        message: `"${pr.title}" PR의 AI 코드 리뷰가 완료되었습니다.`,
+        userId: prOwnerId,
+        prId: pullRequestId,
+      },
+    })
+    emitNotification(prOwnerId, {
+      ...reviewNotification,
+      createdAt: reviewNotification.createdAt.toISOString(),
     })
 
     return NextResponse.json(completed)
