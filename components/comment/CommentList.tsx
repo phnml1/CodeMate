@@ -1,13 +1,15 @@
 "use client"
 
-import { useCallback, memo } from "react"
+import { useCallback, memo, useMemo } from "react"
 import { MessageSquare } from "lucide-react"
 import { useCreateComment } from "@/hooks/useComments"
 import { useRealtimeComments } from "@/hooks/useRealtimeComments"
 import { useTypingIndicator } from "@/hooks/useTypingIndicator"
+import { usePRDetail } from "@/hooks/usePRDetail"
 import CommentInput from "./CommentInput"
 import CommentThread from "./CommentThread"
 import TypingIndicator from "./TypingIndicator"
+import type { MentionUser } from "@/types/comment"
 
 interface CommentListProps {
   prId: string
@@ -38,6 +40,29 @@ export default function CommentList({ prId, currentUserId }: CommentListProps) {
   const { data: comments = [], isLoading } = useRealtimeComments(prId)
   const createComment = useCreateComment(prId)
   const { names: typingNames, onTyping, onTypingStop } = useTypingIndicator(prId)
+  const { data: pr } = usePRDetail(prId)
+
+  // 디버그
+  if (process.env.NODE_ENV === "development") {
+    console.log("[CommentList] pr?.repo.owner:", pr?.repo.owner)
+    console.log("[CommentList] currentUserId:", currentUserId)
+  }
+
+  const mentionUsers = useMemo(() => {
+    const seen = new Set<string>()
+    const users: MentionUser[] = []
+    const candidates = [
+      pr?.repo.owner,
+      ...comments.flatMap((c) => [c.author, ...c.replies.map((r) => r.author)]),
+    ]
+    for (const u of candidates) {
+      if (u && !seen.has(u.id) && u.id !== currentUserId) {
+        seen.add(u.id)
+        users.push(u)
+      }
+    }
+    return users
+  }, [pr, comments, currentUserId])
 
   const handleCreate = useCallback(
     (content: string, mentions: string[]) => {
@@ -56,6 +81,7 @@ export default function CommentList({ prId, currentUserId }: CommentListProps) {
           isLoading={createComment.isPending}
           onTyping={onTyping}
           onTypingStop={onTypingStop}
+          mentionUsers={mentionUsers}
         />
 
         <TypingIndicator names={typingNames} />
@@ -76,6 +102,7 @@ export default function CommentList({ prId, currentUserId }: CommentListProps) {
                   comment={comment}
                   prId={prId}
                   currentUserId={currentUserId}
+                  mentionUsers={mentionUsers}
                 />
               </div>
             ))}

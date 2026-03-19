@@ -64,7 +64,12 @@ export async function GET(
       },
       include: {
         repo: {
-          select: { id: true, name: true, fullName: true },
+          select: {
+            id: true,
+            name: true,
+            fullName: true,
+            owner: { select: { id: true, name: true, image: true } },
+          },
         },
         reviews: true,
       },

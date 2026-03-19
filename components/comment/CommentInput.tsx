@@ -2,7 +2,6 @@
 
 import Image from "next/image"
 import { useState, useRef, useEffect } from "react"
-import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import type { MentionUser } from "@/types/comment"
 
@@ -18,15 +17,14 @@ interface CommentInputProps {
   mentionUsers?: MentionUser[]
 }
 
-// @[name](userId) 형식의 멘션에서 userId 추출
-function extractMentions(content: string): string[] {
-  const regex = /@\[([^\]]+)\]\(([^)]+)\)/g
-  const ids: string[] = []
-  let match
-  while ((match = regex.exec(content)) !== null) {
-    ids.push(match[2])
-  }
-  return [...new Set(ids)]
+// @이름 부분을 파란색 span으로 변환
+function getHighlightedHtml(text: string): string {
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br/>")
+  return escaped.replace(/@(\S+)/g, '<span style="color:#3b82f6;font-weight:500;">@$1</span>') + "&nbsp;"
 }
 
 export default function CommentInput({
@@ -41,24 +39,32 @@ export default function CommentInput({
   mentionUsers = [],
 }: CommentInputProps) {
   const [content, setContent] = useState(initialValue)
+  const [mentionMap, setMentionMap] = useState<Record<string, string>>({})
   const [showMentionPop, setShowMentionPop] = useState(false)
   const [mentionQuery, setMentionQuery] = useState("")
   const [mentionCursorPos, setMentionCursorPos] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
 
   const filteredUsers = mentionUsers.filter((u) =>
     u.name?.toLowerCase().includes(mentionQuery.toLowerCase())
   )
 
+  const syncScroll = () => {
+    if (overlayRef.current && textareaRef.current) {
+      overlayRef.current.scrollTop = textareaRef.current.scrollTop
+    }
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value
     setContent(val)
-
     onTyping?.()
+    syncScroll()
 
     const cursor = e.target.selectionStart ?? 0
     const textBeforeCursor = val.slice(0, cursor)
-    const atMatch = textBeforeCursor.match(/@(\w*)$/)
+    const atMatch = textBeforeCursor.match(/@(\S*)$/)
 
     if (atMatch) {
       setMentionQuery(atMatch[1])
@@ -70,19 +76,23 @@ export default function CommentInput({
   }
 
   const handleMentionSelect = (user: MentionUser) => {
+    const name = user.name ?? user.id
     const before = content.slice(0, mentionCursorPos)
-    const after = content.slice(mentionCursorPos).replace(/@\w*/, "")
-    const inserted = `@[${user.name}](${user.id}) `
-    setContent(before + inserted + after)
+    const after = content.slice(mentionCursorPos).replace(/@\S*/, "")
+    setContent(before + `@${name} ` + after)
+    setMentionMap((prev) => ({ ...prev, [name]: user.id }))
     setShowMentionPop(false)
     textareaRef.current?.focus()
   }
 
   const handleSubmit = () => {
     if (!content.trim()) return
-    const mentions = extractMentions(content)
-    onSubmit(content.trim(), mentions)
+    const mentions = Object.entries(mentionMap)
+      .filter(([name]) => content.includes(`@${name}`))
+      .map(([, id]) => id)
+    onSubmit(content.trim(), [...new Set(mentions)])
     setContent("")
+    setMentionMap({})
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -102,15 +112,26 @@ export default function CommentInput({
 
   return (
     <div className="relative">
-      <Textarea
+      {/* 하이라이트 오버레이 - textarea와 완전히 동일한 크기/패딩 */}
+      <div
+        ref={overlayRef}
+        aria-hidden
+        className="absolute inset-0 pointer-events-none rounded-md px-3 py-2 text-sm whitespace-pre-wrap wrap-break-word overflow-hidden"
+        dangerouslySetInnerHTML={{ __html: getHighlightedHtml(content) }}
+      />
+
+      {/* textarea - 텍스트 투명, 커서만 표시 */}
+      <textarea
         ref={textareaRef}
         value={content}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         onBlur={onTypingStop}
+        onScroll={syncScroll}
         placeholder={placeholder}
         rows={3}
-        className="resize-none text-sm"
+        className="relative z-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+        style={{ color: "transparent", caretColor: "var(--foreground, #0f172a)" }}
       />
 
       {/* 멘션 팝오버 */}
@@ -119,7 +140,10 @@ export default function CommentInput({
           {filteredUsers.slice(0, 6).map((user) => (
             <button
               key={user.id}
-              onClick={() => handleMentionSelect(user)}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                handleMentionSelect(user)
+              }}
               className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-left"
             >
               {user.image ? (
