@@ -26,10 +26,12 @@ export default function PRList() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <PRCardSkeleton key={i} />
-        ))}
+      <div className="w-full flex justify-center">
+        <div className="w-full max-w-3xl space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <PRCardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -49,24 +51,26 @@ export default function PRList() {
   }
 
   return (
-    <div className="space-y-4">
-      {pullRequests.map((pr, index) => (
-        <PRCard key={pr.id} {...pr} animationDelay={index * 75} />
-      ))}
+    <div className="w-full flex justify-center">
+      <div className="w-full max-w-3xl space-y-4">
+        {pullRequests.map((pr, index) => (
+          <PRCard key={pr.id} {...pr} animationDelay={index * 75} />
+        ))}
 
-      <InfiniteScrollTrigger
-        onLoadMore={fetchNextPage}
-        hasNextPage={hasNextPage}
-        isFetchingNextPage={isFetchingNextPage}
-        loadingFallback={
-          <div className="space-y-4">
-            <PRCardSkeleton />
-            <PRCardSkeleton />
-          </div>
-        }
-      />
+        <InfiniteScrollTrigger
+          onLoadMore={fetchNextPage}
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          loadingFallback={
+            <div className="space-y-4">
+              <PRCardSkeleton />
+              <PRCardSkeleton />
+            </div>
+          }
+        />
 
-      {!hasNextPage && <PRListFooter />}
+        {!hasNextPage && <PRListFooter />}
+      </div>
     </div>
   );
 }
