@@ -44,7 +44,7 @@ export default function PRCard({
     >
       <Link href={`/pulls/${id}`} className="absolute inset-0 z-0 rounded-[24px]" aria-label={title} />
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 h-full">
         {/* Header: Status badge + PR number */}
         <div className="flex items-center gap-2 sm:gap-3">
           <PRStatusBadge status={status} />
@@ -58,15 +58,18 @@ export default function PRCard({
           {title}
         </h3>
 
-        {/* Meta info */}
+        {/* Meta info (without time) */}
         <PRCardMeta
           repoName={repo.name}
           author={author}
-          relativeTime={relativeTime}
+          hideTime
         />
 
-        {/* Action button */}
-        <div className="flex justify-end pt-1">
+        {/* Bottom section: Time + Action button */}
+        <div className="flex items-center justify-between gap-3 mt-auto pt-2">
+          <span className="text-slate-400 italic text-[10px] sm:text-xs">
+            {relativeTime}
+          </span>
           <Button
             variant="ghost"
             size="sm"
