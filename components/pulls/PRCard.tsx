@@ -24,12 +24,13 @@ export default function PRCard({
   status,
   repo,
   author,
+  githubCreatedAt,
   createdAt,
   additions,
   deletions,
   animationDelay = 0,
 }: PRCardProps) {
-  const relativeTime = formatDistanceToNow(new Date(createdAt), {
+  const relativeTime = formatDistanceToNow(new Date(githubCreatedAt ?? createdAt), {
     addSuffix: true,
     locale: ko,
   });

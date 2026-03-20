@@ -166,12 +166,14 @@ export async function POST(request: Request) {
                 : "OPEN",
             baseBranch: pr.base.ref,
             headBranch: pr.head.ref,
-            // 목록 API는 additions/deletions 미제공 → 0으로 초기화
+            // 목록 API는 additions/deletions 미제공 → 상세 페이지 진입 시 lazy 보정
             additions: 0,
             deletions: 0,
             changedFiles: 0,
             mergedAt: pr.merged_at ? new Date(pr.merged_at) : null,
             closedAt: pr.closed_at ? new Date(pr.closed_at) : null,
+            githubCreatedAt: pr.created_at ? new Date(pr.created_at) : null,
+            githubUpdatedAt: pr.updated_at ? new Date(pr.updated_at) : null,
             repoId: repository.id,
           })),
           skipDuplicates: true,

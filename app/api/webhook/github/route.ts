@@ -64,6 +64,8 @@ export async function POST(request: Request) {
         changedFiles: pr.changed_files ?? 0,
         mergedAt: pr.merged_at ? new Date(pr.merged_at) : null,
         closedAt: pr.closed_at ? new Date(pr.closed_at) : null,
+        githubCreatedAt: pr.created_at ? new Date(pr.created_at) : null,
+        githubUpdatedAt: pr.updated_at ? new Date(pr.updated_at) : null,
       },
       create: {
         githubId: BigInt(pr.id),
@@ -78,6 +80,8 @@ export async function POST(request: Request) {
         changedFiles: pr.changed_files ?? 0,
         mergedAt: pr.merged_at ? new Date(pr.merged_at) : null,
         closedAt: pr.closed_at ? new Date(pr.closed_at) : null,
+        githubCreatedAt: pr.created_at ? new Date(pr.created_at) : null,
+        githubUpdatedAt: pr.updated_at ? new Date(pr.updated_at) : null,
         repoId: repository.id,
       },
     })
