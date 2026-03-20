@@ -35,7 +35,7 @@ export default function PRCard({
   return (
     <Card
       className={cn(
-        "group relative rounded-[24px] p-6 md:p-8 border-slate-200 shadow-none",
+        "group relative rounded-[24px] p-4 md:p-5 border-slate-200 shadow-none",
         "hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/5",
         "transition-all duration-300 cursor-pointer",
         "animate-in fade-in slide-in-from-bottom-4 fill-mode-both"
@@ -44,27 +44,17 @@ export default function PRCard({
     >
       <Link href={`/pulls/${id}`} className="absolute inset-0 z-0 rounded-[24px]" aria-label={title} />
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         {/* Header: Status badge + PR number */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <PRStatusBadge status={status} />
-            <span className="text-slate-400 font-mono text-xs sm:text-sm">
-              #{number}
-            </span>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="relative z-10 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-50 text-blue-700 rounded-lg text-xs sm:text-sm font-semibold hover:bg-blue-100 border border-blue-200 h-auto whitespace-nowrap transition-colors"
-            asChild
-          >
-            <Link href={`/pulls/${id}`}>리뷰하기</Link>
-          </Button>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <PRStatusBadge status={status} />
+          <span className="text-slate-400 font-mono text-xs sm:text-sm">
+            #{number}
+          </span>
         </div>
 
         {/* Title */}
-        <h3 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-blue-700 transition-colors tracking-tight leading-snug pr-8">
+        <h3 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-blue-700 transition-colors tracking-tight leading-snug">
           {title}
         </h3>
 
@@ -74,6 +64,18 @@ export default function PRCard({
           author={author}
           relativeTime={relativeTime}
         />
+
+        {/* Action button */}
+        <div className="flex justify-end pt-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="relative z-10 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-50 text-blue-700 rounded-lg text-xs sm:text-sm font-semibold hover:bg-blue-100 border border-blue-200 h-auto whitespace-nowrap transition-colors"
+            asChild
+          >
+            <Link href={`/pulls/${id}`}>리뷰하기</Link>
+          </Button>
+        </div>
       </div>
 
       {/* Left border hover indicator */}
