@@ -93,6 +93,11 @@ describe("POST /api/webhook/github", () => {
     mockedFindFirst.mockResolvedValue({ id: "repo-1", userId: "user-1" })
     mockedUpsert.mockResolvedValue({ id: "pr-1" })
     ;(prisma.review.create as jest.Mock).mockResolvedValue({ id: "review-1" })
+    ;(prisma.notification.create as jest.Mock).mockResolvedValue({
+      id: "notif-1",
+      type: "NEW_REVIEW",
+      createdAt: new Date(),
+    })
 
     const response = await POST(createRequest(prPayload))
     const body = await response.json()
