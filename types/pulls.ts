@@ -23,6 +23,8 @@ export interface PullRequest {
   repo: PullRequestRepo;
   mergedAt: string | null;
   closedAt: string | null;
+  githubCreatedAt: string | null;
+  githubUpdatedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

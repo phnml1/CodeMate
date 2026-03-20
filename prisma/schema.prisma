@@ -123,10 +123,12 @@ model PullRequest {
   reviews     Review[]
   comments    Comment[]
 
-  mergedAt    DateTime?
-  closedAt    DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  mergedAt        DateTime?
+  closedAt        DateTime?
+  githubCreatedAt DateTime?  // GitHub PR 실제 생성 시각
+  githubUpdatedAt DateTime?  // GitHub PR 실제 수정 시각
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([repoId])
   @@index([status])

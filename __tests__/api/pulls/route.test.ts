@@ -43,6 +43,8 @@ const samplePR = {
   repo: { id: "repo-1", name: "awesome-app", fullName: "user/awesome-app" },
   mergedAt: null,
   closedAt: null,
+  githubCreatedAt: new Date().toISOString(),
+  githubUpdatedAt: new Date().toISOString(),
   createdAt: new Date(),
   updatedAt: new Date(),
 }
@@ -77,7 +79,10 @@ describe("GET /api/pulls", () => {
     expect(mockedFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { repo: { userId: "user-1" } },
-        orderBy: { createdAt: "desc" },
+        orderBy: [
+          { githubCreatedAt: { sort: "desc", nulls: "last" } },
+          { number: "desc" },
+        ],
         skip: 0,
         take: 20,
       })

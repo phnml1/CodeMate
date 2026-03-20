@@ -50,23 +50,23 @@ export default function PRList() {
 
   return (
     <div className="space-y-4">
-      {pullRequests.map((pr, index) => (
-        <PRCard key={pr.id} {...pr} animationDelay={index * 75} />
-      ))}
+        {pullRequests.map((pr, index) => (
+          <PRCard key={pr.id} {...pr} animationDelay={index * 75} />
+        ))}
 
-      <InfiniteScrollTrigger
-        onLoadMore={fetchNextPage}
-        hasNextPage={hasNextPage}
-        isFetchingNextPage={isFetchingNextPage}
-        loadingFallback={
-          <div className="space-y-4">
-            <PRCardSkeleton />
-            <PRCardSkeleton />
-          </div>
-        }
-      />
+        <InfiniteScrollTrigger
+          onLoadMore={fetchNextPage}
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          loadingFallback={
+            <div className="space-y-4">
+              <PRCardSkeleton />
+              <PRCardSkeleton />
+            </div>
+          }
+        />
 
-      {!hasNextPage && <PRListFooter />}
+        {!hasNextPage && <PRListFooter />}
     </div>
   );
 }

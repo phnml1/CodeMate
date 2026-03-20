@@ -122,7 +122,10 @@ export async function GET(request: Request) {
             select: { id: true, name: true, fullName: true },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [
+          { githubCreatedAt: { sort: "desc", nulls: "last" } },
+          { number: "desc" },
+        ],
         skip: (page - 1) * limit,
         take: limit,
       }),

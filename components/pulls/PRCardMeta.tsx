@@ -10,14 +10,16 @@ export interface PRCardAuthor {
 
 interface PRCardMetaProps {
   repoName: string;
-  relativeTime: string;
+  relativeTime?: string;
   author?: PRCardAuthor;
+  hideTime?: boolean;
 }
 
 export default function PRCardMeta({
   repoName,
   relativeTime,
   author,
+  hideTime = false,
 }: PRCardMetaProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs sm:text-sm text-slate-500 font-medium">
@@ -43,10 +45,14 @@ export default function PRCardMeta({
         </>
       )}
 
-      <span className="hidden sm:block w-1 h-1 bg-slate-200 rounded-full" />
-      <span className="text-slate-400 italic text-[11px] sm:text-xs">
-        {relativeTime}
-      </span>
+      {!hideTime && relativeTime && (
+        <>
+          <span className="hidden sm:block w-1 h-1 bg-slate-200 rounded-full" />
+          <span className="text-slate-400 italic text-[11px] sm:text-xs">
+            {relativeTime}
+          </span>
+        </>
+      )}
     </div>
   );
 }
