@@ -26,12 +26,10 @@ export default function PRList() {
 
   if (isLoading) {
     return (
-      <div className="w-full flex justify-center">
-        <div className="w-full max-w-3xl space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <PRCardSkeleton key={i} />
-          ))}
-        </div>
+      <div className="space-y-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <PRCardSkeleton key={i} />
+        ))}
       </div>
     );
   }
@@ -51,8 +49,7 @@ export default function PRList() {
   }
 
   return (
-    <div className="w-full flex justify-center">
-      <div className="w-full max-w-3xl space-y-4">
+    <div className="space-y-4">
         {pullRequests.map((pr, index) => (
           <PRCard key={pr.id} {...pr} animationDelay={index * 75} />
         ))}
@@ -70,7 +67,6 @@ export default function PRList() {
         />
 
         {!hasNextPage && <PRListFooter />}
-      </div>
     </div>
   );
 }
