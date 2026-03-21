@@ -9,6 +9,8 @@ export interface ServerToClientEvents {
   "comment:deleted": (data: { commentId: string; prId: string }) => void
   "typing:start": (data: { userId: string; userName: string }) => void
   "typing:stop": (data: { userId: string }) => void
+  "inline:typing:start": (data: { userId: string; userName: string; filePath: string; lineNumber: number }) => void
+  "inline:typing:stop": (data: { userId: string }) => void
   "notification:new": (notification: BaseNotification) => void
 }
 
@@ -17,6 +19,8 @@ export interface ClientToServerEvents {
   "room:leave": (prId: string) => void
   "typing:start": (prId: string) => void
   "typing:stop": (prId: string) => void
+  "inline:typing:start": (data: { prId: string; filePath: string; lineNumber: number }) => void
+  "inline:typing:stop": (prId: string) => void
 }
 
 export type InterServerEvents = Record<string, never>

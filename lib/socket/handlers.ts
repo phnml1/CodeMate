@@ -21,6 +21,14 @@ function registerTypingHandlers(socket: TypedServerSocket) {
   socket.on("typing:stop", (prId) => {
     socket.to(`pr:${prId}`).emit("typing:stop", { userId })
   })
+
+  socket.on("inline:typing:start", ({ prId, filePath, lineNumber }) => {
+    socket.to(`pr:${prId}`).emit("inline:typing:start", { userId, userName, filePath, lineNumber })
+  })
+
+  socket.on("inline:typing:stop", (prId) => {
+    socket.to(`pr:${prId}`).emit("inline:typing:stop", { userId })
+  })
 }
 
 export function setupSocketHandlers(io: TypedServer) {
