@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, MessageSquare } from "lucide-react";
 import FileIcon from "../FileIcon";
 import type { PRFile } from "@/types/pulls";
 
@@ -7,9 +7,10 @@ interface DiffHeaderProps {
   collapsed: boolean;
   onToggle: () => void;
   isActive?: boolean;
+  inlineCommentCount?: number;
 }
 
-export default function DiffHeader({ file, collapsed, onToggle, isActive = false }: DiffHeaderProps) {
+export default function DiffHeader({ file, collapsed, onToggle, isActive = false, inlineCommentCount = 0 }: DiffHeaderProps) {
   return (
     <button
       type="button"
@@ -33,6 +34,12 @@ export default function DiffHeader({ file, collapsed, onToggle, isActive = false
           }`}>
             {file.filename}
           </span>
+          {inlineCommentCount > 0 && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400">
+              <MessageSquare size={10} />
+              {inlineCommentCount}
+            </span>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-2 text-xs font-black">
