@@ -26,7 +26,11 @@
       "Bash(git pull:*)",
       "Bash(gh repo view --json nameWithOwner -q .nameWithOwner)",
       "Bash(gh label list)",
-      "Bash(gh label create \"backend\" --color \"#0ea5e9\" --description \"Backend/server-side work\")"
+      "Bash(gh label create \"backend\" --color \"#0ea5e9\" --description \"Backend/server-side work\")",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(ls /c/project/CodeMate/app/\\\\\\(protected\\\\\\)/)",
+      "Bash(find /c/project/CodeMate -name *.test.ts -maxdepth 4)"
     ]
   }
 }

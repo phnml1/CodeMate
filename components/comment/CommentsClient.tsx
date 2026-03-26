@@ -38,7 +38,15 @@ export default function CommentsClient({ repos, userId }: CommentsClientProps) {
   const totalCount = data?.pages[0]?.pagination.total ?? 0
 
   const handleClickComment = (comment: CommentWithPR) => {
-    router.push(`/pulls/${comment.pullRequest.id}`)
+    if (comment.filePath && comment.lineNumber != null) {
+      const params = new URLSearchParams({
+        filePath: comment.filePath,
+        lineNumber: comment.lineNumber.toString(),
+      })
+      router.push(`/pulls/${comment.pullRequest.id}?${params.toString()}`)
+    } else {
+      router.push(`/pulls/${comment.pullRequest.id}`)
+    }
   }
 
   return (

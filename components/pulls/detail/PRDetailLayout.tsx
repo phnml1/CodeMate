@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { ChevronRight, ChevronDown, BotMessageSquare, MessageSquare } from "lucide-react";
 import PRFileList from "./PRFileList";
 import PRDetailHeader from "./PRDetailHeader";
@@ -46,6 +47,8 @@ export default function PRDetailLayout({
   const reset = usePRDetailStore((s) => s.reset);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const initializedRef = useRef<string | null>(null);
+  const searchParams = useSearchParams();
   const [scrolled, setScrolled] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<ReviewIssue | null>(null);
@@ -97,6 +100,40 @@ export default function PRDetailLayout({
   useEffect(() => {
     reset(files[0]?.filename);
   }, [pr.id, files, reset]);
+
+  // 쿼리 파라미터로 전달된 라인으로 스크롤
+  useEffect(() => {
+    const filePath = searchParams.get("filePath");
+    const lineNumber = searchParams.get("lineNumber");
+    const prId = pr.id;
+
+    // 이미 처리했으면 스킵
+    if (initializedRef.current === prId) return;
+
+    if (!filePath || !lineNumber) {
+      initializedRef.current = prId;
+      return;
+    }
+
+    const lineNum = parseInt(lineNumber, 10);
+    expandDiff(filePath);
+    selectFile(filePath);
+    setMobileFileOpen(false);
+
+    const targetId = `diff-line-${filePath}-${lineNum}`;
+    let attempts = 0;
+    const tryScroll = () => {
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else if (attempts++ < 20) {
+        requestAnimationFrame(tryScroll);
+      }
+    };
+    requestAnimationFrame(tryScroll);
+
+    initializedRef.current = prId;
+  }, [pr.id, searchParams, expandDiff, selectFile, setMobileFileOpen]);
 
   const handleScroll = () => {
     const el = scrollContainerRef.current;
