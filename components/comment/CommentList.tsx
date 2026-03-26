@@ -150,6 +150,7 @@ export default function CommentList({ prId, currentUserId }: CommentListProps) {
   const [input, setInput] = useState("")
   const chatEndRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
+  const isInitialMountRef = useRef(true)
 
   const generalComments = useMemo(
     () => allComments.filter((c) => c.filePath == null),
@@ -172,12 +173,12 @@ export default function CommentList({ prId, currentUserId }: CommentListProps) {
     return users
   }, [pr, allComments, currentUserId])
 
-  // 새 메시지 / 타이핑 시 자동 하단 스크롤
+  // 초기 로드 플래그만 유지
   useEffect(() => {
-    if (isAtBottomRef.current) {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false
     }
-  }, [generalComments.length, typingNames.length])
+  }, [generalComments.length])
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
@@ -204,26 +205,26 @@ export default function CommentList({ prId, currentUserId }: CommentListProps) {
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-      {/* 헤더 */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700/80 transition-colors border-b border-slate-200 dark:border-slate-700"
-      >
-        <div className="flex items-center gap-2">
-          <MessageSquare size={15} className="text-blue-500" />
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">댓글</span>
-          {generalComments.length > 0 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400">
-              {generalComments.length}
-            </span>
-          )}
-        </div>
-        <ChevronDown
-          size={15}
-          className={`text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-        />
-      </button>
+        {/* 헤더 */}
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="w-full px-5 py-3 bg-slate-50 dark:bg-slate-800/80 flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700/80 transition-colors border-b border-slate-200 dark:border-slate-700"
+        >
+          <div className="flex items-center gap-2">
+            <MessageSquare size={15} className="text-blue-500" />
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">댓글</span>
+            {generalComments.length > 0 && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400">
+                {generalComments.length}
+              </span>
+            )}
+          </div>
+          <ChevronDown
+            size={15}
+            className={`text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          />
+        </button>
 
       {open && (
         <>
