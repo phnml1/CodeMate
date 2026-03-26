@@ -3,6 +3,7 @@
 import { parsePatch } from "@/lib/diff";
 import type { PRFile } from "@/types/pulls";
 import type { ReviewIssue } from "@/types/review";
+import type { CommentWithAuthor } from "@/types/comment";
 import DiffHeader from "./DiffHeader";
 import DiffTable from "./DiffTable";
 import { usePRDetailStore } from "@/stores/prDetailStore";
@@ -12,6 +13,9 @@ interface PRDiffViewerProps {
   isActive?: boolean;
   issues?: ReviewIssue[];
   onIssueClick?: (issue: ReviewIssue) => void;
+  prId: string;
+  currentUserId: string;
+  inlineComments: CommentWithAuthor[];
 }
 
 export default function PRDiffViewer({
@@ -19,6 +23,9 @@ export default function PRDiffViewer({
   isActive = false,
   issues = [],
   onIssueClick,
+  prId,
+  currentUserId,
+  inlineComments,
 }: PRDiffViewerProps) {
   const collapsed = usePRDetailStore((s) => s.collapsedDiffs[file.filename] ?? false);
   const toggleDiff = usePRDetailStore((s) => s.toggleDiff);
@@ -38,6 +45,7 @@ export default function PRDiffViewer({
         collapsed={collapsed}
         onToggle={() => toggleDiff(file.filename)}
         isActive={isActive}
+        inlineCommentCount={inlineComments.length}
       />
       {!collapsed && (
         <div id={`diff-body-${file.filename}`} className="overflow-x-auto min-w-0 min-h-25">
@@ -46,7 +54,15 @@ export default function PRDiffViewer({
               Binary file or no diff available
             </div>
           ) : (
-            <DiffTable lines={lines} issues={issues} onIssueClick={onIssueClick} />
+            <DiffTable
+              lines={lines}
+              issues={issues}
+              onIssueClick={onIssueClick}
+              inlineComments={inlineComments}
+              prId={prId}
+              filePath={file.filename}
+              currentUserId={currentUserId}
+            />
           )}
         </div>
       )}

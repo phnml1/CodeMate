@@ -16,6 +16,7 @@ interface PRDetailActions {
   setSidebarCollapsed: (collapsed: boolean) => void;
   setMobileFileOpen: (open: boolean) => void;
   toggleDiff: (filename: string) => void;
+  expandDiff: (filename: string) => void;
   // PR 이동 시 상태 초기화
   reset: (initialFile?: string) => void;
 }
@@ -40,6 +41,14 @@ export const usePRDetailStore = create<PRDetailState & PRDetailActions>((set) =>
       collapsedDiffs: {
         ...state.collapsedDiffs,
         [filename]: !state.collapsedDiffs[filename],
+      },
+    })),
+
+  expandDiff: (filename) =>
+    set((state) => ({
+      collapsedDiffs: {
+        ...state.collapsedDiffs,
+        [filename]: false,
       },
     })),
 

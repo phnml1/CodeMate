@@ -72,6 +72,39 @@ import { NextResponse } from "next/server"
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
+/**
+ * @swagger
+ * /api/repositories:
+ *   get:
+ *     summary: 연동된 저장소 목록 조회
+ *     description: 현재 사용자의 연동된 저장소 목록을 반환합니다.
+ *     tags:
+ *       - Repository
+ *     responses:
+ *       200:
+ *         description: 저장소 목록 반환 성공
+ *       401:
+ *         description: 인증되지 않은 사용자
+ */
+export async function GET() {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const repositories = await prisma.repository.findMany({
+      where: { userId: session.user.id },
+      select: { id: true, name: true, fullName: true },
+      orderBy: { name: "asc" },
+    })
+
+    return NextResponse.json({ repositories })
+  } catch {
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await auth()

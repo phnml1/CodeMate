@@ -45,3 +45,26 @@ export interface MentionUser {
   name: string | null
   image: string | null
 }
+
+export interface CommentPR {
+  id: string
+  title: string
+  number: number
+  repoId: string
+  repo: { name: string }
+}
+
+export interface CommentWithPR extends Comment {
+  author: CommentAuthor
+  pullRequest: CommentPR
+}
+
+export interface CommentsListResponse {
+  comments: CommentWithPR[]
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
+}

@@ -1,10 +1,46 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query"
 import type {
   CommentWithAuthor,
+  CommentWithPR,
+  CommentsListResponse,
   CreateCommentInput,
   UpdateCommentInput,
   ReactionEmoji,
 } from "@/types/comment"
+
+export interface CommentsFilter {
+  repoId?: string
+  prId?: string
+  authorId?: string
+}
+
+async function fetchAllCommentsPage(
+  filter: CommentsFilter,
+  page: number
+): Promise<CommentsListResponse> {
+  const params = new URLSearchParams()
+  if (filter.repoId) params.set("repoId", filter.repoId)
+  if (filter.prId) params.set("prId", filter.prId)
+  if (filter.authorId) params.set("authorId", filter.authorId)
+  params.set("page", String(page))
+  params.set("limit", "20")
+
+  const res = await fetch(`/api/comments?${params}`)
+  if (!res.ok) throw new Error("댓글을 불러오지 못했습니다.")
+  return res.json()
+}
+
+export function useAllComments(filter: CommentsFilter) {
+  return useInfiniteQuery({
+    queryKey: ["allComments", filter],
+    queryFn: ({ pageParam }) => fetchAllCommentsPage(filter, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const { page, totalPages } = lastPage.pagination
+      return page < totalPages ? page + 1 : undefined
+    },
+  })
+}
 
 async function fetchComments(prId: string): Promise<CommentWithAuthor[]> {
   const res = await fetch(`/api/pulls/${prId}/comments`)

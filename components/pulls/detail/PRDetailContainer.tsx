@@ -10,9 +10,10 @@ import PRDetailLayout from "@/components/pulls/detail/PRDetailLayout";
 interface PRDetailContainerProps {
   id: string;
   commentSlot: React.ReactNode;
+  currentUserId: string;
 }
 
-export default function PRDetailContainer({ id, commentSlot }: PRDetailContainerProps) {
+export default function PRDetailContainer({ id, commentSlot, currentUserId }: PRDetailContainerProps) {
   const { data: pr, isPending: prPending, isError: prError } = usePRDetail(id);
   const { data: files, isPending: filesPending, isError: filesError } = usePRFiles(id);
   const { data: review, isPending: reviewPending } = useReview(id);
@@ -70,6 +71,7 @@ export default function PRDetailContainer({ id, commentSlot }: PRDetailContainer
       onRequestReview={handleRequestReview}
       isRequesting={isRequesting}
       commentSlot={commentSlot}
+      currentUserId={currentUserId}
     />
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, MessageSquare } from "lucide-react";
 import FileIcon from "./FileIcon";
 import { PR_FILE_STATUS_BADGE } from "@/constants/pulls";
 import type { PRFile } from "@/types/pulls";
@@ -11,10 +11,11 @@ interface PRFileListProps {
   onSelectFile?: (filename: string) => void;
   collapsed?: boolean;
   onCollapse?: (collapsed: boolean) => void;
+  commentCountsByFile?: Record<string, number>;
 }
 
 
-export default function PRFileList({ files, selectedFile, onSelectFile, collapsed = false, onCollapse }: PRFileListProps) {
+export default function PRFileList({ files, selectedFile, onSelectFile, collapsed = false, onCollapse, commentCountsByFile = {} }: PRFileListProps) {
   return (
     <nav
       aria-label="변경된 파일 목록"
@@ -47,6 +48,7 @@ export default function PRFileList({ files, selectedFile, onSelectFile, collapse
         {files.map((file) => {
           const badge = PR_FILE_STATUS_BADGE[file.status];
           const isSelected = file.filename === selectedFile;
+          const commentCount = commentCountsByFile[file.filename] ?? 0;
           return (
             <button
               key={file.filename}
@@ -74,9 +76,17 @@ export default function PRFileList({ files, selectedFile, onSelectFile, collapse
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-[10px] font-black opacity-60 shrink-0">
-                <span className="text-emerald-600">+{file.additions}</span>
-                <span className="text-rose-500">-{file.deletions}</span>
+              <div className="flex items-center gap-2 shrink-0">
+                {commentCount > 0 && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400">
+                    <MessageSquare size={9} />
+                    {commentCount}
+                  </span>
+                )}
+                <div className="flex items-center gap-1 text-[10px] font-black opacity-60">
+                  <span className="text-emerald-600">+{file.additions}</span>
+                  <span className="text-rose-500">-{file.deletions}</span>
+                </div>
               </div>
             </button>
           );
