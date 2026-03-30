@@ -1,6 +1,10 @@
-import { FolderGit2, Github, Check, Trash2, Plus } from "lucide-react"
+"use client"
+
+import { useState } from "react"
+import { FolderGit2, Github, Check, Trash2, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { useSyncRepository } from "@/hooks/useSyncRepository"
 
 const LANGUAGE_COLORS: Record<string, string> = {
   TypeScript: "bg-blue-500",
@@ -29,9 +33,12 @@ export default function RepoCard({
   fullName,
   language,
   isConnected,
+  repositoryId,
   onConnect,
   onDisconnect,
 }: RepoCardProps) {
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
+  const { mutate: sync, isPending: isSyncing } = useSyncRepository()
   const dotColor = language ? (LANGUAGE_COLORS[language] ?? "bg-slate-400") : null
 
   return (
@@ -72,6 +79,37 @@ export default function RepoCard({
                 <Check size={12} aria-hidden />
                 연동됨
               </Badge>
+              {syncMessage && (
+                <span className="text-xs font-medium text-slate-500">
+                  {syncMessage}
+                </span>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={isSyncing || !repositoryId}
+                onClick={() => {
+                  if (!repositoryId) return
+                  sync(repositoryId, {
+                    onSuccess: ({ updated, total }) => {
+                      setSyncMessage(
+                        total === 0
+                          ? "보정할 PR 없음"
+                          : `${updated}/${total}건 보정 완료`
+                      )
+                      setTimeout(() => setSyncMessage(null), 3000)
+                    },
+                    onError: () => {
+                      setSyncMessage("동기화 실패")
+                      setTimeout(() => setSyncMessage(null), 3000)
+                    },
+                  })
+                }}
+                title="코드 변경량 동기화"
+                className="p-2.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl border border-transparent hover:border-blue-100 h-auto w-auto disabled:opacity-40"
+              >
+                <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} aria-hidden />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
