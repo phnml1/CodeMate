@@ -8,22 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts"
-
-const data = [
-  { day: "1일", score: 72 },
-  { day: "3일", score: 75 },
-  { day: "5일", score: 78 },
-  { day: "7일", score: 76 },
-  { day: "9일", score: 80 },
-  { day: "11일", score: 78 },
-  { day: "13일", score: 83 },
-  { day: "15일", score: 82 },
-  { day: "17일", score: 85 },
-  { day: "19일", score: 87 },
-  { day: "23일", score: 89 },
-  { day: "27일", score: 91 },
-  { day: "30일", score: 88 },
-]
+import { type QualityTrendItem } from "@/lib/dashboard"
 
 function CustomTooltip({
   active,
@@ -44,7 +29,7 @@ function CustomTooltip({
   )
 }
 
-export default function CodeQualityChart() {
+export default function CodeQualityChart({ data }: { data: QualityTrendItem[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%" minHeight={200} minWidth={200}>
       <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -55,7 +40,7 @@ export default function CodeQualityChart() {
           </linearGradient>
         </defs>
         <XAxis
-          dataKey="day"
+          dataKey="date"
           axisLine={false}
           tickLine={false}
           tick={{ fontSize: 12, fill: "#94a3b8" }}
@@ -71,7 +56,7 @@ export default function CodeQualityChart() {
         <Tooltip content={<CustomTooltip />} cursor={false} />
         <Area
           type="monotone"
-          dataKey="score"
+          dataKey="avgScore"
           stroke="#4d9be8"
           strokeWidth={2.5}
           fill="url(#scoreGradient)"
