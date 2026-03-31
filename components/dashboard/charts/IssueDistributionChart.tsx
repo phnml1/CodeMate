@@ -1,16 +1,15 @@
 "use client"
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
+import { type IssueSeverityItem } from "@/lib/dashboard"
 
-const data = [
-  { name: "HIGH", value: 15, color: "#ef4444" },
-  { name: "MEDIUM", value: 35, color: "#f59e0b" },
-  { name: "LOW", value: 50, color: "#3b82f6" },
-]
+export default function IssueDistributionChart({
+  data,
+}: {
+  data: IssueSeverityItem[]
+}) {
+  const total = data.reduce((sum, d) => sum + d.value, 0)
 
-const total = data.reduce((sum, d) => sum + d.value, 0)
-
-export default function IssueDistributionChart() {
   return (
     <div className="flex flex-col items-center gap-6">
       <div className="relative w-55 h-55 sm:w-65 sm:h-65">
@@ -35,13 +34,14 @@ export default function IssueDistributionChart() {
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
                 const { name, value, color } = payload[0].payload
+                const pct = total > 0 ? Math.round((value / total) * 100) : 0
                 return (
                   <div className="rounded-lg border bg-white px-3 py-2 shadow-md">
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
                       <span className="text-sm font-semibold text-slate-700">{name}</span>
                     </div>
-                    <p className="mt-1 text-sm text-slate-600">{value}% ({Math.round(total * value / 100)}건)</p>
+                    <p className="mt-1 text-sm text-slate-600">{pct}% ({value}건)</p>
                   </div>
                 )
               }}
@@ -54,15 +54,23 @@ export default function IssueDistributionChart() {
         </div>
       </div>
       <div className="mt-6 sm:mt-8 space-y-3 sm:space-y-4 w-full">
-        {data.map((item) => (
-          <div key={item.name} className="flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full shadow-sm" style={{ backgroundColor: item.color }} />
-              <span className="text-xs sm:text-sm font-semibold text-slate-700">{item.name}</span>
+        {data.map((item) => {
+          const pct = total > 0 ? Math.round((item.value / total) * 100) : 0
+          return (
+            <div key={item.name} className="flex items-center justify-between">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div
+                  className="w-3 h-3 sm:w-4 sm:h-4 rounded-full shadow-sm"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="text-xs sm:text-sm font-semibold text-slate-700">
+                  {item.name}
+                </span>
+              </div>
+              <span className="text-xs sm:text-sm font-bold text-slate-900">{pct}%</span>
             </div>
-            <span className="text-xs sm:text-sm font-bold text-slate-900">{item.value}%</span>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

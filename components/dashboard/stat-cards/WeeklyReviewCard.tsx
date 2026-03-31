@@ -1,14 +1,26 @@
 import { Bot } from "lucide-react"
 import StatCard from "./StatCard"
 
-export default function WeeklyReviewCard() {
+interface WeeklyReviewCardProps {
+  weeklyReviews: number
+  diff: number
+}
+
+export default function WeeklyReviewCard({ weeklyReviews, diff }: WeeklyReviewCardProps) {
+  const diffText =
+    diff > 0 ? `+${diff} vs 지난주` : diff < 0 ? `${diff} vs 지난주` : "지난주와 동일"
+  const diffColor =
+    diff > 0 ? "text-green-600" : diff < 0 ? "text-red-600" : "text-slate-500"
+
   return (
     <StatCard
       icon={Bot}
-      value="23건"
+      value={`${weeklyReviews}건`}
       label="이번주 리뷰"
       badge={
-        <span className="text-green-600 text-xs font-semibold flex items-center gap-1">+8 vs 지난주</span>
+        <span className={`text-xs font-semibold flex items-center gap-1 ${diffColor}`}>
+          {diffText}
+        </span>
       }
     />
   )
