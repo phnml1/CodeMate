@@ -21,7 +21,7 @@ export async function authenticateSocket(
     })
 
     if (!res.ok) return null
-    return res.json()
+    return res.json() as Promise<Pick<SocketData, "userId" | "userName">>
   } catch (err) {
     console.error("[Socket Auth] Failed to verify session:", err)
     return null

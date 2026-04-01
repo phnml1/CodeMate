@@ -40,7 +40,8 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
 
     try {
       const body = (await parseBody(req)) as { event: string; room: string; data: unknown }
-      io.to(body.room).emit(body.event as keyof any, body.data)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      io.to(body.room).emit(body.event as any, body.data)
       res.writeHead(200, { "Content-Type": "application/json" })
       res.end(JSON.stringify({ ok: true }))
     } catch {

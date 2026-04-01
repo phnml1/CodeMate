@@ -1,5 +1,4 @@
 import type { Server, Socket } from "socket.io"
-import type { Socket as ClientSocket } from "socket.io-client"
 
 // --- Comment types (inline from @/types/comment) ---
 export type ReactionEmoji = "👍" | "❤️" | "🎉" | "🚀" | "👀"
@@ -88,7 +87,3 @@ export type TypedServerSocket = Socket<
   SocketData
 >
 
-export type TypedClientSocket = ClientSocket<
-  ServerToClientEvents,
-  ClientToServerEvents
->
