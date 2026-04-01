@@ -1,29 +1,44 @@
+import { createHmac } from "crypto"
 import type { TypedServerSocket, SocketData } from "./types"
 
-export async function authenticateSocket(
+export function authenticateSocket(
   socket: TypedServerSocket
-): Promise<Pick<SocketData, "userId" | "userName"> | null> {
-  const cookieHeader = socket.handshake.headers.cookie
-  if (!cookieHeader) return null
+): Pick<SocketData, "userId" | "userName"> | null {
+  const token = socket.handshake.auth?.token as string | undefined
+  if (!token) {
+    console.error("[Socket Auth] No token provided")
+    return null
+  }
 
-  const nextjsUrl = process.env.NEXTJS_URL
-  if (!nextjsUrl) {
-    console.error("[Socket Auth] NEXTJS_URL is not set")
+  const secret = process.env.SOCKET_INTERNAL_SECRET
+  if (!secret) {
+    console.error("[Socket Auth] SOCKET_INTERNAL_SECRET is not set")
+    return null
+  }
+
+  const [payload, signature] = token.split(".")
+  if (!payload || !signature) {
+    console.error("[Socket Auth] Malformed token")
+    return null
+  }
+
+  const expected = createHmac("sha256", secret).update(payload).digest("hex")
+  if (expected !== signature) {
+    console.error("[Socket Auth] Invalid signature")
     return null
   }
 
   try {
-    const res = await fetch(`${nextjsUrl}/api/socket/auth`, {
-      headers: {
-        cookie: cookieHeader,
-        "x-socket-secret": process.env.SOCKET_INTERNAL_SECRET ?? "",
-      },
-    })
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString())
 
-    if (!res.ok) return null
-    return res.json() as Promise<Pick<SocketData, "userId" | "userName">>
-  } catch (err) {
-    console.error("[Socket Auth] Failed to verify session:", err)
+    if (data.exp < Math.floor(Date.now() / 1000)) {
+      console.error("[Socket Auth] Token expired")
+      return null
+    }
+
+    return { userId: data.userId, userName: data.userName }
+  } catch {
+    console.error("[Socket Auth] Failed to parse token payload")
     return null
   }
 }

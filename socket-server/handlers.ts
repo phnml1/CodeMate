@@ -32,8 +32,8 @@ function registerTypingHandlers(socket: TypedServerSocket) {
 }
 
 export function setupSocketHandlers(io: TypedServer) {
-  io.on("connection", async (socket) => {
-    const userData = await authenticateSocket(socket)
+  io.on("connection", (socket) => {
+    const userData = authenticateSocket(socket)
 
     if (!userData) {
       socket.disconnect(true)
