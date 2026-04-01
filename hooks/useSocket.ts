@@ -40,7 +40,7 @@ function connect() {
   if (socket) return
   if (process.env.NEXT_PUBLIC_REALTIME_MODE !== "socket") return
 
-  socket = io({
+  socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000", {
     path: "/socket.io",
     reconnection: true,
     reconnectionDelay: 1000,
