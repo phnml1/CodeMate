@@ -1,33 +1,43 @@
 import type { CommentWithAuthor } from "@/types/comment"
 import type { BaseNotification } from "@/types/notification"
-import { getSocketServer } from "./server"
 
-// Prisma에서 반환된 Date 객체를 JSON 직렬화 (string으로 변환)
 function serialize<T>(data: unknown): T {
   return JSON.parse(JSON.stringify(data))
 }
 
+async function emitToSocket(room: string, event: string, data: unknown): Promise<void> {
+  const socketUrl = process.env.SOCKET_SERVER_URL
+  if (!socketUrl) {
+    console.warn("[Socket Emitter] SOCKET_SERVER_URL not set, skipping emit")
+    return
+  }
+
+  try {
+    await fetch(`${socketUrl}/internal/emit`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-socket-secret": process.env.SOCKET_INTERNAL_SECRET ?? "",
+      },
+      body: JSON.stringify({ event, room, data }),
+    })
+  } catch (err) {
+    console.error("[Socket Emitter] Failed to emit event:", err)
+  }
+}
+
 export function emitCommentNew(prId: string, comment: unknown) {
-  getSocketServer()
-    ?.to(`pr:${prId}`)
-    .emit("comment:new", serialize<CommentWithAuthor>(comment))
+  emitToSocket(`pr:${prId}`, "comment:new", serialize<CommentWithAuthor>(comment))
 }
 
 export function emitCommentUpdated(prId: string, comment: unknown) {
-  getSocketServer()
-    ?.to(`pr:${prId}`)
-    .emit("comment:updated", serialize<CommentWithAuthor>(comment))
+  emitToSocket(`pr:${prId}`, "comment:updated", serialize<CommentWithAuthor>(comment))
 }
 
 export function emitCommentDeleted(prId: string, commentId: string) {
-  getSocketServer()
-    ?.to(`pr:${prId}`)
-    .emit("comment:deleted", { commentId, prId })
+  emitToSocket(`pr:${prId}`, "comment:deleted", { commentId, prId })
 }
 
-export function emitNotification(
-  userId: string,
-  notification: BaseNotification
-) {
-  getSocketServer()?.to(`user:${userId}`).emit("notification:new", notification)
+export function emitNotification(userId: string, notification: BaseNotification) {
+  emitToSocket(`user:${userId}`, "notification:new", notification)
 }
