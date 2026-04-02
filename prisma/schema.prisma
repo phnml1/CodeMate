@@ -29,6 +29,7 @@ model User {
   comments      Comment[]
   notifications       Notification[]
   notificationSetting NotificationSetting?
+  reviewSetting       ReviewSetting?
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -246,6 +247,18 @@ model NotificationSetting {
   commentReplyEnabled Boolean @default(true)
 
   updatedAt DateTime @updatedAt
+}
+
+model ReviewSetting {
+  id            String  @id @default(cuid())
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String  @unique
+
+  autoReview    Boolean @default(true)
+  language      String  @default("ko")      // "ko" | "en"
+  severityLevel String  @default("normal")  // "strict" | "normal" | "lenient"
+
+  updatedAt     DateTime @updatedAt
 }
 
 enum NotificationType {
