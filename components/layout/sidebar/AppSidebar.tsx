@@ -1,5 +1,4 @@
-"use client"
-
+import { auth } from "@/lib/auth"
 import {
   Sidebar,
   SidebarContent,
@@ -12,7 +11,10 @@ import { SidebarLogo } from "./SidebarLogo"
 import { SidebarNav } from "./SidebarNav"
 import { SidebarUser } from "./SidebarUser"
 
-export function AppSidebar() {
+export async function AppSidebar() {
+  const session = await auth()
+  const user = session?.user
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-3">
@@ -24,7 +26,9 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarSeparator />
       <SidebarFooter>
-        <SidebarUser />
+        <SidebarUser
+          user={user ? { name: user.name, email: user.email, image: user.image } : undefined}
+        />
       </SidebarFooter>
     </Sidebar>
   )
