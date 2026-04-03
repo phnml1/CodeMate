@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
 import {
   fetchDashboardStats,
@@ -8,6 +9,11 @@ import {
 import StatCards from "@/components/dashboard/stat-cards/StatCards"
 import ChartsSection from "@/components/dashboard/charts/ChartsSection"
 import RecentPRSection from "@/components/dashboard/recent-prs/RecentPRSection"
+
+export const metadata: Metadata = {
+  title: "대시보드",
+  description: "코드 품질 통계 및 최근 Pull Request 현황을 한눈에 확인하세요",
+}
 
 export default async function Page() {
   const session = await auth()

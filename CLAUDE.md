@@ -105,5 +105,23 @@ export default function CommentsHeader({ totalCount, isLoading }) {
 
 ---
 
+## PR 규칙
+
+### PR 템플릿 준수
+모든 PR은 `.github/pull_request_template.md`를 참고하여 작성합니다.
+
+**필수 항목:**
+- [ ] 작업 유형 (feat, fix, refactor, style, test, docs, chore)
+- [ ] 개요: PR이 하는 일을 간단히 설명
+- [ ] 변경 사항: 주요 변경 사항을 목록으로 작성
+- [ ] 테스트: 테스트 항목 체크
+
+**권장 항목:**
+- [ ] 관련 마일스톤 (Week 1-10 중 해당하는 주차)
+- [ ] 스크린샷 (UI 변경이 있는 경우)
+- [ ] 참고 사항 (리뷰어가 알아야 할 추가 정보)
+
+---
+
 ## 푸시 규칙
 - **git push는 항상 사용자 허락 후 실행**

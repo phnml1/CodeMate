@@ -1,24 +1,11 @@
-"use client"
+import type { Metadata } from "next"
+import RepositoriesClient from "@/components/repositories/RepositoriesClient"
 
-import { useState } from "react"
-
-import { useRepositories } from "@/hooks/useRepositories"
-import RepositoriesPageHeader from "@/components/github/RepositoriesPageHeader"
-import RepoSearchBar from "@/components/github/RepoSearchBar"
-import RepoList from "@/components/github/RepoList"
+export const metadata: Metadata = {
+  title: "저장소",
+  description: "GitHub 저장소를 연동하고 관리하세요",
+}
 
 export default function Page() {
-  const [search, setSearch] = useState("")
-  const { data } = useRepositories()
-
-  const connectedCount =
-    data?.pages.flatMap((p) => p.repos).filter((r) => r.isConnected).length ?? 0
-
-  return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <RepositoriesPageHeader connectedCount={connectedCount} />
-      <RepoSearchBar value={search} onChange={setSearch} />
-      <RepoList search={search} />
-    </div>
-  )
+  return <RepositoriesClient />
 }

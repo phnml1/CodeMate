@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="headGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e0eaff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="180" height="180" rx="38" fill="url(#bg)"/>
+
+  <!-- Antenna stem -->
+  <rect x="84" y="24" width="12" height="26" rx="6" fill="white" opacity="0.95"/>
+  <!-- Antenna ball -->
+  <circle cx="90" cy="20" r="10" fill="white"/>
+  <circle cx="90" cy="20" r="6" fill="#93c5fd"/>
+
+  <!-- Head -->
+  <rect x="36" y="50" width="108" height="82" rx="17" fill="url(#headGrad)"/>
+
+  <!-- Left eye -->
+  <circle cx="65" cy="86" r="14" fill="#2563eb"/>
+  <circle cx="69" cy="82" r="4" fill="white" opacity="0.9"/>
+  <circle cx="65" cy="86" r="4" fill="#1e3a8a"/>
+
+  <!-- Right eye -->
+  <circle cx="115" cy="86" r="14" fill="#2563eb"/>
+  <circle cx="119" cy="82" r="4" fill="white" opacity="0.9"/>
+  <circle cx="115" cy="86" r="4" fill="#1e3a8a"/>
+
+  <!-- Mouth -->
+  <rect x="63" y="110" width="54" height="11" rx="5.5" fill="#2563eb" opacity="0.85"/>
+
+  <!-- Ear accents -->
+  <circle cx="36" cy="91" r="6" fill="#60a5fa" opacity="0.6"/>
+  <circle cx="144" cy="91" r="6" fill="#60a5fa" opacity="0.6"/>
+</svg>
