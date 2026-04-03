@@ -45,3 +45,6 @@ setups
 /lib/generated/prisma
 docs
 .claude
+
+/socket-server/node_modules
+/socket-server/package-lock.json

@@ -1,7 +1,13 @@
+import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import SettingsClient from "@/components/settings/SettingsClient"
+
+export const metadata: Metadata = {
+  title: "설정",
+  description: "계정 정보 및 GitHub 연동을 관리하세요",
+}
 
 export default async function SettingsPage() {
   const session = await auth()
