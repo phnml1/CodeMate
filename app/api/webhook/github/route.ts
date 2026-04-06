@@ -3,7 +3,7 @@ import { verifyWebhookSignature } from "@/lib/webhook-validator"
 import { analyzeReview } from "@/lib/ai/analyze"
 import { emitNotification } from "@/lib/socket/emitter"
 import { isNotificationEnabled } from "@/lib/notification-settings"
-import { NextResponse } from "next/server"
+import { NextResponse, after } from "next/server"
 
 function getPRStatus(pr: {
   state: string
@@ -109,22 +109,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "PR status processed" })
     }
 
-    // Create PENDING review record and trigger analysis in background
-    await prisma.review.create({
-      data: {
-        pullRequestId: pullRequest.id,
-        status: "PENDING",
-        aiSuggestions: {},
-        qualityScore: 0,
-        severity: "LOW",
-        issueCount: 0,
-      },
-    })
+    // after(): 응답 반환 후에도 런타임이 이 블록이 완료될 때까지 인스턴스를 유지함
+    // PENDING 레코드 생성은 analyzeReview 내부에서 단독으로 관리
+    after(async () => {
+      try {
+        await analyzeReview(pullRequest.id)
 
-    // Fire-and-forget: respond immediately, analyze in background
-    analyzeReview(pullRequest.id)
-      .then(async () => {
         if (!(await isNotificationEnabled(repository.userId, "NEW_REVIEW"))) return
+
         const notification = await prisma.notification.create({
           data: {
             type: "NEW_REVIEW",
@@ -138,9 +130,12 @@ export async function POST(request: Request) {
           ...notification,
           createdAt: notification.createdAt.toISOString(),
         })
-      })
-      .catch((err) => console.error("[webhook] analyzeReview failed:", err)
-      )
+      } catch (err) {
+        // after() 내부 에러는 응답에 영향 없음
+        // try/catch 없으면 에러가 완전히 무시되므로 반드시 로깅
+        console.error("[webhook] analyzeReview failed:", err)
+      }
+    })
 
     return NextResponse.json({ message: "PR processed" })
   } catch {
