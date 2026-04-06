@@ -64,15 +64,21 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
       per_page: 100,
     })
 
-    const diff = files
-      .filter((f) => f.patch)
-      .map((f) => `--- ${f.filename}\n${f.patch}`)
-      .join("\n\n")
+    const MAX_DIFF_CHARS = 20000
+    let diff = ""
+    for (const f of files.filter((f) => f.patch)) {
+      const chunk = `--- ${f.filename}\n${f.patch}\n\n`
+      if (diff.length + chunk.length > MAX_DIFF_CHARS) {
+        diff += "... (diff truncated)"
+        break
+      }
+      diff += chunk
+    }
 
     // Call Claude
     const response = await getAnthropicClient().messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: SYSTEM_PROMPT,
       messages: [
         {
