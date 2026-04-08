@@ -164,6 +164,9 @@ model Review {
 
   @@index([pullRequestId])
   @@index([status])
+  // NOTE: PENDING/IN_PROGRESS 상태는 pullRequestId당 1개만 허용하는 partial unique index가
+  // raw migration으로 적용되어 있음 (Prisma schema 문법으로 표현 불가).
+  // → prisma/migrations/20260408000000_add_review_active_unique/migration.sql 참고
 }
 
 enum Severity {
