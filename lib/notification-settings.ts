@@ -49,8 +49,8 @@ export async function getEnabledUserIds(
     select: { userId: true, [key]: true },
   })
 
-  const settingsMap = new Map(
-    settings.map((s) => [s.userId, s[key as keyof typeof s] as boolean])
+  const settingsMap = new Map<string, boolean>(
+    settings.map((s) => [s.userId, (s as Record<string, unknown>)[key] as boolean])
   )
 
   // Map에 없는 userId = 설정 레코드 없음 → 기본값 true
