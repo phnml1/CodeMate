@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 import { emitCommentNew, emitNotification } from "@/lib/socket/emitter"
-import { isNotificationEnabled } from "@/lib/notification-settings"
+import { isNotificationEnabled, getEnabledUserIds } from "@/lib/notification-settings"
 
 /**
  * @swagger
@@ -152,13 +152,8 @@ export async function POST(
       if (uniqueMentions.length > 0) {
         const mentionMessage = `${session.user.name ?? "누군가"}님이 댓글에서 회원님을 멘션했습니다.`
 
-        // 구독 설정 확인 후 알림 생성
-        const enabledMentions: string[] = []
-        for (const userId of uniqueMentions) {
-          if (await isNotificationEnabled(userId, "MENTION")) {
-            enabledMentions.push(userId)
-          }
-        }
+        // 구독 설정 확인 후 알림 생성 — 배치 조회로 N+1 방지
+        const enabledMentions = await getEnabledUserIds(uniqueMentions, "MENTION")
 
         if (enabledMentions.length > 0) {
           await prisma.notification.createMany({
