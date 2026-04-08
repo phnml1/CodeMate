@@ -5,6 +5,10 @@ import { emitNotification } from "@/lib/socket/emitter"
 import { isNotificationEnabled } from "@/lib/notification-settings"
 import { NextResponse, after } from "next/server"
 
+// after() 블록이 완료될 때까지 인스턴스를 유지하려면 maxDuration 명시 필요
+// 미설정 시 Vercel 기본값(Hobby 10초, Pro 15초)이 적용되어 after()가 중간에 잘림
+export const maxDuration = 300
+
 function getPRStatus(pr: {
   state: string
   draft: boolean
@@ -131,9 +135,25 @@ export async function POST(request: Request) {
           createdAt: notification.createdAt.toISOString(),
         })
       } catch (err) {
-        // after() 내부 에러는 응답에 영향 없음
-        // try/catch 없으면 에러가 완전히 무시되므로 반드시 로깅
         console.error("[webhook] analyzeReview failed:", err)
+
+        try {
+          const failureNotification = await prisma.notification.create({
+            data: {
+              type: "REVIEW_FAILED",
+              title: "AI 코드 리뷰에 실패했습니다",
+              message: `"${pr.title}" PR의 AI 코드 리뷰를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.`,
+              userId: repository.userId,
+              prId: pullRequest.id,
+            },
+          })
+          emitNotification(repository.userId, {
+            ...failureNotification,
+            createdAt: failureNotification.createdAt.toISOString(),
+          })
+        } catch (notifyErr) {
+          console.error("[webhook] failed to send failure notification:", notifyErr)
+        }
       }
     })
 

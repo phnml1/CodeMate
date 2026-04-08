@@ -1,22 +1,31 @@
 import { POST } from "@/app/api/webhook/github/route"
 import { prisma } from "@/lib/prisma"
 import * as webhookValidator from "@/lib/webhook-validator"
+import * as analyzeModule from "@/lib/ai/analyze"
+import * as emitterModule from "@/lib/socket/emitter"
 import crypto from "crypto"
+
+// after()는 콜백을 큐에 저장 → flushAfter()로 수동 실행
+// POST가 after() 완료를 기다리지 않으므로 직접 flush해야 비동기 결과 검증 가능
+const afterQueue: Array<() => Promise<void>> = []
+async function flushAfter() {
+  for (const fn of afterQueue) await fn()
+  afterQueue.length = 0
+}
+
+jest.mock("next/server", () => {
+  const actual = jest.requireActual("next/server")
+  return {
+    ...actual,
+    after: jest.fn((fn: () => Promise<void>) => { afterQueue.push(fn) }),
+  }
+})
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
-    repository: {
-      findFirst: jest.fn(),
-    },
-    pullRequest: {
-      upsert: jest.fn(),
-    },
-    review: {
-      create: jest.fn(),
-    },
-    notification: {
-      create: jest.fn(),
-    },
+    repository: { findFirst: jest.fn() },
+    pullRequest: { upsert: jest.fn() },
+    notification: { create: jest.fn() },
   },
 }))
 
@@ -39,24 +48,23 @@ jest.mock("@/lib/notification-settings", () => ({
 const mockedVerify = webhookValidator.verifyWebhookSignature as jest.Mock
 const mockedFindFirst = prisma.repository.findFirst as jest.Mock
 const mockedUpsert = prisma.pullRequest.upsert as jest.Mock
-
-const SECRET = "test-secret"
+const mockedAnalyzeReview = analyzeModule.analyzeReview as jest.Mock
+const mockedEmitNotification = emitterModule.emitNotification as jest.Mock
 
 function makeSignature(payload: string): string {
-  const hmac = crypto.createHmac("sha256", SECRET)
+  const hmac = crypto.createHmac("sha256", "test-secret")
   hmac.update(payload)
   return "sha256=" + hmac.digest("hex")
 }
 
 function createRequest(body: object, event = "pull_request", valid = true) {
   const payload = JSON.stringify(body)
-  const signature = valid ? makeSignature(payload) : "sha256=invalid"
   return new Request("http://localhost/api/webhook/github", {
     method: "POST",
     body: payload,
     headers: {
       "content-type": "application/json",
-      "x-hub-signature-256": signature,
+      "x-hub-signature-256": valid ? makeSignature(payload) : "sha256=invalid",
       "x-github-event": event,
     },
   })
@@ -84,36 +92,87 @@ const prPayload = {
 }
 
 describe("POST /api/webhook/github", () => {
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
-  it("유효한 서명과 PR opened 이벤트를 처리한다", async () => {
+  beforeEach(() => {
     mockedVerify.mockResolvedValue(true)
     mockedFindFirst.mockResolvedValue({ id: "repo-1", userId: "user-1" })
     mockedUpsert.mockResolvedValue({ id: "pr-1" })
-    ;(prisma.review.create as jest.Mock).mockResolvedValue({ id: "review-1" })
     ;(prisma.notification.create as jest.Mock).mockResolvedValue({
       id: "notif-1",
       type: "NEW_REVIEW",
+      title: "AI 코드 리뷰가 완료되었습니다",
+      message: null,
+      isRead: false,
+      userId: "user-1",
+      prId: "pr-1",
+      commentId: null,
       createdAt: new Date(),
     })
+  })
 
+  afterEach(() => {
+    jest.clearAllMocks()
+    afterQueue.length = 0
+  })
+
+  it("유효한 PR opened 이벤트에 200으로 즉시 응답한다", async () => {
     const response = await POST(createRequest(prPayload))
     const body = await response.json()
 
     expect(response.status).toBe(200)
     expect(body.message).toBe("PR processed")
-    expect(mockedUpsert).toHaveBeenCalledWith(
+  })
+
+  it("after() 안에서 analyzeReview를 호출한다 (PENDING 생성은 analyzeReview 내부 책임)", async () => {
+    await POST(createRequest(prPayload))
+    await flushAfter()
+
+    expect(mockedAnalyzeReview).toHaveBeenCalledWith("pr-1")
+    // webhook이 직접 review.create를 호출하지 않음
+    expect(prisma.notification.create).toHaveBeenCalledTimes(1) // NEW_REVIEW 알림만
+  })
+
+  it("analyzeReview 성공 시 NEW_REVIEW 알림을 발송한다", async () => {
+    await POST(createRequest(prPayload))
+    await flushAfter()
+
+    expect(prisma.notification.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { githubId: BigInt(1001) },
-        create: expect.objectContaining({ number: 42, title: "Fix bug", status: "OPEN" }),
+        data: expect.objectContaining({ type: "NEW_REVIEW", userId: "user-1", prId: "pr-1" }),
       })
     )
-    expect(prisma.review.create).toHaveBeenCalledWith(
+    expect(mockedEmitNotification).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({ type: "NEW_REVIEW" })
+    )
+  })
+
+  it("analyzeReview 실패 시 REVIEW_FAILED 알림을 발송한다", async () => {
+    mockedAnalyzeReview.mockRejectedValueOnce(new Error("Claude timeout"))
+    ;(prisma.notification.create as jest.Mock).mockResolvedValue({
+      id: "notif-fail",
+      type: "REVIEW_FAILED",
+      title: "AI 코드 리뷰에 실패했습니다",
+      message: null,
+      isRead: false,
+      userId: "user-1",
+      prId: "pr-1",
+      commentId: null,
+      createdAt: new Date(),
+    })
+
+    const response = await POST(createRequest(prPayload))
+    await flushAfter()
+
+    // 분석 실패여도 webhook 응답은 200
+    expect(response.status).toBe(200)
+    expect(prisma.notification.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ pullRequestId: "pr-1", status: "PENDING" }),
+        data: expect.objectContaining({ type: "REVIEW_FAILED", userId: "user-1" }),
       })
+    )
+    expect(mockedEmitNotification).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({ type: "REVIEW_FAILED" })
     )
   })
 
@@ -128,8 +187,6 @@ describe("POST /api/webhook/github", () => {
   })
 
   it("pull_request 외 이벤트는 200으로 무시한다", async () => {
-    mockedVerify.mockResolvedValue(true)
-
     const response = await POST(createRequest({ zen: "Keep it simple" }, "ping"))
     const body = await response.json()
 
@@ -139,11 +196,7 @@ describe("POST /api/webhook/github", () => {
   })
 
   it("opened/synchronize/closed 외 action은 무시한다", async () => {
-    mockedVerify.mockResolvedValue(true)
-
-    const response = await POST(
-      createRequest({ ...prPayload, action: "labeled" })
-    )
+    const response = await POST(createRequest({ ...prPayload, action: "labeled" }))
     const body = await response.json()
 
     expect(response.status).toBe(200)
@@ -151,15 +204,12 @@ describe("POST /api/webhook/github", () => {
     expect(mockedUpsert).not.toHaveBeenCalled()
   })
 
-  it("closed action은 PR 상태 변경을 처리하고 알림을 생성한다", async () => {
-    mockedVerify.mockResolvedValue(true)
-    mockedFindFirst.mockResolvedValue({ id: "repo-1", userId: "user-1" })
-    mockedUpsert.mockResolvedValue({ id: "pr-1" })
+  it("closed action은 PR 상태 변경을 처리하고 PR_MERGED 알림을 생성한다", async () => {
     ;(prisma.notification.create as jest.Mock).mockResolvedValue({
       id: "notif-1",
       type: "PR_MERGED",
       title: "PR이 닫혔습니다",
-      message: "...",
+      message: null,
       isRead: false,
       userId: "user-1",
       prId: "pr-1",
@@ -178,10 +228,14 @@ describe("POST /api/webhook/github", () => {
 
     expect(response.status).toBe(200)
     expect(body.message).toBe("PR status processed")
+    expect(prisma.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ type: "PR_MERGED" }),
+      })
+    )
   })
 
   it("연동되지 않은 Repository의 이벤트는 404를 반환한다", async () => {
-    mockedVerify.mockResolvedValue(true)
     mockedFindFirst.mockResolvedValue(null)
 
     const response = await POST(createRequest(prPayload))
@@ -192,11 +246,6 @@ describe("POST /api/webhook/github", () => {
   })
 
   it("draft PR은 DRAFT 상태로 저장한다", async () => {
-    mockedVerify.mockResolvedValue(true)
-    mockedFindFirst.mockResolvedValue({ id: "repo-1", userId: "user-1" })
-    mockedUpsert.mockResolvedValue({})
-    ;(prisma.review.create as jest.Mock).mockResolvedValue({ id: "review-1" })
-
     const draftPayload = {
       ...prPayload,
       pull_request: { ...prPayload.pull_request, draft: true },

@@ -1,4 +1,4 @@
-export type NotificationType = "MENTION" | "NEW_REVIEW" | "PR_MERGED" | "COMMENT_REPLY"
+export type NotificationType = "MENTION" | "NEW_REVIEW" | "PR_MERGED" | "COMMENT_REPLY" | "REVIEW_FAILED"
 
 /** 소켓/DB에서 사용되는 기본 알림 타입 */
 export interface BaseNotification {

@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query"
 import type {
   CommentWithAuthor,
-  CommentWithPR,
   CommentsListResponse,
   CreateCommentInput,
   UpdateCommentInput,
