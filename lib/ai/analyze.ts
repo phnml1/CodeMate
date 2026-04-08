@@ -1,5 +1,5 @@
 import { Octokit } from "@octokit/rest"
-import { Prisma } from "@prisma/client"
+import { Prisma } from "@/lib/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getAnthropicClient, CLAUDE_MODEL } from "@/lib/ai/claude"
 import { SYSTEM_PROMPT, buildUserPrompt } from "@/lib/ai/prompts"
