@@ -3,7 +3,11 @@ import { verifyWebhookSignature } from "@/lib/webhook-validator"
 import { analyzeReview } from "@/lib/ai/analyze"
 import { emitNotification } from "@/lib/socket/emitter"
 import { isNotificationEnabled } from "@/lib/notification-settings"
-import { NextResponse } from "next/server"
+import { NextResponse, after } from "next/server"
+
+// after() 블록이 완료될 때까지 인스턴스를 유지하려면 maxDuration 명시 필요
+// 미설정 시 Vercel 기본값(Hobby 10초, Pro 15초)이 적용되어 after()가 중간에 잘림
+export const maxDuration = 300
 
 function getPRStatus(pr: {
   state: string
@@ -109,22 +113,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "PR status processed" })
     }
 
-    // Create PENDING review record and trigger analysis in background
-    await prisma.review.create({
-      data: {
-        pullRequestId: pullRequest.id,
-        status: "PENDING",
-        aiSuggestions: {},
-        qualityScore: 0,
-        severity: "LOW",
-        issueCount: 0,
-      },
-    })
+    // after(): 응답 반환 후에도 런타임이 이 블록이 완료될 때까지 인스턴스를 유지함
+    // PENDING 레코드 생성은 analyzeReview 내부에서 단독으로 관리
+    after(async () => {
+      try {
+        await analyzeReview(pullRequest.id)
 
-    // Fire-and-forget: respond immediately, analyze in background
-    analyzeReview(pullRequest.id)
-      .then(async () => {
         if (!(await isNotificationEnabled(repository.userId, "NEW_REVIEW"))) return
+
         const notification = await prisma.notification.create({
           data: {
             type: "NEW_REVIEW",
@@ -138,9 +134,28 @@ export async function POST(request: Request) {
           ...notification,
           createdAt: notification.createdAt.toISOString(),
         })
-      })
-      .catch((err) => console.error("[webhook] analyzeReview failed:", err)
-      )
+      } catch (err) {
+        console.error("[webhook] analyzeReview failed:", err)
+
+        try {
+          const failureNotification = await prisma.notification.create({
+            data: {
+              type: "REVIEW_FAILED",
+              title: "AI 코드 리뷰에 실패했습니다",
+              message: `"${pr.title}" PR의 AI 코드 리뷰를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.`,
+              userId: repository.userId,
+              prId: pullRequest.id,
+            },
+          })
+          emitNotification(repository.userId, {
+            ...failureNotification,
+            createdAt: failureNotification.createdAt.toISOString(),
+          })
+        } catch (notifyErr) {
+          console.error("[webhook] failed to send failure notification:", notifyErr)
+        }
+      }
+    })
 
     return NextResponse.json({ message: "PR processed" })
   } catch {

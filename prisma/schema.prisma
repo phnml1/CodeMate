@@ -266,4 +266,5 @@ enum NotificationType {
   NEW_REVIEW
   PR_MERGED
   COMMENT_REPLY
+  REVIEW_FAILED
 }

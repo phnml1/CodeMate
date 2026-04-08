@@ -92,7 +92,6 @@ describe("GET /api/comments", () => {
 
     expect(response.status).toBe(200)
     expect(mockedTransaction).toHaveBeenCalledTimes(1)
-    const [[findManyCall]] = mockedTransaction.mock.calls
     // $transaction은 [findMany promise, count promise]를 인자로 받음
     expect(body.pagination.total).toBe(1)
   })

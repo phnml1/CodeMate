@@ -1,12 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { AlertTriangle } from "lucide-react"
 
 export default function DangerZoneSection() {
-  const router = useRouter()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -56,7 +54,7 @@ export default function DangerZoneSection() {
           <button
             onClick={handleDisconnectGitHub}
             disabled={isDisconnecting}
-            className="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+            className="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             {isDisconnecting ? "처리 중..." : "연결 해제"}
           </button>
@@ -72,7 +70,7 @@ export default function DangerZoneSection() {
           </div>
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors flex-shrink-0"
+            className="px-3 py-1.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors shrink-0"
           >
             계정 삭제
           </button>

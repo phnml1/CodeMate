@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import type { NotificationType } from "@/types/notification"
 
-const TYPE_TO_SETTING_KEY: Record<NotificationType, string> = {
+// REVIEW_FAILED는 항상 전송 (사용자가 옵트아웃 불가한 critical 알림)
+const TYPE_TO_SETTING_KEY: Partial<Record<NotificationType, string>> = {
   MENTION: "mentionEnabled",
   NEW_REVIEW: "newReviewEnabled",
   PR_MERGED: "prMergedEnabled",
@@ -20,8 +21,10 @@ export async function isNotificationEnabled(
     where: { userId },
   })
 
+  const key = TYPE_TO_SETTING_KEY[type]
+  if (!key) return true  // 설정 키가 없는 타입(REVIEW_FAILED 등)은 항상 전송
+
   if (!setting) return true
 
-  const key = TYPE_TO_SETTING_KEY[type] as keyof typeof setting
-  return setting[key] as boolean
+  return setting[key as keyof typeof setting] as boolean
 }
