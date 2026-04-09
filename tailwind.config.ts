@@ -58,9 +58,9 @@ const config = {
         "primary-fixed": "#dbe1ff",
       },
       fontFamily: {
-        headline: ["Manrope"],
-        body: ["Inter"],
-        label: ["Inter"],
+        headline: ["var(--font-manrope)"],
+        body: ["var(--font-inter)"],
+        label: ["var(--font-inter)"],
       },
       borderRadius: {
         DEFAULT: "0.25rem",
