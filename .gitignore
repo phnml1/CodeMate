@@ -45,6 +45,7 @@ setups
 /lib/generated/prisma
 docs
 .claude
+lighthouses
 
 /socket-server/node_modules
 /socket-server/package-lock.json

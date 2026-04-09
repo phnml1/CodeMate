@@ -9,14 +9,19 @@ import type {
   IssueDistribution,
   CodeChangesItem,
 } from "@/lib/stats"
+import dynamic from "next/dynamic"
+import { Skeleton } from "@/components/ui/skeleton"
 import StatsHeader from "./StatsHeader"
 import StatsSummaryCards from "./StatsSummaryCards"
-import PRTrendChart from "./charts/PRTrendChart"
-import PRStatusChart from "./charts/PRStatusChart"
-import QualityTrendChart from "./charts/QualityTrendChart"
-import IssueSeverityChart from "./charts/IssueSeverityChart"
-import CodeChangesChart from "./charts/CodeChangesChart"
-import IssueCategoryChart from "./charts/IssueCategoryChart"
+
+const ChartSkeleton = () => <Skeleton className="h-64 w-full rounded-lg" />
+
+const PRTrendChart       = dynamic(() => import("./charts/PRTrendChart"),       { ssr: false, loading: ChartSkeleton })
+const PRStatusChart      = dynamic(() => import("./charts/PRStatusChart"),      { ssr: false, loading: ChartSkeleton })
+const QualityTrendChart  = dynamic(() => import("./charts/QualityTrendChart"),  { ssr: false, loading: ChartSkeleton })
+const IssueSeverityChart = dynamic(() => import("./charts/IssueSeverityChart"), { ssr: false, loading: ChartSkeleton })
+const CodeChangesChart   = dynamic(() => import("./charts/CodeChangesChart"),   { ssr: false, loading: ChartSkeleton })
+const IssueCategoryChart = dynamic(() => import("./charts/IssueCategoryChart"), { ssr: false, loading: ChartSkeleton })
 
 interface Repo {
   id: string

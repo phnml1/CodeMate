@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { ChevronRight, ChevronDown, BotMessageSquare, MessageSquare } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Skeleton } from "@/components/ui/skeleton";
 import PRFileList from "./PRFileList";
 import PRDetailHeader from "./PRDetailHeader";
-import PRDiffViewer from "./PRDiffViewer";
 import FileIcon from "./FileIcon";
 import { usePRDetailStore } from "@/stores/prDetailStore";
 import { useComments } from "@/hooks/useComments";
@@ -14,7 +15,15 @@ import { useInlineTypingIndicator } from "@/hooks/useInlineTypingIndicator";
 import type { PRFile, PullRequest } from "@/types/pulls";
 import type { Review, ReviewIssue } from "@/types/review";
 import ReviewPanel from "@/components/review/ReviewPanel";
-import IssueDetailModal from "@/components/review/IssueDetailModal";
+
+const PRDiffViewer = dynamic(() => import("./PRDiffViewer"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-96 w-full rounded-lg" />,
+});
+
+const IssueDetailModal = dynamic(() => import("@/components/review/IssueDetailModal"), {
+  ssr: false,
+});
 
 interface PRDetailLayoutProps {
   pr: PullRequest;
