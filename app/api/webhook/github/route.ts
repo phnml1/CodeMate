@@ -3,6 +3,7 @@ import { verifyWebhookSignature } from "@/lib/webhook-validator"
 import { analyzeReview } from "@/lib/ai/analyze"
 import { emitNotification } from "@/lib/socket/emitter"
 import { isNotificationEnabled } from "@/lib/notification-settings"
+import { revalidateTag } from "next/cache"
 import { NextResponse, after } from "next/server"
 
 // after() 블록이 완료될 때까지 인스턴스를 유지하려면 maxDuration 명시 필요
@@ -110,6 +111,7 @@ export async function POST(request: Request) {
           createdAt: statusNotification.createdAt.toISOString(),
         })
       }
+      revalidateTag(`dashboard-${repository.userId}`)
       return NextResponse.json({ message: "PR status processed" })
     }
 
@@ -118,6 +120,7 @@ export async function POST(request: Request) {
     after(async () => {
       try {
         await analyzeReview(pullRequest.id)
+        revalidateTag(`dashboard-${repository.userId}`)
 
         if (!(await isNotificationEnabled(repository.userId, "NEW_REVIEW"))) return
 

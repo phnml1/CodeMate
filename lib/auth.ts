@@ -5,7 +5,9 @@ import GitHub from "next-auth/providers/github"
 import { prisma } from "./prisma"
 
 export const authConfig = {
-  adapter: PrismaAdapter(prisma),
+  // PrismaPg 드라이버 어댑터 사용 시 타입 시그니처가 달라져 @auth/prisma-adapter와 충돌
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adapter: PrismaAdapter(prisma as any),
   providers: [
     GitHub({
       clientId: process.env.GITHUB_ID!,
@@ -63,6 +65,7 @@ export const authConfig = {
   session: {
     strategy: 'database',
   },
+  trustHost: true,
 } satisfies NextAuthConfig
 
 export const { auth, handlers, signIn, signOut } = NextAuth(authConfig)
