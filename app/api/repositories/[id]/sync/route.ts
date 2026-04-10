@@ -52,7 +52,13 @@ export async function POST(
     const [owner, repo] = repository.fullName.split("/")
     const octokit = await getOctokit(session.user.id)
 
-    let updated = 0
+    // 1단계: GitHub API 결과를 메모리에 수집 (개별 실패는 건너뜀)
+    const results: {
+      id: string
+      additions: number
+      deletions: number
+      changedFiles: number
+    }[] = []
 
     for (const pr of unsynced) {
       try {
@@ -67,21 +73,34 @@ export async function POST(
           continue
         }
 
-        await prisma.pullRequest.update({
-          where: { id: pr.id },
-          data: {
-            additions: data.additions,
-            deletions: data.deletions,
-            changedFiles: data.changed_files,
-          },
+        results.push({
+          id: pr.id,
+          additions: data.additions,
+          deletions: data.deletions,
+          changedFiles: data.changed_files,
         })
-        updated++
       } catch {
         // 개별 PR 보정 실패는 건너뛰고 계속 진행
       }
     }
 
-    return NextResponse.json({ updated, total: unsynced.length })
+    // 2단계: 단일 트랜잭션으로 DB 업데이트 (N회 왕복 → 1회)
+    if (results.length > 0) {
+      await prisma.$transaction(
+        results.map((r) =>
+          prisma.pullRequest.update({
+            where: { id: r.id },
+            data: {
+              additions: r.additions,
+              deletions: r.deletions,
+              changedFiles: r.changedFiles,
+            },
+          })
+        )
+      )
+    }
+
+    return NextResponse.json({ updated: results.length, total: unsynced.length })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
