@@ -71,7 +71,19 @@ export async function GET(
             owner: { select: { id: true, name: true, image: true } },
           },
         },
-        reviews: true,
+        reviews: {
+          select: {
+            id: true,
+            status: true,
+            qualityScore: true,
+            issueCount: true,
+            severity: true,
+            reviewedAt: true,
+            // aiSuggestions 제외 — /api/pulls/[id]/review 전용 API에서 제공
+          },
+          take: 1,
+          orderBy: { reviewedAt: "desc" },
+        },
       },
     })
 
