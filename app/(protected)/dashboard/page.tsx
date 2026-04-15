@@ -1,10 +1,10 @@
 import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
 import {
-  fetchDashboardStats,
-  fetchDashboardQualityTrend,
-  fetchDashboardIssueSeverity,
-  fetchDashboardRecentPRs,
+  getCachedDashboardStats,
+  getCachedDashboardQualityTrend,
+  getCachedDashboardIssueSeverity,
+  getCachedDashboardRecentPRs,
 } from "@/lib/dashboard"
 import StatCards from "@/components/dashboard/stat-cards/StatCards"
 import ChartsSection from "@/components/dashboard/charts/ChartsSection"
@@ -20,10 +20,10 @@ export default async function Page() {
   if (!session?.user?.id) return null
 
   const [stats, qualityTrend, issueSeverity, recentPRs] = await Promise.all([
-    fetchDashboardStats(session.user.id),
-    fetchDashboardQualityTrend(session.user.id),
-    fetchDashboardIssueSeverity(session.user.id),
-    fetchDashboardRecentPRs(session.user.id),
+    getCachedDashboardStats(session.user.id),
+    getCachedDashboardQualityTrend(session.user.id),
+    getCachedDashboardIssueSeverity(session.user.id),
+    getCachedDashboardRecentPRs(session.user.id),
   ])
 
   return (

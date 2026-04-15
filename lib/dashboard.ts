@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import {
   fetchQualityTrend,
@@ -170,3 +171,31 @@ export async function fetchDashboardRecentPRs(
     status: pr.status as DashboardRecentPR["status"],
   }))
 }
+
+export const getCachedDashboardStats = (userId: string) =>
+  unstable_cache(
+    () => fetchDashboardStats(userId),
+    ["dashboard-stats", userId],
+    { revalidate: 3600, tags: ["dashboard", `dashboard-${userId}`] }
+  )()
+
+export const getCachedDashboardQualityTrend = (userId: string) =>
+  unstable_cache(
+    () => fetchDashboardQualityTrend(userId),
+    ["dashboard-quality-trend", userId],
+    { revalidate: 3600, tags: ["dashboard", `dashboard-${userId}`] }
+  )()
+
+export const getCachedDashboardIssueSeverity = (userId: string) =>
+  unstable_cache(
+    () => fetchDashboardIssueSeverity(userId),
+    ["dashboard-issue-severity", userId],
+    { revalidate: 3600, tags: ["dashboard", `dashboard-${userId}`] }
+  )()
+
+export const getCachedDashboardRecentPRs = (userId: string) =>
+  unstable_cache(
+    () => fetchDashboardRecentPRs(userId),
+    ["dashboard-recent-prs", userId],
+    { revalidate: 3600, tags: ["dashboard", `dashboard-${userId}`] }
+  )()
