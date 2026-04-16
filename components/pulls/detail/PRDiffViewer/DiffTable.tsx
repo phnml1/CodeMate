@@ -8,8 +8,8 @@ import type { DiffLine } from "@/lib/diff"
 import type { ReviewIssue } from "@/types/review"
 import type { CommentWithAuthor } from "@/types/comment"
 import { ISSUE_ICON } from "@/lib/review-ui"
-import InlineCommentForm from "@/components/comment/InlineCommentForm"
-import InlineCommentThread from "@/components/comment/InlineCommentThread"
+import InlineCommentForm from "../../../comment/InlineCommentForm"
+import InlineCommentThread from "../../../comment/InlineCommentThread"
 import { useInlineTypingIndicator } from "@/hooks/useInlineTypingIndicator"
 
 interface DiffTableProps {
