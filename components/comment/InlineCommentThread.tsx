@@ -3,7 +3,7 @@
 import Image from "next/image"
 import { formatDistanceToNow } from "date-fns"
 import { ko } from "date-fns/locale"
-import { Trash2 } from "lucide-react"
+import { Loader2, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useDeleteComment } from "@/hooks/useComments"
 import type { CommentWithAuthor } from "@/types/comment"
@@ -23,7 +23,11 @@ export default function InlineCommentThread({
 
   return (
     <div className="bg-slate-50 dark:bg-slate-800/50 border-y border-slate-200 dark:border-slate-700 divide-y divide-slate-200 dark:divide-slate-700">
-      {comments.map((comment) => (
+      {comments.map((comment) => {
+        const isDeletingComment =
+          deleteComment.isPending && deleteComment.variables === comment.id
+
+        return (
         <div key={comment.id} id={`comment-${comment.id}`} className="px-4 py-3 flex gap-3">
           <div className="shrink-0">
             {comment.author.image ? (
@@ -65,9 +69,15 @@ export default function InlineCommentThread({
             <p className="mt-0.5 text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
               {comment.content}
             </p>
+            {isDeletingComment && (
+              <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-300">
+                <Loader2 size={11} className="animate-spin" />
+                삭제 중입니다...
+              </div>
+            )}
           </div>
         </div>
-      ))}
+      )})}
     </div>
   )
 }
