@@ -20,6 +20,8 @@ interface DiffTableProps {
   prId?: string
   filePath?: string
   currentUserId?: string
+  currentUserName?: string | null
+  currentUserImage?: string | null
 }
 
 export default function DiffTable({
@@ -30,6 +32,8 @@ export default function DiffTable({
   prId,
   filePath,
   currentUserId = "",
+  currentUserName = null,
+  currentUserImage = null,
 }: DiffTableProps) {
   const [hoveredLine, setHoveredLine] = useState<number | null>(null)
   const [openFormLine, setOpenFormLine] = useState<number | null>(null)
@@ -135,6 +139,9 @@ export default function DiffTable({
                       prId={prId!}
                       filePath={filePath!}
                       lineNumber={line.newNum!}
+                      currentUserId={currentUserId}
+                      currentUserName={currentUserName}
+                      currentUserImage={currentUserImage}
                       onClose={() => setOpenFormLine(null)}
                     />
                   </td>

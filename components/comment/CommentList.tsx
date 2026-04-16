@@ -26,6 +26,8 @@ import type { CommentWithAuthor, MentionUser } from "@/types/comment"
 interface CommentListProps {
   prId: string
   currentUserId: string
+  currentUserName?: string | null
+  currentUserImage?: string | null
 }
 
 const isSocketMode = process.env.NEXT_PUBLIC_REALTIME_MODE === "socket"
@@ -125,6 +127,8 @@ function ChatBubble({
 }) {
   const deleteComment = useDeleteComment(prId)
   const isPendingComment = isOptimisticComment(comment.id)
+  const isDeletingComment =
+    deleteComment.isPending && deleteComment.variables === comment.id
 
   return (
     <div className={cn("group flex items-end gap-2", isOwn ? "flex-row-reverse" : "flex-row")}>
@@ -168,7 +172,7 @@ function ChatBubble({
               isOwn
                 ? "rounded-[18px] rounded-br-[4px] bg-blue-500 text-white"
                 : "rounded-[18px] rounded-bl-[4px] border border-slate-100 bg-white text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100",
-              isPendingComment && "opacity-80"
+              (isPendingComment || isDeletingComment) && "opacity-80"
             )}
           >
             {renderContent(comment.content, isOwn)}
@@ -186,6 +190,18 @@ function ChatBubble({
             )}
           </div>
 
+          {isDeletingComment && (
+            <span
+              className={cn(
+                "mb-1 inline-flex shrink-0 items-center gap-1 text-[10px] font-medium",
+                isOwn ? "text-blue-200" : "text-slate-500 dark:text-slate-300"
+              )}
+            >
+              <Loader2 size={10} className="animate-spin" />
+              삭제 중입니다...
+            </span>
+          )}
+
           {isOwn && !isPendingComment && (
             <button
               className="mb-1 shrink-0 text-slate-300 opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
@@ -202,14 +218,14 @@ function ChatBubble({
           {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: ko })}
         </span>
 
-        {comment.replies.length > 0 && (
+        {(comment.replies?.length ?? 0) > 0 && (
           <div
             className={cn(
               "mt-0.5 flex w-full flex-col gap-1",
               isOwn ? "items-end" : "items-start"
             )}
           >
-            {comment.replies.map((reply) => {
+            {(comment.replies ?? []).map((reply) => {
               const isOwnReply = reply.authorId === currentUserId
               const isPendingReply = isOptimisticComment(reply.id)
 
@@ -251,9 +267,18 @@ function ChatBubble({
   )
 }
 
-export default function CommentList({ prId, currentUserId }: CommentListProps) {
+export default function CommentList({
+  prId,
+  currentUserId,
+  currentUserName,
+  currentUserImage,
+}: CommentListProps) {
   const { data: allComments = [], isLoading } = useRealtimeComments(prId)
-  const createComment = useCreateComment(prId, { id: currentUserId })
+  const createComment = useCreateComment(prId, {
+    id: currentUserId,
+    name: currentUserName,
+    image: currentUserImage,
+  })
   const { names: typingNames, onTyping, onTypingStop } = useTypingIndicator(prId)
   const { connectionStatus, connectionError } = useSocket()
   const { data: pr } = usePRDetail(prId)
@@ -273,7 +298,10 @@ export default function CommentList({ prId, currentUserId }: CommentListProps) {
     const users: MentionUser[] = []
     const candidates = [
       pr?.repo.owner,
-      ...allComments.flatMap((comment) => [comment.author, ...comment.replies.map((reply) => reply.author)]),
+      ...allComments.flatMap((comment) => [
+        comment.author,
+        ...(Array.isArray(comment.replies) ? comment.replies : []).map((reply) => reply.author),
+      ]),
     ]
 
     for (const user of candidates) {

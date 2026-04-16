@@ -20,6 +20,18 @@ type OptimisticUser = {
   image?: string | null
 }
 
+function normalizeComment(comment: CommentWithAuthor): CommentWithAuthor {
+  return {
+    ...comment,
+    author: {
+      id: comment.author?.id ?? comment.authorId,
+      name: comment.author?.name ?? null,
+      image: comment.author?.image ?? null,
+    },
+    replies: Array.isArray(comment.replies) ? comment.replies.map(normalizeComment) : [],
+  }
+}
+
 async function fetchAllCommentsPage(
   filter: CommentsFilter,
   page: number
@@ -32,7 +44,7 @@ async function fetchAllCommentsPage(
   params.set("limit", "20")
 
   const res = await fetch(`/api/comments?${params}`)
-  if (!res.ok) throw new Error("댓글을 불러오지 못했습니다.")
+  if (!res.ok) throw new Error("Failed to load comments.")
   return res.json()
 }
 
@@ -50,28 +62,32 @@ export function useAllComments(filter: CommentsFilter) {
 
 async function fetchComments(prId: string): Promise<CommentWithAuthor[]> {
   const res = await fetch(`/api/pulls/${prId}/comments`)
-  if (!res.ok) throw new Error("댓글을 불러오지 못했습니다.")
+  if (!res.ok) throw new Error("Failed to load comments.")
   const data = await res.json()
-  return data.comments
+  return (data.comments as CommentWithAuthor[]).map(normalizeComment)
 }
 
 function appendComment(
   comments: CommentWithAuthor[],
   comment: CommentWithAuthor
 ): CommentWithAuthor[] {
-  if (comment.parentId == null) {
-    if (comments.some((item) => item.id === comment.id)) return comments
-    return [...comments, comment]
+  const normalizedComment = normalizeComment(comment)
+
+  if (normalizedComment.parentId == null) {
+    if (comments.some((item) => item.id === normalizedComment.id)) return comments
+    return [...comments, normalizedComment]
   }
 
   return comments.map((item) => {
-    if (item.id === comment.parentId) {
-      if (item.replies.some((reply) => reply.id === comment.id)) return item
-      return { ...item, replies: [...item.replies, comment] }
+    const replies = Array.isArray(item.replies) ? item.replies : []
+
+    if (item.id === normalizedComment.parentId) {
+      if (replies.some((reply) => reply.id === normalizedComment.id)) return item
+      return { ...item, replies: [...replies, normalizedComment] }
     }
 
-    if (item.replies.length === 0) return item
-    return { ...item, replies: appendComment(item.replies, comment) }
+    if (replies.length === 0) return item
+    return { ...item, replies: appendComment(replies, normalizedComment) }
   })
 }
 
@@ -81,22 +97,24 @@ function replaceComment(
   nextComment: CommentWithAuthor
 ): CommentWithAuthor[] {
   let replaced = false
+  const normalizedNextComment = normalizeComment(nextComment)
 
   const walk = (items: CommentWithAuthor[]): CommentWithAuthor[] =>
     items.map((item) => {
       if (item.id === targetId) {
         replaced = true
-        return nextComment
+        return normalizedNextComment
       }
 
-      if (item.replies.length === 0) return item
+      const replies = Array.isArray(item.replies) ? item.replies : []
+      if (replies.length === 0) return item
 
-      const nextReplies = walk(item.replies)
-      return nextReplies === item.replies ? item : { ...item, replies: nextReplies }
+      const nextReplies = walk(replies)
+      return nextReplies === replies ? item : { ...item, replies: nextReplies }
     })
 
   const updated = walk(comments)
-  return replaced ? updated : appendComment(updated, nextComment)
+  return replaced ? updated : appendComment(updated, normalizedNextComment)
 }
 
 export function useComments(prId: string) {
@@ -116,9 +134,9 @@ export function useCreateComment(prId: string, optimisticUser?: OptimisticUser) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       })
-      if (!res.ok) throw new Error("댓글 작성에 실패했습니다.")
+      if (!res.ok) throw new Error("Failed to create comment.")
       const data = await res.json()
-      return data.comment as CommentWithAuthor
+      return normalizeComment(data.comment as CommentWithAuthor)
     },
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: ["comments", prId] })
@@ -130,7 +148,7 @@ export function useCreateComment(prId: string, optimisticUser?: OptimisticUser) 
       const now = new Date().toISOString()
       const author: CommentAuthor = {
         id: optimisticUser?.id ?? "optimistic-user",
-        name: optimisticUser?.name ?? "나",
+        name: optimisticUser?.name ?? null,
         image: optimisticUser?.image ?? null,
       }
 
@@ -182,7 +200,7 @@ export function useUpdateComment(prId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       })
-      if (!res.ok) throw new Error("댓글 수정에 실패했습니다.")
+      if (!res.ok) throw new Error("Failed to update comment.")
       const data = await res.json()
       return data.comment as CommentWithAuthor
     },
@@ -197,7 +215,7 @@ export function useDeleteComment(prId: string) {
   return useMutation({
     mutationFn: async (commentId: string) => {
       const res = await fetch(`/api/comments/${commentId}`, { method: "DELETE" })
-      if (!res.ok) throw new Error("댓글 삭제에 실패했습니다.")
+      if (!res.ok) throw new Error("Failed to delete comment.")
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["comments", prId] })
@@ -214,7 +232,7 @@ export function useToggleReaction(prId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emoji }),
       })
-      if (!res.ok) throw new Error("반응 추가에 실패했습니다.")
+      if (!res.ok) throw new Error("Failed to toggle reaction.")
       const data = await res.json()
       return data.comment as CommentWithAuthor
     },
@@ -229,7 +247,7 @@ export function useToggleResolve(prId: string) {
   return useMutation({
     mutationFn: async (commentId: string) => {
       const res = await fetch(`/api/comments/${commentId}/resolve`, { method: "PATCH" })
-      if (!res.ok) throw new Error("resolve 토글에 실패했습니다.")
+      if (!res.ok) throw new Error("Failed to resolve comment.")
       const data = await res.json()
       return data.comment as CommentWithAuthor
     },

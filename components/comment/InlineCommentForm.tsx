@@ -11,6 +11,8 @@ interface InlineCommentFormProps {
   filePath: string
   lineNumber: number
   currentUserId?: string
+  currentUserName?: string | null
+  currentUserImage?: string | null
   onClose: () => void
 }
 
@@ -19,10 +21,16 @@ export default function InlineCommentForm({
   filePath,
   lineNumber,
   currentUserId = "",
+  currentUserName = null,
+  currentUserImage = null,
   onClose,
 }: InlineCommentFormProps) {
   const [content, setContent] = useState("")
-  const createComment = useCreateComment(prId, { id: currentUserId })
+  const createComment = useCreateComment(prId, {
+    id: currentUserId,
+    name: currentUserName,
+    image: currentUserImage,
+  })
   const { onInlineTyping, onInlineTypingStop } = useInlineTypingIndicator(prId)
 
   const handleClose = () => {

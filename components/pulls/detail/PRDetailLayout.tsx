@@ -12,6 +12,7 @@ import { usePRDetailStore } from "@/stores/prDetailStore";
 import { useComments } from "@/hooks/useComments";
 import { useSocketRoom } from "@/hooks/useSocketRoom";
 import { useInlineTypingIndicator } from "@/hooks/useInlineTypingIndicator";
+import { layoutStyles } from "@/lib/styles";
 import type { PRFile, PullRequest } from "@/types/pulls";
 import type { Review, ReviewIssue } from "@/types/review";
 import ReviewPanel from "@/components/review/ReviewPanel";
@@ -34,6 +35,8 @@ interface PRDetailLayoutProps {
   isRequesting?: boolean;
   commentSlot: React.ReactNode;
   currentUserId: string;
+  currentUserName?: string | null;
+  currentUserImage?: string | null;
 }
 
 export default function PRDetailLayout({
@@ -45,6 +48,8 @@ export default function PRDetailLayout({
   isRequesting = false,
   commentSlot,
   currentUserId,
+  currentUserName,
+  currentUserImage,
 }: PRDetailLayoutProps) {
   const selectedFile = usePRDetailStore((s) => s.selectedFile);
   const sidebarCollapsed = usePRDetailStore((s) => s.sidebarCollapsed);
@@ -178,7 +183,7 @@ export default function PRDetailLayout({
 
   return (
     <>
-      <div className="flex h-[calc(100svh-6.5rem)] md:h-[calc(100svh-8.5rem)] lg:h-[calc(100svh-9.5rem)] bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[24px] shadow-sm relative min-w-0 overflow-hidden mt-2">
+      <div className={`${layoutStyles.detailFrame} relative`}>
         <PRFileList
           files={files}
           selectedFile={selectedFile}
@@ -357,6 +362,8 @@ export default function PRDetailLayout({
                 onIssueClick={setSelectedIssue}
                 prId={pr.id}
                 currentUserId={currentUserId}
+                currentUserName={currentUserName}
+                currentUserImage={currentUserImage}
                 inlineComments={inlineCommentsByFile[file.filename] ?? []}
               />
             ))}
