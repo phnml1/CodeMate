@@ -251,7 +251,6 @@ export default function CommentCacheMeasurementClient() {
 
       <section className={`${panelClass} ${panelPaddingClass}`}>
         <h2 className="text-lg font-bold text-slate-950 dark:text-slate-50">
-          이력서/포트폴리오 기록용 문장
         </h2>
         <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-md bg-slate-950 p-4 text-sm leading-6 text-slate-100">
           {summaryReport}
