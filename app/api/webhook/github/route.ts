@@ -111,7 +111,7 @@ export async function POST(request: Request) {
           createdAt: statusNotification.createdAt.toISOString(),
         })
       }
-      revalidateTag(`dashboard-${repository.userId}`)
+      revalidateTag(`dashboard-${repository.userId}`, "max")
       return NextResponse.json({ message: "PR status processed" })
     }
 
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     after(async () => {
       try {
         await analyzeReview(pullRequest.id)
-        revalidateTag(`dashboard-${repository.userId}`)
+        revalidateTag(`dashboard-${repository.userId}`, "max")
 
         if (!(await isNotificationEnabled(repository.userId, "NEW_REVIEW"))) return
 
