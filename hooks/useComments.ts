@@ -1,16 +1,23 @@
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query"
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type {
+  CommentAuthor,
   CommentWithAuthor,
   CommentsListResponse,
   CreateCommentInput,
-  UpdateCommentInput,
   ReactionEmoji,
+  UpdateCommentInput,
 } from "@/types/comment"
 
 export interface CommentsFilter {
   repoId?: string
   prId?: string
   authorId?: string
+}
+
+type OptimisticUser = {
+  id: string
+  name?: string | null
+  image?: string | null
 }
 
 async function fetchAllCommentsPage(
@@ -48,6 +55,50 @@ async function fetchComments(prId: string): Promise<CommentWithAuthor[]> {
   return data.comments
 }
 
+function appendComment(
+  comments: CommentWithAuthor[],
+  comment: CommentWithAuthor
+): CommentWithAuthor[] {
+  if (comment.parentId == null) {
+    if (comments.some((item) => item.id === comment.id)) return comments
+    return [...comments, comment]
+  }
+
+  return comments.map((item) => {
+    if (item.id === comment.parentId) {
+      if (item.replies.some((reply) => reply.id === comment.id)) return item
+      return { ...item, replies: [...item.replies, comment] }
+    }
+
+    if (item.replies.length === 0) return item
+    return { ...item, replies: appendComment(item.replies, comment) }
+  })
+}
+
+function replaceComment(
+  comments: CommentWithAuthor[],
+  targetId: string,
+  nextComment: CommentWithAuthor
+): CommentWithAuthor[] {
+  let replaced = false
+
+  const walk = (items: CommentWithAuthor[]): CommentWithAuthor[] =>
+    items.map((item) => {
+      if (item.id === targetId) {
+        replaced = true
+        return nextComment
+      }
+
+      if (item.replies.length === 0) return item
+
+      const nextReplies = walk(item.replies)
+      return nextReplies === item.replies ? item : { ...item, replies: nextReplies }
+    })
+
+  const updated = walk(comments)
+  return replaced ? updated : appendComment(updated, nextComment)
+}
+
 export function useComments(prId: string) {
   return useQuery({
     queryKey: ["comments", prId],
@@ -55,8 +106,9 @@ export function useComments(prId: string) {
   })
 }
 
-export function useCreateComment(prId: string) {
+export function useCreateComment(prId: string, optimisticUser?: OptimisticUser) {
   const queryClient = useQueryClient()
+
   return useMutation({
     mutationFn: async (input: CreateCommentInput) => {
       const res = await fetch(`/api/pulls/${prId}/comments`, {
@@ -68,7 +120,54 @@ export function useCreateComment(prId: string) {
       const data = await res.json()
       return data.comment as CommentWithAuthor
     },
-    onSuccess: () => {
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: ["comments", prId] })
+
+      const previousComments =
+        queryClient.getQueryData<CommentWithAuthor[]>(["comments", prId]) ?? []
+
+      const optimisticId = `optimistic-comment-${Date.now()}`
+      const now = new Date().toISOString()
+      const author: CommentAuthor = {
+        id: optimisticUser?.id ?? "optimistic-user",
+        name: optimisticUser?.name ?? "나",
+        image: optimisticUser?.image ?? null,
+      }
+
+      const optimisticComment: CommentWithAuthor = {
+        id: optimisticId,
+        content: input.content.trim(),
+        lineNumber: input.lineNumber ?? null,
+        filePath: input.filePath ?? null,
+        isResolved: false,
+        pullRequestId: prId,
+        authorId: author.id,
+        parentId: input.parentId ?? null,
+        mentions: input.mentions ?? [],
+        reactions: {},
+        createdAt: now,
+        updatedAt: now,
+        author,
+        replies: [],
+      }
+
+      queryClient.setQueryData<CommentWithAuthor[]>(["comments", prId], (old = []) =>
+        appendComment(old, optimisticComment)
+      )
+
+      return { previousComments, optimisticId }
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previousComments) {
+        queryClient.setQueryData(["comments", prId], context.previousComments)
+      }
+    },
+    onSuccess: (comment, _input, context) => {
+      queryClient.setQueryData<CommentWithAuthor[]>(["comments", prId], (old = []) =>
+        replaceComment(old, context?.optimisticId ?? "", comment)
+      )
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["comments", prId] })
     },
   })
@@ -115,7 +214,7 @@ export function useToggleReaction(prId: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emoji }),
       })
-      if (!res.ok) throw new Error("반응 토글에 실패했습니다.")
+      if (!res.ok) throw new Error("반응 추가에 실패했습니다.")
       const data = await res.json()
       return data.comment as CommentWithAuthor
     },
