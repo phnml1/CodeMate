@@ -1,91 +1,13 @@
 import { auth } from "@/lib/auth"
 import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
+import {
+  buildAccessibleRepositoryWhere,
+  connectRepositoryToUser,
+  isRepositoryMembershipMigrationError,
+} from "@/lib/repository-access"
 import { NextResponse } from "next/server"
 
-/**
- * @swagger
- * /api/repositories:
- *   post:
- *     summary: Repository 연동
- *     description: GitHub Repository를 CodeMate에 연동합니다.
- *     tags:
- *       - Repository
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - githubId
- *               - name
- *               - fullName
- *             properties:
- *               githubId:
- *                 type: integer
- *                 description: GitHub Repository ID
- *               name:
- *                 type: string
- *                 description: Repository 이름
- *               fullName:
- *                 type: string
- *                 description: "owner/repo 형식의 전체 이름"
- *               description:
- *                 type: string
- *                 nullable: true
- *               language:
- *                 type: string
- *                 nullable: true
- *     responses:
- *       201:
- *         description: Repository 연동 성공
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 repository:
- *                   $ref: '#/components/schemas/Repository'
- *       400:
- *         description: 필수 필드 누락
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       401:
- *         description: 인증되지 않은 사용자
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       409:
- *         description: 이미 연동된 Repository
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       500:
- *         description: 서버 내부 오류
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
-/**
- * @swagger
- * /api/repositories:
- *   get:
- *     summary: 연동된 저장소 목록 조회
- *     description: 현재 사용자의 연동된 저장소 목록을 반환합니다.
- *     tags:
- *       - Repository
- *     responses:
- *       200:
- *         description: 저장소 목록 반환 성공
- *       401:
- *         description: 인증되지 않은 사용자
- */
 export async function GET() {
   try {
     const session = await auth()
@@ -93,14 +15,27 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const repositoryWhere = await buildAccessibleRepositoryWhere(session.user.id)
+
     const repositories = await prisma.repository.findMany({
-      where: { userId: session.user.id },
+      where: repositoryWhere,
       select: { id: true, name: true, fullName: true },
       orderBy: { name: "asc" },
     })
 
     return NextResponse.json({ repositories })
-  } catch {
+  } catch (error) {
+    if (isRepositoryMembershipMigrationError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            'Shared repository migration is not applied. Run the "split_repository_membership" migration first.',
+        },
+        { status: 503 }
+      )
+    }
+
+    console.error("[GET /api/repositories] failed:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -118,110 +53,167 @@ export async function POST(request: Request) {
 
     if (!githubId || !name || !fullName) {
       return NextResponse.json(
-        { error: "githubId, name, fullName은 필수 항목입니다" },
+        { error: "githubId, name, fullName are required" },
         { status: 400 }
       )
     }
 
-    const existing = await prisma.repository.findFirst({
-      where: { githubId: BigInt(githubId), userId: session.user.id },
-    })
-
-    if (existing) {
-      return NextResponse.json(
-        { error: "이미 연동된 Repository입니다" },
-        { status: 409 }
-      )
-    }
-
-    const repository = await prisma.repository.create({
-      data: {
-        githubId: BigInt(githubId),
-        name,
-        fullName,
-        description: description ?? null,
-        language: language ?? null,
-        userId: session.user.id,
+    const parsedGithubId = BigInt(githubId)
+    let repository = await prisma.repository.findUnique({
+      where: { githubId: parsedGithubId },
+      select: {
+        id: true,
+        githubId: true,
+        name: true,
+        fullName: true,
+        description: true,
+        language: true,
+        webhookId: true,
       },
     })
 
-    const [owner, repo] = fullName.split("/")
+    if (repository) {
+      const connectionResult = await connectRepositoryToUser(
+        session.user.id,
+        repository.id
+      )
 
-    // Webhook 등록
-    try {
-      const octokit = await getOctokit(session.user.id)
-      const { data: hook } = await octokit.rest.repos.createWebhook({
-        owner,
-        repo,
-        config: {
-          url: `${process.env.NEXTAUTH_URL}/api/webhook/github`,
-          content_type: "json",
-          secret: process.env.GITHUB_WEBHOOK_SECRET,
+      if (connectionResult === "existing") {
+        return NextResponse.json(
+          { error: "Repository is already connected" },
+          { status: 409 }
+        )
+      }
+    } else {
+      repository = await prisma.repository.create({
+        data: {
+          githubId: parsedGithubId,
+          name,
+          fullName,
+          description: description ?? null,
+          language: language ?? null,
+          userRepositories: {
+            create: {
+              userId: session.user.id,
+            },
+          },
         },
-        events: ["pull_request"],
-        active: true,
+        select: {
+          id: true,
+          githubId: true,
+          name: true,
+          fullName: true,
+          description: true,
+          language: true,
+          webhookId: true,
+        },
       })
-      await prisma.repository.update({
-        where: { id: repository.id },
-        data: { webhookId: hook.id },
-      })
-      repository.webhookId = hook.id
-    } catch (err) {
-      console.warn("[Webhook] 등록 실패 (로컬 환경에서는 정상):", err)
     }
 
-    // 기존 PR Backfill: 연동 시점 이전에 생성된 PR을 DB에 동기화
-    try {
-      const octokit = await getOctokit(session.user.id)
-      const { data: prs } = await octokit.rest.pulls.list({
-        owner,
-        repo,
-        state: "all",
-        per_page: 100,
-        sort: "updated",
-        direction: "desc",
-      })
+    if (!repository) {
+      throw new Error("Repository creation failed")
+    }
 
-      console.log(`[Backfill] ${fullName}: GitHub에서 PR ${prs.length}개 조회됨`)
+    const [owner, repo] = fullName.split("/")
 
-      if (prs.length > 0) {
-        const result = await prisma.pullRequest.createMany({
-          data: prs.map((pr) => ({
-            githubId: BigInt(pr.id),
-            number: pr.number,
-            title: pr.title,
-            description: pr.body ?? null,
-            // PR 목록 API는 merged 필드가 없으므로 merged_at으로 판단
-            status: pr.draft
-              ? "DRAFT"
-              : pr.state === "closed"
-                ? pr.merged_at ? "MERGED" : "CLOSED"
-                : "OPEN",
-            baseBranch: pr.base.ref,
-            headBranch: pr.head.ref,
-            // 목록 API는 additions/deletions 미제공 → 상세 페이지 진입 시 lazy 보정
-            additions: 0,
-            deletions: 0,
-            changedFiles: 0,
-            mergedAt: pr.merged_at ? new Date(pr.merged_at) : null,
-            closedAt: pr.closed_at ? new Date(pr.closed_at) : null,
-            githubCreatedAt: pr.created_at ? new Date(pr.created_at) : null,
-            githubUpdatedAt: pr.updated_at ? new Date(pr.updated_at) : null,
-            repoId: repository.id,
-          })),
-          skipDuplicates: true,
+    if (!repository.webhookId) {
+      try {
+        const octokit = await getOctokit(session.user.id)
+        const { data: hook } = await octokit.rest.repos.createWebhook({
+          owner,
+          repo,
+          config: {
+            url: `${process.env.NEXTAUTH_URL}/api/webhook/github`,
+            content_type: "json",
+            secret: process.env.GITHUB_WEBHOOK_SECRET,
+          },
+          events: ["pull_request"],
+          active: true,
         })
-        console.log(`[Backfill] DB에 PR ${result.count}개 저장됨`)
+
+        repository = await prisma.repository.update({
+          where: { id: repository.id },
+          data: { webhookId: hook.id },
+          select: {
+            id: true,
+            githubId: true,
+            name: true,
+            fullName: true,
+            description: true,
+            language: true,
+            webhookId: true,
+          },
+        })
+      } catch (error) {
+        console.warn("[Webhook] registration failed:", error)
       }
-    } catch (err) {
-      console.error("[Backfill] PR 동기화 실패:", err)
+    }
+
+    const existingPullRequestCount = await prisma.pullRequest.count({
+      where: { repoId: repository.id },
+    })
+
+    if (existingPullRequestCount === 0) {
+      try {
+        const octokit = await getOctokit(session.user.id)
+        const { data: prs } = await octokit.rest.pulls.list({
+          owner,
+          repo,
+          state: "all",
+          per_page: 100,
+          sort: "updated",
+          direction: "desc",
+        })
+
+        if (prs.length > 0) {
+          await prisma.pullRequest.createMany({
+            data: prs.map((pr) => ({
+              githubId: BigInt(pr.id),
+              number: pr.number,
+              title: pr.title,
+              description: pr.body ?? null,
+              status: pr.draft
+                ? "DRAFT"
+                : pr.state === "closed"
+                  ? pr.merged_at
+                    ? "MERGED"
+                    : "CLOSED"
+                  : "OPEN",
+              baseBranch: pr.base.ref,
+              headBranch: pr.head.ref,
+              additions: 0,
+              deletions: 0,
+              changedFiles: 0,
+              mergedAt: pr.merged_at ? new Date(pr.merged_at) : null,
+              closedAt: pr.closed_at ? new Date(pr.closed_at) : null,
+              githubCreatedAt: pr.created_at ? new Date(pr.created_at) : null,
+              githubUpdatedAt: pr.updated_at ? new Date(pr.updated_at) : null,
+              repoId: repository.id,
+            })),
+            skipDuplicates: true,
+          })
+        }
+      } catch (error) {
+        console.error("[Backfill] failed:", error)
+      }
     }
 
     return NextResponse.json(
       { repository: { ...repository, githubId: Number(repository.githubId) } },
       { status: 201 }
     )
-  } catch {
+  } catch (error) {
+    if (isRepositoryMembershipMigrationError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            'Shared repository migration is not applied. Run the "split_repository_membership" migration first.',
+        },
+        { status: 503 }
+      )
+    }
+
+    console.error("[POST /api/repositories] failed:", error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

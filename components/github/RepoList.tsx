@@ -7,12 +7,17 @@ import RepoCard from "@/components/github/RepoCard"
 import RepoCardSkeleton from "@/components/github/RepoCardSkeleton"
 import RepoListHeader from "@/components/github/RepoListHeader"
 import { InfiniteScrollTrigger } from "@/components/ui/InfiniteScrollTrigger"
+import { layoutStyles, surfaceStyles } from "@/lib/styles"
 
 interface RepoListProps {
   search?: string
+  repositoriesQuery: ReturnType<typeof useRepositories>
 }
 
-export default function RepoList({ search = "" }: RepoListProps) {
+export default function RepoList({
+  search = "",
+  repositoriesQuery,
+}: RepoListProps) {
   const {
     data,
     fetchNextPage,
@@ -20,14 +25,15 @@ export default function RepoList({ search = "" }: RepoListProps) {
     isFetchingNextPage,
     isLoading,
     isError,
-  } = useRepositories()
+    error,
+  } = repositoriesQuery
 
-  const { mutate: connect } = useConnectRepository()
+  const connectMutation = useConnectRepository()
   const { mutate: disconnect } = useDisconnectRepository()
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className={layoutStyles.listStack}>
         {Array.from({ length: 3 }).map((_, i) => (
           <RepoCardSkeleton key={i} />
         ))}
@@ -37,8 +43,10 @@ export default function RepoList({ search = "" }: RepoListProps) {
 
   if (isError) {
     return (
-      <div className="py-20 text-center text-sm text-slate-400 font-medium">
-        저장소 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
+      <div className={surfaceStyles.emptyState}>
+        {error instanceof Error
+          ? error.message
+          : "저장소 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요."}
       </div>
     )
   }
@@ -50,16 +58,16 @@ export default function RepoList({ search = "" }: RepoListProps) {
 
   if (filtered.length === 0) {
     return (
-      <div className="py-20 text-center text-sm text-slate-400 font-medium">
+      <div className={surfaceStyles.emptyState}>
         {search ? "검색 결과가 없습니다." : "저장소가 없습니다."}
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
+    <div className={layoutStyles.listStack}>
       <RepoListHeader count={filtered.length} />
-      <div className="space-y-4">
+      <div className={layoutStyles.listStack}>
         {filtered.map((repo) => (
           <RepoCard
             key={repo.id}
@@ -69,12 +77,26 @@ export default function RepoList({ search = "" }: RepoListProps) {
             language={repo.language}
             isConnected={repo.isConnected}
             repositoryId={repo.repositoryId}
-            onConnect={() => connect({
-              githubId: repo.id,
-              name: repo.name,
-              fullName: repo.fullName,
-              language: repo.language,
-            })}
+            isConnecting={
+              connectMutation.isPending &&
+              connectMutation.variables?.githubId === repo.id
+            }
+            connectError={
+              connectMutation.isError &&
+              connectMutation.variables?.githubId === repo.id
+                ? connectMutation.error instanceof Error
+                  ? connectMutation.error.message
+                  : "저장소 연결 중 오류가 발생했습니다."
+                : null
+            }
+            onConnect={() =>
+              connectMutation.mutate({
+                githubId: repo.id,
+                name: repo.name,
+                fullName: repo.fullName,
+                language: repo.language,
+              })
+            }
             onDisconnect={() => repo.repositoryId && disconnect(repo.repositoryId)}
           />
         ))}
@@ -85,7 +107,7 @@ export default function RepoList({ search = "" }: RepoListProps) {
         hasNextPage={hasNextPage}
         isFetchingNextPage={isFetchingNextPage}
         loadingFallback={
-          <div className="space-y-4">
+          <div className={layoutStyles.listStack}>
             <RepoCardSkeleton />
             <RepoCardSkeleton />
           </div>

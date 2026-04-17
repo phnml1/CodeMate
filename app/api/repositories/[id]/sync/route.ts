@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
+import { buildAccessibleRepositoryWhere } from "@/lib/repository-access"
 import { NextResponse } from "next/server"
 
 export async function POST(
@@ -14,27 +15,17 @@ export async function POST(
     }
 
     const { id } = await params
+    const repositoryWhere = await buildAccessibleRepositoryWhere(session.user.id, id)
 
-    const repository = await prisma.repository.findUnique({
-      where: { id },
-      select: { id: true, userId: true, fullName: true },
+    const repository = await prisma.repository.findFirst({
+      where: repositoryWhere,
+      select: { id: true, fullName: true },
     })
 
     if (!repository) {
-      return NextResponse.json(
-        { error: "Repository를 찾을 수 없습니다" },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Repository not found" }, { status: 404 })
     }
 
-    if (repository.userId !== session.user.id) {
-      return NextResponse.json(
-        { error: "해당 Repository에 대한 권한이 없습니다" },
-        { status: 403 }
-      )
-    }
-
-    // additions=0 AND deletions=0 AND changedFiles=0 인 PR만 보정 대상
     const unsynced = await prisma.pullRequest.findMany({
       where: {
         repoId: id,
@@ -52,7 +43,6 @@ export async function POST(
     const [owner, repo] = repository.fullName.split("/")
     const octokit = await getOctokit(session.user.id)
 
-    // 1단계: GitHub API 결과를 메모리에 수집 (개별 실패는 건너뜀)
     const results: {
       id: string
       additions: number
@@ -68,8 +58,11 @@ export async function POST(
           pull_number: pr.number,
         })
 
-        // GitHub API가 반환하는 값이 실제로도 0인 PR은 건너뜀 (진짜 변경 없는 PR)
-        if (data.additions === 0 && data.deletions === 0 && data.changed_files === 0) {
+        if (
+          data.additions === 0 &&
+          data.deletions === 0 &&
+          data.changed_files === 0
+        ) {
           continue
         }
 
@@ -80,20 +73,19 @@ export async function POST(
           changedFiles: data.changed_files,
         })
       } catch {
-        // 개별 PR 보정 실패는 건너뛰고 계속 진행
+        // Skip PRs that fail detail hydration and continue.
       }
     }
 
-    // 2단계: 단일 트랜잭션으로 DB 업데이트 (N회 왕복 → 1회)
     if (results.length > 0) {
       await prisma.$transaction(
-        results.map((r) =>
+        results.map((result) =>
           prisma.pullRequest.update({
-            where: { id: r.id },
+            where: { id: result.id },
             data: {
-              additions: r.additions,
-              deletions: r.deletions,
-              changedFiles: r.changedFiles,
+              additions: result.additions,
+              deletions: result.deletions,
+              changedFiles: result.changedFiles,
             },
           })
         )
