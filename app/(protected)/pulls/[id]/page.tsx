@@ -21,16 +21,12 @@ export default async function PRDetailPage({ params }: PRDetailPageProps) {
   const { id } = await params;
   const session = await auth();
   const currentUserId = session?.user?.id ?? "";
-  const currentUserName = session?.user?.name ?? null;
-  const currentUserImage = session?.user?.image ?? null;
 
   return (
     <PRDetailContainer
       id={id}
       commentSlot={<CommentSection prId={id} />}
       currentUserId={currentUserId}
-      currentUserName={currentUserName}
-      currentUserImage={currentUserImage}
     />
   );
 }

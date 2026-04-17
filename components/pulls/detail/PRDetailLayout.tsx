@@ -35,8 +35,6 @@ interface PRDetailLayoutProps {
   isRequesting?: boolean;
   commentSlot: React.ReactNode;
   currentUserId: string;
-  currentUserName?: string | null;
-  currentUserImage?: string | null;
 }
 
 export default function PRDetailLayout({
@@ -48,8 +46,6 @@ export default function PRDetailLayout({
   isRequesting = false,
   commentSlot,
   currentUserId,
-  currentUserName,
-  currentUserImage,
 }: PRDetailLayoutProps) {
   const selectedFile = usePRDetailStore((s) => s.selectedFile);
   const sidebarCollapsed = usePRDetailStore((s) => s.sidebarCollapsed);
@@ -362,8 +358,6 @@ export default function PRDetailLayout({
                 onIssueClick={setSelectedIssue}
                 prId={pr.id}
                 currentUserId={currentUserId}
-                currentUserName={currentUserName}
-                currentUserImage={currentUserImage}
                 inlineComments={inlineCommentsByFile[file.filename] ?? []}
               />
             ))}

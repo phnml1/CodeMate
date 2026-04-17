@@ -1,6 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type {
-  CommentAuthor,
   CommentWithAuthor,
   CommentsListResponse,
   CreateCommentInput,
@@ -12,12 +11,6 @@ export interface CommentsFilter {
   repoId?: string
   prId?: string
   authorId?: string
-}
-
-type OptimisticUser = {
-  id: string
-  name?: string | null
-  image?: string | null
 }
 
 function normalizeComment(comment: CommentWithAuthor): CommentWithAuthor {
@@ -67,56 +60,6 @@ async function fetchComments(prId: string): Promise<CommentWithAuthor[]> {
   return (data.comments as CommentWithAuthor[]).map(normalizeComment)
 }
 
-function appendComment(
-  comments: CommentWithAuthor[],
-  comment: CommentWithAuthor
-): CommentWithAuthor[] {
-  const normalizedComment = normalizeComment(comment)
-
-  if (normalizedComment.parentId == null) {
-    if (comments.some((item) => item.id === normalizedComment.id)) return comments
-    return [...comments, normalizedComment]
-  }
-
-  return comments.map((item) => {
-    const replies = Array.isArray(item.replies) ? item.replies : []
-
-    if (item.id === normalizedComment.parentId) {
-      if (replies.some((reply) => reply.id === normalizedComment.id)) return item
-      return { ...item, replies: [...replies, normalizedComment] }
-    }
-
-    if (replies.length === 0) return item
-    return { ...item, replies: appendComment(replies, normalizedComment) }
-  })
-}
-
-function replaceComment(
-  comments: CommentWithAuthor[],
-  targetId: string,
-  nextComment: CommentWithAuthor
-): CommentWithAuthor[] {
-  let replaced = false
-  const normalizedNextComment = normalizeComment(nextComment)
-
-  const walk = (items: CommentWithAuthor[]): CommentWithAuthor[] =>
-    items.map((item) => {
-      if (item.id === targetId) {
-        replaced = true
-        return normalizedNextComment
-      }
-
-      const replies = Array.isArray(item.replies) ? item.replies : []
-      if (replies.length === 0) return item
-
-      const nextReplies = walk(replies)
-      return nextReplies === replies ? item : { ...item, replies: nextReplies }
-    })
-
-  const updated = walk(comments)
-  return replaced ? updated : appendComment(updated, normalizedNextComment)
-}
-
 export function useComments(prId: string) {
   return useQuery({
     queryKey: ["comments", prId],
@@ -124,7 +67,7 @@ export function useComments(prId: string) {
   })
 }
 
-export function useCreateComment(prId: string, optimisticUser?: OptimisticUser) {
+export function useCreateComment(prId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -137,53 +80,6 @@ export function useCreateComment(prId: string, optimisticUser?: OptimisticUser) 
       if (!res.ok) throw new Error("Failed to create comment.")
       const data = await res.json()
       return normalizeComment(data.comment as CommentWithAuthor)
-    },
-    onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: ["comments", prId] })
-
-      const previousComments =
-        queryClient.getQueryData<CommentWithAuthor[]>(["comments", prId]) ?? []
-
-      const optimisticId = `optimistic-comment-${Date.now()}`
-      const now = new Date().toISOString()
-      const author: CommentAuthor = {
-        id: optimisticUser?.id ?? "optimistic-user",
-        name: optimisticUser?.name ?? null,
-        image: optimisticUser?.image ?? null,
-      }
-
-      const optimisticComment: CommentWithAuthor = {
-        id: optimisticId,
-        content: input.content.trim(),
-        lineNumber: input.lineNumber ?? null,
-        filePath: input.filePath ?? null,
-        isResolved: false,
-        pullRequestId: prId,
-        authorId: author.id,
-        parentId: input.parentId ?? null,
-        mentions: input.mentions ?? [],
-        reactions: {},
-        createdAt: now,
-        updatedAt: now,
-        author,
-        replies: [],
-      }
-
-      queryClient.setQueryData<CommentWithAuthor[]>(["comments", prId], (old = []) =>
-        appendComment(old, optimisticComment)
-      )
-
-      return { previousComments, optimisticId }
-    },
-    onError: (_error, _input, context) => {
-      if (context?.previousComments) {
-        queryClient.setQueryData(["comments", prId], context.previousComments)
-      }
-    },
-    onSuccess: (comment, _input, context) => {
-      queryClient.setQueryData<CommentWithAuthor[]>(["comments", prId], (old = []) =>
-        replaceComment(old, context?.optimisticId ?? "", comment)
-      )
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["comments", prId] })
