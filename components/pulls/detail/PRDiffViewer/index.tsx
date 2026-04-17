@@ -15,8 +15,6 @@ interface PRDiffViewerProps {
   onIssueClick?: (issue: ReviewIssue) => void;
   prId: string;
   currentUserId: string;
-  currentUserName?: string | null;
-  currentUserImage?: string | null;
   inlineComments: CommentWithAuthor[];
 }
 
@@ -27,8 +25,6 @@ export default function PRDiffViewer({
   onIssueClick,
   prId,
   currentUserId,
-  currentUserName,
-  currentUserImage,
   inlineComments,
 }: PRDiffViewerProps) {
   const collapsed = usePRDetailStore((s) => s.collapsedDiffs[file.filename] ?? false);
@@ -66,8 +62,6 @@ export default function PRDiffViewer({
               prId={prId}
               filePath={file.filename}
               currentUserId={currentUserId}
-              currentUserName={currentUserName}
-              currentUserImage={currentUserImage}
             />
           )}
         </div>

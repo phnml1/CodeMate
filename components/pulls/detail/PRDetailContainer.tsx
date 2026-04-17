@@ -12,16 +12,12 @@ interface PRDetailContainerProps {
   id: string;
   commentSlot: React.ReactNode;
   currentUserId: string;
-  currentUserName?: string | null;
-  currentUserImage?: string | null;
 }
 
 export default function PRDetailContainer({
   id,
   commentSlot,
   currentUserId,
-  currentUserName,
-  currentUserImage,
 }: PRDetailContainerProps) {
   const { data: pr, isPending: prPending, isError: prError } = usePRDetail(id);
   const { data: files, isPending: filesPending, isError: filesError } = usePRFiles(id);
@@ -81,8 +77,6 @@ export default function PRDetailContainer({
       isRequesting={isRequesting}
       commentSlot={commentSlot}
       currentUserId={currentUserId}
-      currentUserName={currentUserName}
-      currentUserImage={currentUserImage}
     />
   );
 }

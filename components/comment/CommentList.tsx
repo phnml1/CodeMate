@@ -26,8 +26,6 @@ import type { CommentWithAuthor, MentionUser } from "@/types/comment"
 interface CommentListProps {
   prId: string
   currentUserId: string
-  currentUserName?: string | null
-  currentUserImage?: string | null
 }
 
 const isSocketMode = process.env.NEXT_PUBLIC_REALTIME_MODE === "socket"
@@ -270,15 +268,9 @@ function ChatBubble({
 export default function CommentList({
   prId,
   currentUserId,
-  currentUserName,
-  currentUserImage,
 }: CommentListProps) {
   const { data: allComments = [], isLoading } = useRealtimeComments(prId)
-  const createComment = useCreateComment(prId, {
-    id: currentUserId,
-    name: currentUserName,
-    image: currentUserImage,
-  })
+  const createComment = useCreateComment(prId)
   const { names: typingNames, onTyping, onTypingStop } = useTypingIndicator(prId)
   const { connectionStatus, connectionError } = useSocket()
   const { data: pr } = usePRDetail(prId)

@@ -8,15 +8,6 @@ interface CommentSectionProps {
 export default async function CommentSection({ prId }: CommentSectionProps) {
   const session = await auth()
   const currentUserId = session?.user?.id ?? ""
-  const currentUserName = session?.user?.name ?? null
-  const currentUserImage = session?.user?.image ?? null
 
-  return (
-    <CommentList
-      prId={prId}
-      currentUserId={currentUserId}
-      currentUserName={currentUserName}
-      currentUserImage={currentUserImage}
-    />
-  )
+  return <CommentList prId={prId} currentUserId={currentUserId} />
 }
