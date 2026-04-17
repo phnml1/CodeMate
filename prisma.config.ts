@@ -7,6 +7,8 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"]!,
+    // Prefer a direct connection for Prisma schema/migration commands.
+    // Pooler URLs can work for runtime queries but often hang or fail for DDL.
+    url: process.env["DIRECT_DATABASE_URL"] ?? process.env["DATABASE_URL"]!,
   },
 });

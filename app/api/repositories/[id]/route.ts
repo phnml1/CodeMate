@@ -1,57 +1,16 @@
 import { auth } from "@/lib/auth"
 import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
+import {
+  detachRepositoryFromUser,
+  getRepositoryMemberCount,
+  isRepositoryMembershipMigrationError,
+  isRepositoryAccessibleToUser,
+} from "@/lib/repository-access"
 import { NextResponse } from "next/server"
 
-/**
- * @swagger
- * /api/repositories/{id}:
- *   delete:
- *     summary: Repository 연동 해제
- *     description: CodeMate에 연동된 Repository를 해제합니다.
- *     tags:
- *       - Repository
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Repository DB ID
- *     responses:
- *       200:
- *         description: Repository 연동 해제 성공
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Message'
- *       401:
- *         description: 인증되지 않은 사용자
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       403:
- *         description: 권한 없음 (소유자가 아님)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       404:
- *         description: Repository를 찾을 수 없음
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       500:
- *         description: 서버 내부 오류
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
 export async function DELETE(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -65,20 +24,31 @@ export async function DELETE(
 
     const repository = await prisma.repository.findUnique({
       where: { id },
+      select: {
+        id: true,
+        fullName: true,
+        webhookId: true,
+      },
     })
 
     if (!repository) {
-      return NextResponse.json(
-        { error: "Repository를 찾을 수 없습니다" },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Repository not found" }, { status: 404 })
     }
 
-    if (repository.userId !== session.user.id) {
-      return NextResponse.json(
-        { error: "해당 Repository에 대한 권한이 없습니다" },
-        { status: 403 }
-      )
+    const isConnected = await isRepositoryAccessibleToUser(session.user.id, id)
+
+    if (!isConnected) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const memberCount = await getRepositoryMemberCount(id)
+
+    if (memberCount > 1) {
+      await detachRepositoryFromUser(session.user.id, id)
+
+      return NextResponse.json({
+        message: "Repository connection removed.",
+      })
     }
 
     if (repository.webhookId) {
@@ -91,16 +61,26 @@ export async function DELETE(
           hook_id: repository.webhookId,
         })
       } catch {
-        // Webhook 삭제 실패해도 DB 삭제는 계속 진행
+        // Continue deleting the local repository record even if webhook cleanup fails.
       }
     }
 
     await prisma.repository.delete({ where: { id } })
 
     return NextResponse.json({
-      message: "Repository 연동이 해제되었습니다",
+      message: "Repository removed.",
     })
-  } catch {
+  } catch (error) {
+    if (isRepositoryMembershipMigrationError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            'Shared repository migration is not applied. Run the "split_repository_membership" migration first.',
+        },
+        { status: 503 }
+      )
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

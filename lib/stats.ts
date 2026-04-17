@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import type { AIReviewIssue } from "@/lib/ai/parsers"
+import { getAccessibleRepositoryIds } from "@/lib/repository-access"
 
 export type StatsRange = "7d" | "30d" | "90d" | "all"
 export type StatsType =
@@ -87,20 +88,19 @@ export function isValidRange(range: string): range is StatsRange {
 function getStartDate(range: StatsRange): Date | undefined {
   if (range === "all") return undefined
   const days = range === "7d" ? 7 : range === "30d" ? 30 : 90
-  const d = new Date()
-  d.setDate(d.getDate() - days)
-  d.setHours(0, 0, 0, 0)
-  return d
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - days)
+  startDate.setHours(0, 0, 0, 0)
+  return startDate
 }
 
-// 해당 날짜가 속한 주의 월요일을 반환
 function getWeekStart(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  d.setDate(diff)
-  d.setHours(0, 0, 0, 0)
-  return d
+  const current = new Date(date)
+  const day = current.getDay()
+  const diff = current.getDate() - day + (day === 0 ? -6 : 1)
+  current.setDate(diff)
+  current.setHours(0, 0, 0, 0)
+  return current
 }
 
 function formatWeekLabel(date: Date): string {
@@ -116,32 +116,29 @@ export async function fetchStatsOverview(
   range: StatsRange,
   repoId?: string
 ): Promise<StatsOverview> {
+  const repoIds = await getAccessibleRepositoryIds(userId, repoId)
   const startDate = getStartDate(range)
 
-  const prDateFilter = startDate
-    ? { githubCreatedAt: { gte: startDate } }
-    : {}
-  const reviewDateFilter = startDate
-    ? { reviewedAt: { gte: startDate } }
-    : {}
-  const commentDateFilter = startDate
-    ? { createdAt: { gte: startDate } }
-    : {}
+  const prDateFilter = startDate ? { githubCreatedAt: { gte: startDate } } : {}
+  const reviewDateFilter = startDate ? { reviewedAt: { gte: startDate } } : {}
+  const commentDateFilter = startDate ? { createdAt: { gte: startDate } } : {}
 
-  const prRepoFilter = {
-    repo: { userId, ...(repoId ? { id: repoId } : {}) },
+  const pullRequestFilter = {
+    repoId: {
+      in: repoIds,
+    },
   }
 
-  const [prStats, reviewAgg, issueAgg, totalComments, resolvedComments] =
+  const [prStats, reviewAggregate, issueAggregate, totalComments, resolvedComments] =
     await Promise.all([
       prisma.pullRequest.groupBy({
         by: ["status"],
-        where: { ...prRepoFilter, ...prDateFilter },
+        where: { ...pullRequestFilter, ...prDateFilter },
         _count: { id: true },
       }),
       prisma.review.aggregate({
         where: {
-          pullRequest: prRepoFilter,
+          pullRequest: pullRequestFilter,
           status: "COMPLETED",
           ...reviewDateFilter,
         },
@@ -149,27 +146,26 @@ export async function fetchStatsOverview(
       }),
       prisma.review.aggregate({
         where: {
-          pullRequest: prRepoFilter,
+          pullRequest: pullRequestFilter,
           status: "COMPLETED",
           ...reviewDateFilter,
         },
         _sum: { issueCount: true },
       }),
       prisma.comment.count({
-        where: { pullRequest: prRepoFilter, ...commentDateFilter },
+        where: { pullRequest: pullRequestFilter, ...commentDateFilter },
       }),
       prisma.comment.count({
         where: {
-          pullRequest: prRepoFilter,
+          pullRequest: pullRequestFilter,
           isResolved: true,
           ...commentDateFilter,
         },
       }),
     ])
 
-  const totalPRs = prStats.reduce((sum, s) => sum + s._count.id, 0)
-  const mergedPRs =
-    prStats.find((s) => s.status === "MERGED")?._count.id ?? 0
+  const totalPRs = prStats.reduce((sum, item) => sum + item._count.id, 0)
+  const mergedPRs = prStats.find((item) => item.status === "MERGED")?._count.id ?? 0
   const mergeRate =
     totalPRs > 0 ? Math.round((mergedPRs / totalPRs) * 1000) / 10 : 0
 
@@ -178,8 +174,8 @@ export async function fetchStatsOverview(
     mergedPRs,
     mergeRate,
     avgQualityScore:
-      Math.round((reviewAgg._avg.qualityScore ?? 0) * 10) / 10,
-    totalIssues: issueAgg._sum.issueCount ?? 0,
+      Math.round((reviewAggregate._avg.qualityScore ?? 0) * 10) / 10,
+    totalIssues: issueAggregate._sum.issueCount ?? 0,
     resolvedComments,
     totalComments,
   }
@@ -190,11 +186,12 @@ export async function fetchPRTrend(
   range: StatsRange,
   repoId?: string
 ): Promise<PRTrendItem[]> {
+  const repoIds = await getAccessibleRepositoryIds(userId, repoId)
   const startDate = getStartDate(range)
 
-  const prs = await prisma.pullRequest.findMany({
+  const pullRequests = await prisma.pullRequest.findMany({
     where: {
-      repo: { userId, ...(repoId ? { id: repoId } : {}) },
+      repoId: { in: repoIds },
       ...(startDate ? { githubCreatedAt: { gte: startDate } } : {}),
     },
     select: { status: true, githubCreatedAt: true, createdAt: true },
@@ -203,8 +200,8 @@ export async function fetchPRTrend(
 
   const weekMap = new Map<string, PRTrendItem>()
 
-  for (const pr of prs) {
-    const date = pr.githubCreatedAt ?? pr.createdAt
+  for (const pullRequest of pullRequests) {
+    const date = pullRequest.githubCreatedAt ?? pullRequest.createdAt
     const weekStart = getWeekStart(date)
     const key = weekStart.toISOString()
 
@@ -219,10 +216,10 @@ export async function fetchPRTrend(
     }
 
     const entry = weekMap.get(key)!
-    if (pr.status === "OPEN") entry.open++
-    else if (pr.status === "MERGED") entry.merged++
-    else if (pr.status === "CLOSED") entry.closed++
-    else if (pr.status === "DRAFT") entry.draft++
+    if (pullRequest.status === "OPEN") entry.open++
+    else if (pullRequest.status === "MERGED") entry.merged++
+    else if (pullRequest.status === "CLOSED") entry.closed++
+    else if (pullRequest.status === "DRAFT") entry.draft++
   }
 
   return Array.from(weekMap.values())
@@ -233,13 +230,12 @@ export async function fetchQualityTrend(
   range: StatsRange,
   repoId?: string
 ): Promise<QualityTrendItem[]> {
+  const repoIds = await getAccessibleRepositoryIds(userId, repoId)
   const startDate = getStartDate(range)
 
   const reviews = await prisma.review.findMany({
     where: {
-      pullRequest: {
-        repo: { userId, ...(repoId ? { id: repoId } : {}) },
-      },
+      pullRequest: { repoId: { in: repoIds } },
       status: "COMPLETED",
       ...(startDate ? { reviewedAt: { gte: startDate } } : {}),
     },
@@ -249,21 +245,24 @@ export async function fetchQualityTrend(
 
   const dayMap = new Map<string, { total: number; count: number }>()
 
-  for (const r of reviews) {
-    const d = new Date(r.reviewedAt)
-    d.setHours(0, 0, 0, 0)
-    const key = d.toISOString()
+  for (const review of reviews) {
+    const day = new Date(review.reviewedAt)
+    day.setHours(0, 0, 0, 0)
+    const key = day.toISOString()
 
-    if (!dayMap.has(key)) dayMap.set(key, { total: 0, count: 0 })
+    if (!dayMap.has(key)) {
+      dayMap.set(key, { total: 0, count: 0 })
+    }
+
     const entry = dayMap.get(key)!
-    entry.total += r.qualityScore
+    entry.total += review.qualityScore
     entry.count++
   }
 
-  return Array.from(dayMap.entries()).map(([key, val]) => ({
+  return Array.from(dayMap.entries()).map(([key, value]) => ({
     date: formatDayLabel(new Date(key)),
-    avgScore: Math.round((val.total / val.count) * 10) / 10,
-    reviewCount: val.count,
+    avgScore: Math.round((value.total / value.count) * 10) / 10,
+    reviewCount: value.count,
   }))
 }
 
@@ -272,12 +271,11 @@ export async function fetchIssueDistribution(
   range: StatsRange,
   repoId?: string
 ): Promise<IssueDistribution> {
+  const repoIds = await getAccessibleRepositoryIds(userId, repoId)
   const startDate = getStartDate(range)
 
   const reviewFilter = {
-    pullRequest: {
-      repo: { userId, ...(repoId ? { id: repoId } : {}) },
-    },
+    pullRequest: { repoId: { in: repoIds } },
     status: "COMPLETED" as const,
     ...(startDate ? { reviewedAt: { gte: startDate } } : {}),
   }
@@ -298,22 +296,21 @@ export async function fetchIssueDistribution(
   const bySeverity: IssueSeverityItem[] = severityOrder
     .map((name) => ({
       name,
-      value:
-        severityGroups.find((g) => g.severity === name)?._count.id ?? 0,
+      value: severityGroups.find((group) => group.severity === name)?._count.id ?? 0,
       color: SEVERITY_COLORS[name],
     }))
     .filter((item) => item.value > 0)
 
-  // aiSuggestions JSON에서 카테고리별 이슈 수 집계
   const categoryCount = new Map<string, number>()
 
-  for (const r of reviews) {
-    const suggestions = r.aiSuggestions as { issues?: AIReviewIssue[] }
+  for (const review of reviews) {
+    const suggestions = review.aiSuggestions as { issues?: AIReviewIssue[] }
     if (!suggestions?.issues) continue
+
     for (const issue of suggestions.issues) {
-      const cat = issue.category
-      if ((ISSUE_CATEGORIES as readonly string[]).includes(cat)) {
-        categoryCount.set(cat, (categoryCount.get(cat) ?? 0) + 1)
+      const category = issue.category
+      if ((ISSUE_CATEGORIES as readonly string[]).includes(category)) {
+        categoryCount.set(category, (categoryCount.get(category) ?? 0) + 1)
       }
     }
   }
@@ -331,11 +328,12 @@ export async function fetchCodeChanges(
   range: StatsRange,
   repoId?: string
 ): Promise<CodeChangesItem[]> {
+  const repoIds = await getAccessibleRepositoryIds(userId, repoId)
   const startDate = getStartDate(range)
 
-  const prs = await prisma.pullRequest.findMany({
+  const pullRequests = await prisma.pullRequest.findMany({
     where: {
-      repo: { userId, ...(repoId ? { id: repoId } : {}) },
+      repoId: { in: repoIds },
       ...(startDate ? { githubCreatedAt: { gte: startDate } } : {}),
     },
     select: {
@@ -350,8 +348,8 @@ export async function fetchCodeChanges(
 
   const weekMap = new Map<string, CodeChangesItem>()
 
-  for (const pr of prs) {
-    const date = pr.githubCreatedAt ?? pr.createdAt
+  for (const pullRequest of pullRequests) {
+    const date = pullRequest.githubCreatedAt ?? pullRequest.createdAt
     const weekStart = getWeekStart(date)
     const key = weekStart.toISOString()
 
@@ -365,9 +363,9 @@ export async function fetchCodeChanges(
     }
 
     const entry = weekMap.get(key)!
-    entry.additions += pr.additions
-    entry.deletions += pr.deletions
-    entry.files += pr.changedFiles
+    entry.additions += pullRequest.additions
+    entry.deletions += pullRequest.deletions
+    entry.files += pullRequest.changedFiles
   }
 
   return Array.from(weekMap.values())

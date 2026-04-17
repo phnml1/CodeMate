@@ -1,9 +1,10 @@
 import { revalidateTag } from "next/cache"
 import { NextResponse, after } from "next/server"
 import { analyzeReview } from "@/lib/ai/analyze"
-import { emitNotification } from "@/lib/socket/emitter"
-import { isNotificationEnabled } from "@/lib/notification-settings"
+import { getEnabledUserIds } from "@/lib/notification-settings"
 import { prisma } from "@/lib/prisma"
+import { getRepositoryMemberIds } from "@/lib/repository-access"
+import { emitNotification } from "@/lib/socket/emitter"
 import { verifyWebhookSignature } from "@/lib/webhook-validator"
 
 export const maxDuration = 300
@@ -30,6 +31,35 @@ function getPRStatus(pr: {
   if (pr.draft) return "DRAFT"
   if (pr.state === "closed") return pr.merged ? "MERGED" : "CLOSED"
   return "OPEN"
+}
+
+async function notifyUsers(params: {
+  userIds: string[]
+  type: "NEW_REVIEW" | "PR_MERGED" | "REVIEW_FAILED"
+  title: string
+  message: string
+  prId: string
+}) {
+  const recipients = await getEnabledUserIds(params.userIds, params.type)
+
+  await Promise.all(
+    recipients.map(async (userId) => {
+      const notification = await prisma.notification.create({
+        data: {
+          type: params.type,
+          title: params.title,
+          message: params.message,
+          userId,
+          prId: params.prId,
+        },
+      })
+
+      emitNotification(userId, {
+        ...notification,
+        createdAt: notification.createdAt.toISOString(),
+      })
+    })
+  )
 }
 
 export async function POST(request: Request) {
@@ -60,7 +90,7 @@ export async function POST(request: Request) {
 
     const repository = await prisma.repository.findFirst({
       where: { githubId: BigInt(repo.id) },
-      select: { id: true, userId: true },
+      select: { id: true },
     })
 
     if (!repository) {
@@ -70,12 +100,18 @@ export async function POST(request: Request) {
       )
     }
 
+    const recipientIds = [...new Set(await getRepositoryMemberIds(repository.id))]
+
     const pullRequest = await prisma.pullRequest.upsert({
       where: { githubId: BigInt(pr.id) },
       update: {
         title: pr.title,
         description: pr.body ?? null,
-        status: getPRStatus({ state: pr.state, draft: pr.draft, merged: pr.merged }),
+        status: getPRStatus({
+          state: pr.state,
+          draft: pr.draft,
+          merged: pr.merged,
+        }),
         additions: pr.additions ?? 0,
         deletions: pr.deletions ?? 0,
         changedFiles: pr.changed_files ?? 0,
@@ -89,7 +125,11 @@ export async function POST(request: Request) {
         number: pr.number,
         title: pr.title,
         description: pr.body ?? null,
-        status: getPRStatus({ state: pr.state, draft: pr.draft, merged: pr.merged }),
+        status: getPRStatus({
+          state: pr.state,
+          draft: pr.draft,
+          merged: pr.merged,
+        }),
         baseBranch: pr.base.ref,
         headBranch: pr.head.ref,
         additions: pr.additions ?? 0,
@@ -104,71 +144,59 @@ export async function POST(request: Request) {
     })
 
     if (isStatusChange) {
-      const newStatus = getPRStatus({ state: pr.state, draft: pr.draft, merged: pr.merged })
-      const isMerged = newStatus === "MERGED"
+      const isMerged =
+        getPRStatus({
+          state: pr.state,
+          draft: pr.draft,
+          merged: pr.merged,
+        }) === "MERGED"
 
-      if (await isNotificationEnabled(repository.userId, "PR_MERGED")) {
-        const statusNotification = await prisma.notification.create({
-          data: {
-            type: "PR_MERGED",
-            title: isMerged ? "PR이 병합되었습니다" : "PR이 닫혔습니다",
-            message: `"${pr.title}" PR이 ${isMerged ? "병합" : "닫"}혔습니다.`,
-            userId: repository.userId,
-            prId: pullRequest.id,
-          },
-        })
-
-        emitNotification(repository.userId, {
-          ...statusNotification,
-          createdAt: statusNotification.createdAt.toISOString(),
+      if (recipientIds.length > 0) {
+        await notifyUsers({
+          userIds: recipientIds,
+          type: "PR_MERGED",
+          title: isMerged ? "PR merged" : "PR closed",
+          message: `"${pr.title}" was ${isMerged ? "merged" : "closed"}.`,
+          prId: pullRequest.id,
         })
       }
 
-      safeRevalidateDashboard(repository.userId)
+      recipientIds.forEach((userId) => safeRevalidateDashboard(userId))
       return NextResponse.json({ message: "PR status processed" })
     }
 
     after(async () => {
       try {
         await analyzeReview(pullRequest.id)
-        safeRevalidateDashboard(repository.userId)
+        recipientIds.forEach((userId) => safeRevalidateDashboard(userId))
 
-        if (!(await isNotificationEnabled(repository.userId, "NEW_REVIEW"))) return
+        if (recipientIds.length === 0) return
 
-        const notification = await prisma.notification.create({
-          data: {
-            type: "NEW_REVIEW",
-            title: "AI 코드 리뷰가 완료되었습니다",
-            message: `"${pr.title}" PR의 AI 코드 리뷰가 완료되었습니다.`,
-            userId: repository.userId,
-            prId: pullRequest.id,
-          },
-        })
-
-        emitNotification(repository.userId, {
-          ...notification,
-          createdAt: notification.createdAt.toISOString(),
+        await notifyUsers({
+          userIds: recipientIds,
+          type: "NEW_REVIEW",
+          title: "AI review is ready",
+          message: `The AI review for "${pr.title}" is complete.`,
+          prId: pullRequest.id,
         })
       } catch (error) {
         console.error("[webhook] analyzeReview failed:", error)
 
         try {
-          const failureNotification = await prisma.notification.create({
-            data: {
-              type: "REVIEW_FAILED",
-              title: "AI 코드 리뷰에 실패했습니다",
-              message: `"${pr.title}" PR의 AI 코드 리뷰를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.`,
-              userId: repository.userId,
-              prId: pullRequest.id,
-            },
-          })
+          if (recipientIds.length === 0) return
 
-          emitNotification(repository.userId, {
-            ...failureNotification,
-            createdAt: failureNotification.createdAt.toISOString(),
+          await notifyUsers({
+            userIds: recipientIds,
+            type: "REVIEW_FAILED",
+            title: "AI review failed",
+            message: `The AI review for "${pr.title}" could not be completed.`,
+            prId: pullRequest.id,
           })
         } catch (notifyError) {
-          console.error("[webhook] failed to send failure notification:", notifyError)
+          console.error(
+            "[webhook] failed to send failure notification:",
+            notifyError
+          )
         }
       }
     })

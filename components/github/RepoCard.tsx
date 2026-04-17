@@ -1,10 +1,21 @@
 "use client"
 
 import { useState } from "react"
-import { FolderGit2, Github, Check, Trash2, Plus, RefreshCw } from "lucide-react"
+import {
+  AlertCircle,
+  Check,
+  FolderGit2,
+  Github,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useSyncRepository } from "@/hooks/useSyncRepository"
+import { controlStyles, surfaceStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 
 const LANGUAGE_COLORS: Record<string, string> = {
   TypeScript: "bg-blue-500",
@@ -26,6 +37,8 @@ interface RepoCardProps {
   repositoryId?: string
   onConnect?: () => void
   onDisconnect?: () => void
+  isConnecting?: boolean
+  connectError?: string | null
 }
 
 export default function RepoCard({
@@ -36,53 +49,50 @@ export default function RepoCard({
   repositoryId,
   onConnect,
   onDisconnect,
+  isConnecting = false,
+  connectError = null,
 }: RepoCardProps) {
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const { mutate: sync, isPending: isSyncing } = useSyncRepository()
   const dotColor = language ? (LANGUAGE_COLORS[language] ?? "bg-slate-400") : null
 
   return (
-    <div className="group relative bg-white border border-slate-200 rounded-[24px] p-6 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-300">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-
-        {/* 왼쪽: 아이콘 + 정보 */}
+    <div className={cn("group relative", surfaceStyles.interactiveCard)}>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors border border-slate-100 shrink-0">
+          <div className="h-12 w-12 shrink-0 rounded-2xl border border-slate-100 bg-slate-50 text-slate-400 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600 flex items-center justify-center">
             <FolderGit2 size={22} aria-hidden />
           </div>
 
-          <div className="space-y-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-bold text-slate-900">{name}</h3>
               {language && dotColor && (
                 <Badge
                   variant="outline"
-                  className="gap-1.5 px-2 py-0.5 rounded-full bg-slate-50 border-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wide"
+                  className="gap-1.5 rounded-full border-slate-100 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500"
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                  <span className={cn("h-1.5 w-1.5 rounded-full", dotColor)} />
                   {language}
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-slate-400 font-medium flex items-center gap-1.5">
+            <p className="flex items-center gap-1.5 text-sm font-medium text-slate-400">
               <Github size={12} aria-hidden />
               {fullName}
             </p>
           </div>
         </div>
 
-        {/* 오른쪽: 상태 + 액션 */}
-        <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
+        <div className="flex shrink-0 items-center gap-3 self-end sm:self-center">
           {isConnected ? (
             <>
-              <Badge className="gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-bold">
+              <Badge className="gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-600">
                 <Check size={12} aria-hidden />
                 연동됨
               </Badge>
               {syncMessage && (
-                <span className="text-xs font-medium text-slate-500">
-                  {syncMessage}
-                </span>
+                <span className="text-xs font-medium text-slate-500">{syncMessage}</span>
               )}
               <Button
                 variant="ghost"
@@ -90,12 +100,11 @@ export default function RepoCard({
                 disabled={isSyncing || !repositoryId}
                 onClick={() => {
                   if (!repositoryId) return
+
                   sync(repositoryId, {
                     onSuccess: ({ updated, total }) => {
                       setSyncMessage(
-                        total === 0
-                          ? "보정할 PR 없음"
-                          : `${updated}/${total}건 보정 완료`
+                        total === 0 ? "보정할 PR 없음" : `${updated}/${total}건 보정 완료`
                       )
                       setTimeout(() => setSyncMessage(null), 3000)
                     },
@@ -106,7 +115,10 @@ export default function RepoCard({
                   })
                 }}
                 title="코드 변경량 동기화"
-                className="p-2.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl border border-transparent hover:border-blue-100 h-auto w-auto disabled:opacity-40"
+                className={cn(
+                  controlStyles.iconButton,
+                  "text-slate-400 hover:border-blue-100 hover:bg-blue-50 hover:text-blue-500 disabled:opacity-40"
+                )}
               >
                 <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} aria-hidden />
               </Button>
@@ -115,7 +127,10 @@ export default function RepoCard({
                 size="icon"
                 onClick={onDisconnect}
                 title="연동 해제"
-                className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl border border-transparent hover:border-rose-100 h-auto w-auto"
+                className={cn(
+                  controlStyles.iconButton,
+                  "text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-500"
+                )}
               >
                 <Trash2 size={18} aria-hidden />
               </Button>
@@ -124,17 +139,33 @@ export default function RepoCard({
             <Button
               onClick={onConnect}
               size="sm"
-              className="gap-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold shadow-lg shadow-blue-700/20 h-auto px-4 py-2"
+              disabled={isConnecting}
+              className={cn("h-9 gap-1.5 px-4", controlStyles.primaryAction)}
             >
-              <Plus size={14} aria-hidden />
-              연동
+              {isConnecting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" aria-hidden />
+                  연동 중...
+                </>
+              ) : (
+                <>
+                  <Plus size={14} aria-hidden />
+                  연동
+                </>
+              )}
             </Button>
           )}
         </div>
       </div>
 
-      {/* 호버 시 왼쪽 파란 인디케이터 */}
-      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0 group-hover:h-12 bg-blue-600 rounded-r-full transition-all duration-300" />
+      {connectError && !isConnected && (
+        <div className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600">
+          <AlertCircle size={13} aria-hidden />
+          {connectError}
+        </div>
+      )}
+
+      <div className="absolute left-0 top-1/2 h-0 w-1 -translate-y-1/2 rounded-r-full bg-blue-600 transition-all duration-300 group-hover:h-12" />
     </div>
   )
 }

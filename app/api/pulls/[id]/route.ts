@@ -1,49 +1,12 @@
 import { auth } from "@/lib/auth"
 import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
+import {
+  buildAccessiblePullRequestWhere,
+  getRepositoryPrimaryUser,
+} from "@/lib/repository-access"
 import { NextResponse } from "next/server"
 
-/**
- * @swagger
- * /api/pulls/{id}:
- *   get:
- *     summary: PR 상세 조회
- *     description: PR 상세 정보를 반환합니다. additions/deletions/changedFiles가 모두 0이면 GitHub API로 실시간 보정합니다.
- *     tags:
- *       - PullRequest
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: PR ID (DB)
- *     responses:
- *       200:
- *         description: PR 상세 조회 성공
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/PullRequest'
- *       401:
- *         description: 인증되지 않은 사용자
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       404:
- *         description: PR을 찾을 수 없음
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       500:
- *         description: 서버 내부 오류
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -56,11 +19,14 @@ export async function GET(
     }
 
     const { id } = await params
+    const pullRequestWhere = await buildAccessiblePullRequestWhere(
+      session.user.id
+    )
 
     const pr = await prisma.pullRequest.findFirst({
       where: {
         id,
-        repo: { userId: session.user.id },
+        ...pullRequestWhere,
       },
       include: {
         repo: {
@@ -68,7 +34,6 @@ export async function GET(
             id: true,
             name: true,
             fullName: true,
-            owner: { select: { id: true, name: true, image: true } },
           },
         },
         reviews: {
@@ -79,7 +44,6 @@ export async function GET(
             issueCount: true,
             severity: true,
             reviewedAt: true,
-            // aiSuggestions 제외 — /api/pulls/[id]/review 전용 API에서 제공
           },
           take: 1,
           orderBy: { reviewedAt: "desc" },
@@ -88,19 +52,20 @@ export async function GET(
     })
 
     if (!pr) {
-      return NextResponse.json({ error: "PR을 찾을 수 없습니다." }, { status: 404 })
+      return NextResponse.json({ error: "Pull request not found" }, { status: 404 })
     }
+
+    const owner = await getRepositoryPrimaryUser(pr.repo.id)
 
     let { additions, deletions, changedFiles } = pr
 
-    // additions/deletions/changedFiles가 모두 0이면 GitHub API로 실시간 보정
     if (additions === 0 && deletions === 0 && changedFiles === 0) {
       try {
         const octokit = await getOctokit(session.user.id)
-        const [owner, repo] = pr.repo.fullName.split("/")
+        const [ownerName, repoName] = pr.repo.fullName.split("/")
         const { data } = await octokit.pulls.get({
-          owner,
-          repo,
+          owner: ownerName,
+          repo: repoName,
           pull_number: pr.number,
         })
 
@@ -108,16 +73,15 @@ export async function GET(
         deletions = data.deletions
         changedFiles = data.changed_files
 
-        // DB 보정값 저장 (fire-and-forget)
         prisma.pullRequest
           .update({ where: { id }, data: { additions, deletions, changedFiles } })
           .catch(() => {})
       } catch {
-        // GitHub API 실패 시 DB 값(0)을 그대로 반환
+        // Keep stored values when GitHub hydration fails.
       }
     }
 
-    const { githubId, ...rest } = pr
+    const { githubId, repo: repository, ...rest } = pr
 
     return NextResponse.json({
       ...rest,
@@ -125,6 +89,12 @@ export async function GET(
       additions,
       deletions,
       changedFiles,
+      repo: {
+        id: repository.id,
+        name: repository.name,
+        fullName: repository.fullName,
+        owner,
+      },
     })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

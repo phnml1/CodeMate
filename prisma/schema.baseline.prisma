@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id                String  @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Comment {
+  id            String      @id
+  content       String
+  lineNumber    Int?
+  filePath      String?
+  isResolved    Boolean     @default(false)
+  pullRequestId String
+  authorId      String
+  parentId      String?
+  mentions      String[]
+  reactions     Json?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime
+  User          User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  Comment       Comment?    @relation("CommentToComment", fields: [parentId], references: [id], onDelete: Cascade)
+  other_Comment Comment[]   @relation("CommentToComment")
+  PullRequest   PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@index([pullRequestId])
+}
+
+model Notification {
+  id        String           @id
+  type      NotificationType
+  title     String
+  message   String?
+  isRead    Boolean          @default(false)
+  userId    String
+  prId      String?
+  commentId String?
+  createdAt DateTime         @default(now())
+  User      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model NotificationSetting {
+  id                  String   @id
+  userId              String   @unique
+  mentionEnabled      Boolean  @default(true)
+  newReviewEnabled    Boolean  @default(true)
+  prMergedEnabled     Boolean  @default(true)
+  commentReplyEnabled Boolean  @default(true)
+  updatedAt           DateTime
+  User                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PullRequest {
+  id              String     @id
+  githubId        BigInt     @unique
+  number          Int
+  title           String
+  description     String?
+  status          PRStatus   @default(OPEN)
+  baseBranch      String
+  headBranch      String
+  additions       Int        @default(0)
+  deletions       Int        @default(0)
+  changedFiles    Int        @default(0)
+  repoId          String
+  mergedAt        DateTime?
+  closedAt        DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime
+  githubCreatedAt DateTime?
+  githubUpdatedAt DateTime?
+  Comment         Comment[]
+  Repository      Repository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  Review          Review[]
+
+  @@index([repoId])
+  @@index([status])
+}
+
+model Repository {
+  id          String        @id
+  githubId    BigInt        @unique
+  name        String
+  fullName    String
+  description String?
+  language    String?
+  isActive    Boolean       @default(true)
+  webhookId   Int?
+  userId      String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime
+  PullRequest PullRequest[]
+  User        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([fullName])
+  @@index([userId])
+}
+
+model Review {
+  id            String       @id
+  aiSuggestions Json
+  qualityScore  Int
+  severity      Severity     @default(LOW)
+  issueCount    Int          @default(0)
+  status        ReviewStatus @default(PENDING)
+  pullRequestId String
+  reviewedAt    DateTime     @default(now())
+  PullRequest   PullRequest  @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+
+  @@index([pullRequestId])
+  @@index([status])
+}
+
+model ReviewSetting {
+  id            String   @id
+  userId        String   @unique
+  autoReview    Boolean  @default(true)
+  language      String   @default("ko")
+  severityLevel String   @default("normal")
+  updatedAt     DateTime
+  User          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model User {
+  id                  String               @id
+  email               String?              @unique
+  name                String?
+  image               String?
+  emailVerified       DateTime?
+  githubId            BigInt?              @unique
+  githubToken         String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime
+  Account             Account[]
+  Comment             Comment[]
+  Notification        Notification[]
+  NotificationSetting NotificationSetting?
+  Repository          Repository[]
+  ReviewSetting       ReviewSetting?
+  Session             Session[]
+
+  @@index([email])
+  @@index([githubId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum NotificationType {
+  MENTION
+  NEW_REVIEW
+  PR_MERGED
+  COMMENT_REPLY
+}
+
+enum PRStatus {
+  OPEN
+  CLOSED
+  MERGED
+  DRAFT
+}
+
+enum ReviewStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}

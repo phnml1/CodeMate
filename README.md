@@ -368,6 +368,7 @@ npx shadcn@latest add dropdown-menu avatar badge
 ```env
 # Database
 DATABASE_URL="postgresql://username:password@localhost:5432/codemate"
+DIRECT_DATABASE_URL="postgresql://username:password@localhost:5432/codemate"
 
 # NextAuth
 NEXTAUTH_URL="http://localhost:3000"
@@ -418,6 +419,10 @@ npx prisma generate
 # (Optional) Prisma Studio로 DB 확인
 npx prisma studio
 ```
+
+Supabase pooler URL을 `DATABASE_URL`로 쓰는 경우:
+`DIRECT_DATABASE_URL`에는 direct connection URL을 따로 넣어두는 것을 권장합니다.
+런타임 쿼리는 pooler로 처리해도 되지만, Prisma migration은 direct URL이 더 안정적입니다.
 
 ### 5. 개발 서버 실행
 
