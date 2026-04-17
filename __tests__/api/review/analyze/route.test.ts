@@ -1,11 +1,11 @@
 import { POST } from "@/app/api/review/analyze/route"
 import { prisma } from "@/lib/prisma"
 import * as analyzeModule from "@/lib/ai/analyze"
+import { getRepositoryMemberIds } from "@/lib/repository-access"
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     pullRequest: { findUnique: jest.fn() },
-    review: { create: jest.fn(), findUnique: jest.fn() },
     notification: { create: jest.fn() },
   },
 }))
@@ -19,12 +19,17 @@ jest.mock("@/lib/socket/emitter", () => ({
 }))
 
 jest.mock("@/lib/notification-settings", () => ({
-  isNotificationEnabled: jest.fn().mockResolvedValue(true),
+  getEnabledUserIds: jest.fn().mockResolvedValue(["user-1"]),
+}))
+
+jest.mock("@/lib/repository-access", () => ({
+  getRepositoryMemberIds: jest.fn().mockResolvedValue(["user-1"]),
 }))
 
 const mockedFindUnique = prisma.pullRequest.findUnique as jest.Mock
-const mockedReviewCreate = prisma.review.create as jest.Mock
+const mockedNotificationCreate = prisma.notification.create as jest.Mock
 const mockedAnalyze = analyzeModule.analyzeReview as jest.Mock
+const mockedGetRepositoryMemberIds = getRepositoryMemberIds as jest.Mock
 
 function makeRequest(body: object) {
   return new Request("http://localhost/api/review/analyze", {
@@ -37,27 +42,37 @@ function makeRequest(body: object) {
 const mockPR = {
   id: "pr-1",
   title: "Fix bug",
-  repo: { userId: "user-1" },
+  repoId: "repo-1",
 }
 
 describe("POST /api/review/analyze", () => {
   afterEach(() => jest.clearAllMocks())
 
-  it("유효한 pullRequestId로 리뷰 분석을 백그라운드에서 실행하고 PENDING을 반환한다", async () => {
+  it("starts review analysis and returns PENDING", async () => {
     mockedFindUnique.mockResolvedValue(mockPR)
-    mockedReviewCreate.mockResolvedValue({ id: "review-1" })
     mockedAnalyze.mockResolvedValue(undefined)
+    mockedNotificationCreate.mockResolvedValue({
+      id: "notif-1",
+      type: "NEW_REVIEW",
+      title: "AI review is ready",
+      message: "done",
+      isRead: false,
+      userId: "user-1",
+      prId: "pr-1",
+      commentId: null,
+      createdAt: new Date(),
+    })
 
     const res = await POST(makeRequest({ pullRequestId: "pr-1" }))
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(body.reviewId).toBe("review-1")
     expect(body.status).toBe("PENDING")
     expect(mockedAnalyze).toHaveBeenCalledWith("pr-1")
+    expect(mockedGetRepositoryMemberIds).toHaveBeenCalledWith("repo-1")
   })
 
-  it("pullRequestId 없으면 400을 반환한다", async () => {
+  it("returns 400 when pullRequestId is missing", async () => {
     const res = await POST(makeRequest({}))
     const body = await res.json()
 
@@ -66,17 +81,17 @@ describe("POST /api/review/analyze", () => {
     expect(mockedAnalyze).not.toHaveBeenCalled()
   })
 
-  it("존재하지 않는 pullRequestId면 404를 반환한다", async () => {
+  it("returns 404 when the pull request does not exist", async () => {
     mockedFindUnique.mockResolvedValue(null)
 
     const res = await POST(makeRequest({ pullRequestId: "not-exist" }))
     const body = await res.json()
 
     expect(res.status).toBe(404)
-    expect(body.error).toBe("PullRequest not found")
+    expect(body.error).toBe("Pull request not found")
   })
 
-  it("서버 에러 시 500을 반환한다", async () => {
+  it("returns 500 on unexpected errors", async () => {
     mockedFindUnique.mockRejectedValue(new Error("DB error"))
 
     const res = await POST(makeRequest({ pullRequestId: "pr-1" }))

@@ -25,7 +25,7 @@ model User {
   // Relations
   accounts      Account[]
   sessions      Session[]
-  repositories  Repository[]
+  repositories  UserRepository[]
   comments      Comment[]
   notifications       Notification[]
   notificationSetting NotificationSetting?
@@ -92,15 +92,27 @@ model Repository {
   webhookId    Int?      // GitHub Webhook ID
 
   // Relations
-  owner        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId       String
+  userRepositories UserRepository[]
   pullRequests PullRequest[]
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  @@index([userId])
   @@index([fullName])
+}
+
+model UserRepository {
+  id           String     @id @default(cuid())
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  repositoryId String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([userId, repositoryId])
+  @@index([userId])
+  @@index([repositoryId])
 }
 
 model PullRequest {

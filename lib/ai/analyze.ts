@@ -4,15 +4,9 @@ import { prisma } from "@/lib/prisma"
 import { getAnthropicClient, CLAUDE_MODEL } from "@/lib/ai/claude"
 import { SYSTEM_PROMPT, buildUserPrompt } from "@/lib/ai/prompts"
 import { parseAIReviewResponse } from "@/lib/ai/parsers"
+import { getRepositoryPrimaryUser } from "@/lib/repository-access"
 import { calculateScore } from "@/lib/scoring"
 
-/**
- * DB partial unique index("review_active_unique") 위반 여부를 판별한다.
- *
- * 이 오류는 동일 PR에 대해 PENDING/IN_PROGRESS Review가 이미 존재할 때 발생하며,
- * "다른 인스턴스가 이미 처리 중"이라는 정상적인 중복 차단 신호다.
- * → 오류로 취급하지 않고 조용히 종료(early return)한다.
- */
 function isActiveReviewConflict(err: unknown): boolean {
   return (
     err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -26,12 +20,6 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
   let reviewId: string | null = null
 
   try {
-    // ── Review 레코드 생성 ──────────────────────────────────────────────────
-    // findFirst → create 패턴(TOCTOU race condition)을 제거하고,
-    // create를 먼저 시도한다.
-    //
-    // DB partial unique index가 PENDING/IN_PROGRESS 중복을 원자적으로 차단하므로
-    // 동시 요청이 와도 정확히 하나의 인스턴스만 create에 성공한다.
     let review: { id: string }
     try {
       review = await prisma.review.create({
@@ -45,16 +33,17 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
         },
         select: { id: true },
       })
-    } catch (err) {
-      if (isActiveReviewConflict(err)) {
-        // 이미 다른 인스턴스가 처리 중 — 정상적인 중복 차단
+    } catch (error) {
+      if (isActiveReviewConflict(error)) {
         console.info(
           `[analyzeReview] already active for PR ${pullRequestId}, skipping.`
         )
         return
       }
-      throw err
+
+      throw error
     }
+
     reviewId = review.id
 
     await prisma.review.update({
@@ -62,24 +51,27 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
       data: { status: "IN_PROGRESS" },
     })
 
-    // ── PR + Repository + GitHub 토큰 로드 ─────────────────────────────────
     const pr = await prisma.pullRequest.findUnique({
       where: { id: pullRequestId },
       include: {
-        repo: {
-          include: {
-            owner: { select: { githubToken: true, name: true } },
-          },
-        },
+        repo: true,
       },
     })
 
-    if (!pr) throw new Error(`PullRequest not found: ${pullRequestId}`)
+    if (!pr) {
+      throw new Error(`Pull request not found: ${pullRequestId}`)
+    }
 
-    const { githubToken, name: authorName } = pr.repo.owner
-    if (!githubToken) throw new Error("GitHub token not found for repository owner")
+    const tokenUser = await getRepositoryPrimaryUser(pr.repo.id, {
+      requireGithubToken: true,
+    })
+    const githubToken = tokenUser?.githubToken ?? null
+    const authorName = tokenUser?.name ?? null
 
-    // ── GitHub에서 PR diff 조회 ─────────────────────────────────────────────
+    if (!githubToken) {
+      throw new Error("GitHub token not found for any connected repository user")
+    }
+
     const octokit = new Octokit({ auth: githubToken })
     const [owner, repo] = pr.repo.fullName.split("/")
 
@@ -92,8 +84,8 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
 
     const MAX_DIFF_CHARS = 20000
     let diff = ""
-    for (const f of files.filter((f) => f.patch)) {
-      const chunk = `--- ${f.filename}\n${f.patch}\n\n`
+    for (const file of files.filter((candidate) => candidate.patch)) {
+      const chunk = `--- ${file.filename}\n${file.patch}\n\n`
       if (diff.length + chunk.length > MAX_DIFF_CHARS) {
         diff += "... (diff truncated)"
         break
@@ -101,7 +93,6 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
       diff += chunk
     }
 
-    // ── Claude 호출 ─────────────────────────────────────────────────────────
     const response = await getAnthropicClient().messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 8192,
@@ -138,8 +129,8 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
         status: "COMPLETED",
       },
     })
-  } catch (err) {
-    console.error("[analyzeReview] failed:", err)
+  } catch (error) {
+    console.error("[analyzeReview] failed:", error)
 
     if (reviewId) {
       await prisma.review.update({

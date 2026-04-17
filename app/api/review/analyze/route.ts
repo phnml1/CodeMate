@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { analyzeReview } from "@/lib/ai/analyze"
+import { getEnabledUserIds } from "@/lib/notification-settings"
+import { prisma } from "@/lib/prisma"
+import { getRepositoryMemberIds } from "@/lib/repository-access"
 import { emitNotification } from "@/lib/socket/emitter"
-import { isNotificationEnabled } from "@/lib/notification-settings"
 
 export async function POST(request: Request) {
   try {
@@ -18,51 +19,50 @@ export async function POST(request: Request) {
 
     const pr = await prisma.pullRequest.findUnique({
       where: { id: pullRequestId },
-      include: { repo: { select: { userId: true } } },
+      select: {
+        id: true,
+        title: true,
+        repoId: true,
+      },
     })
 
     if (!pr) {
       return NextResponse.json(
-        { error: "PullRequest not found" },
+        { error: "Pull request not found" },
         { status: 404 }
       )
     }
 
-    // Create PENDING review record upfront
-    const review = await prisma.review.create({
-      data: {
-        pullRequestId,
-        status: "PENDING",
-        aiSuggestions: {},
-        qualityScore: 0,
-        severity: "LOW",
-        issueCount: 0,
-      },
-    })
-
-    const prOwnerId = pr.repo.userId
-
-    // Fire-and-forget: respond immediately, notify when done
     analyzeReview(pullRequestId)
       .then(async () => {
-        if (!(await isNotificationEnabled(prOwnerId, "NEW_REVIEW"))) return
-        const notification = await prisma.notification.create({
-          data: {
-            type: "NEW_REVIEW",
-            title: "AI 코드 리뷰가 완료되었습니다",
-            message: `"${pr.title}" PR의 AI 코드 리뷰가 완료되었습니다.`,
-            userId: prOwnerId,
-            prId: pullRequestId,
-          },
-        })
-        emitNotification(prOwnerId, {
-          ...notification,
-          createdAt: notification.createdAt.toISOString(),
-        })
-      })
-      .catch((err) => console.error("[analyze] analyzeReview failed:", err))
+        const repositoryUserIds = await getRepositoryMemberIds(pr.repoId)
+        const recipientIds = await getEnabledUserIds(
+          [...new Set(repositoryUserIds)],
+          "NEW_REVIEW"
+        )
 
-    return NextResponse.json({ reviewId: review.id, status: "PENDING" })
+        await Promise.all(
+          recipientIds.map(async (userId) => {
+            const notification = await prisma.notification.create({
+              data: {
+                type: "NEW_REVIEW",
+                title: "AI review is ready",
+                message: `The AI review for "${pr.title}" is complete.`,
+                userId,
+                prId: pullRequestId,
+              },
+            })
+
+            emitNotification(userId, {
+              ...notification,
+              createdAt: notification.createdAt.toISOString(),
+            })
+          })
+        )
+      })
+      .catch((error) => console.error("[analyze] analyzeReview failed:", error))
+
+    return NextResponse.json({ status: "PENDING" })
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

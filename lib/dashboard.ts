@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import {
   fetchQualityTrend,
@@ -5,16 +6,17 @@ import {
   type QualityTrendItem,
   type IssueSeverityItem,
 } from "@/lib/stats"
+import { getAccessibleRepositoryIds } from "@/lib/repository-access"
 
 export type { QualityTrendItem, IssueSeverityItem }
 
 export interface DashboardStats {
   avgQualityScore: number
-  qualityScoreTrend: number // 이전 30일 대비 변화율 (%)
+  qualityScoreTrend: number
   openPRs: number
-  pendingReviewPRs: number // 리뷰 없는 OPEN PR 수
+  pendingReviewPRs: number
   weeklyReviews: number
-  weeklyReviewsDiff: number // 지난주 대비 차이
+  weeklyReviewsDiff: number
 }
 
 export interface DashboardRecentPR {
@@ -27,17 +29,18 @@ export interface DashboardRecentPR {
 }
 
 function getWeekStart(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  d.setDate(diff)
-  d.setHours(0, 0, 0, 0)
-  return d
+  const current = new Date(date)
+  const day = current.getDay()
+  const diff = current.getDate() - day + (day === 0 ? -6 : 1)
+  current.setDate(diff)
+  current.setHours(0, 0, 0, 0)
+  return current
 }
 
 export async function fetchDashboardStats(
   userId: string
 ): Promise<DashboardStats> {
+  const repoIds = await getAccessibleRepositoryIds(userId)
   const now = new Date()
 
   const thirtyDaysAgo = new Date(now)
@@ -52,7 +55,11 @@ export async function fetchDashboardStats(
   const lastWeekStart = new Date(thisWeekStart)
   lastWeekStart.setDate(thisWeekStart.getDate() - 7)
 
-  const repoFilter = { repo: { userId } }
+  const pullRequestFilter = {
+    repoId: {
+      in: repoIds,
+    },
+  }
 
   const [
     currentQuality,
@@ -64,7 +71,7 @@ export async function fetchDashboardStats(
   ] = await Promise.all([
     prisma.review.aggregate({
       where: {
-        pullRequest: repoFilter,
+        pullRequest: pullRequestFilter,
         status: "COMPLETED",
         reviewedAt: { gte: thirtyDaysAgo },
       },
@@ -72,32 +79,32 @@ export async function fetchDashboardStats(
     }),
     prisma.review.aggregate({
       where: {
-        pullRequest: repoFilter,
+        pullRequest: pullRequestFilter,
         status: "COMPLETED",
         reviewedAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
       },
       _avg: { qualityScore: true },
     }),
     prisma.pullRequest.count({
-      where: { ...repoFilter, status: "OPEN" },
+      where: { ...pullRequestFilter, status: "OPEN" },
     }),
     prisma.pullRequest.count({
       where: {
-        ...repoFilter,
+        ...pullRequestFilter,
         status: "OPEN",
         reviews: { none: { status: "COMPLETED" } },
       },
     }),
     prisma.review.count({
       where: {
-        pullRequest: repoFilter,
+        pullRequest: pullRequestFilter,
         status: "COMPLETED",
         reviewedAt: { gte: thisWeekStart },
       },
     }),
     prisma.review.count({
       where: {
-        pullRequest: repoFilter,
+        pullRequest: pullRequestFilter,
         status: "COMPLETED",
         reviewedAt: { gte: lastWeekStart, lt: thisWeekStart },
       },
@@ -132,15 +139,21 @@ export async function fetchDashboardQualityTrend(
 export async function fetchDashboardIssueSeverity(
   userId: string
 ): Promise<IssueSeverityItem[]> {
-  const dist = await fetchIssueDistribution(userId, "30d")
-  return dist.bySeverity
+  const distribution = await fetchIssueDistribution(userId, "30d")
+  return distribution.bySeverity
 }
 
 export async function fetchDashboardRecentPRs(
   userId: string
 ): Promise<DashboardRecentPR[]> {
-  const prs = await prisma.pullRequest.findMany({
-    where: { repo: { userId } },
+  const repoIds = await getAccessibleRepositoryIds(userId)
+
+  const pullRequests = await prisma.pullRequest.findMany({
+    where: {
+      repoId: {
+        in: repoIds,
+      },
+    },
     select: {
       id: true,
       number: true,
@@ -161,12 +174,40 @@ export async function fetchDashboardRecentPRs(
     take: 5,
   })
 
-  return prs.map((pr) => ({
-    id: pr.id,
-    number: pr.number,
-    title: pr.title,
-    repoName: pr.repo.name,
-    score: pr.reviews[0]?.qualityScore ?? null,
-    status: pr.status as DashboardRecentPR["status"],
+  return pullRequests.map((pullRequest) => ({
+    id: pullRequest.id,
+    number: pullRequest.number,
+    title: pullRequest.title,
+    repoName: pullRequest.repo.name,
+    score: pullRequest.reviews[0]?.qualityScore ?? null,
+    status: pullRequest.status as DashboardRecentPR["status"],
   }))
 }
+
+export const getCachedDashboardStats = (userId: string) =>
+  unstable_cache(
+    () => fetchDashboardStats(userId),
+    ["dashboard-stats", userId],
+    { revalidate: 3600, tags: ["dashboard", `dashboard-${userId}`] }
+  )()
+
+export const getCachedDashboardQualityTrend = (userId: string) =>
+  unstable_cache(
+    () => fetchDashboardQualityTrend(userId),
+    ["dashboard-quality-trend", userId],
+    { revalidate: 3600, tags: ["dashboard", `dashboard-${userId}`] }
+  )()
+
+export const getCachedDashboardIssueSeverity = (userId: string) =>
+  unstable_cache(
+    () => fetchDashboardIssueSeverity(userId),
+    ["dashboard-issue-severity", userId],
+    { revalidate: 3600, tags: ["dashboard", `dashboard-${userId}`] }
+  )()
+
+export const getCachedDashboardRecentPRs = (userId: string) =>
+  unstable_cache(
+    () => fetchDashboardRecentPRs(userId),
+    ["dashboard-recent-prs", userId],
+    { revalidate: 3600, tags: ["dashboard", `dashboard-${userId}`] }
+  )()

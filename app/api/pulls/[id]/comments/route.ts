@@ -1,33 +1,42 @@
 import { auth } from "@/lib/auth"
+import { getEnabledUserIds } from "@/lib/notification-settings"
 import { prisma } from "@/lib/prisma"
-import { NextResponse } from "next/server"
+import {
+  buildAccessiblePullRequestWhere,
+  getRepositoryMemberIds,
+} from "@/lib/repository-access"
 import { emitCommentNew, emitNotification } from "@/lib/socket/emitter"
-import { isNotificationEnabled, getEnabledUserIds } from "@/lib/notification-settings"
+import { NextResponse } from "next/server"
 
-/**
- * @swagger
- * /api/pulls/{id}/comments:
- *   get:
- *     summary: 댓글 목록 조회
- *     description: PR의 루트 댓글 목록을 replies 중첩 포함하여 반환합니다.
- *     tags:
- *       - Comment
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: 댓글 목록 조회 성공
- *       401:
- *         description: 인증되지 않은 사용자
- *       404:
- *         description: PR을 찾을 수 없음
- *       500:
- *         description: 서버 내부 오류
- */
+async function createNotificationsForUsers(params: {
+  userIds: string[]
+  type: "MENTION" | "COMMENT_REPLY"
+  title: string
+  message: string
+  prId: string
+  commentId: string
+}) {
+  await Promise.all(
+    params.userIds.map(async (userId) => {
+      const notification = await prisma.notification.create({
+        data: {
+          type: params.type,
+          title: params.title,
+          message: params.message,
+          userId,
+          prId: params.prId,
+          commentId: params.commentId,
+        },
+      })
+
+      emitNotification(userId, {
+        ...notification,
+        createdAt: notification.createdAt.toISOString(),
+      })
+    })
+  )
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -39,13 +48,19 @@ export async function GET(
     }
 
     const { id } = await params
+    const pullRequestWhere = await buildAccessiblePullRequestWhere(
+      session.user.id
+    )
 
     const pr = await prisma.pullRequest.findFirst({
-      where: { id, repo: { userId: session.user.id } },
+      where: {
+        id,
+        ...pullRequestWhere,
+      },
       select: { id: true },
     })
     if (!pr) {
-      return NextResponse.json({ error: "PR을 찾을 수 없습니다." }, { status: 404 })
+      return NextResponse.json({ error: "Pull request not found" }, { status: 404 })
     }
 
     const comments = await prisma.comment.findMany({
@@ -69,30 +84,6 @@ export async function GET(
   }
 }
 
-/**
- * @swagger
- * /api/pulls/{id}/comments:
- *   post:
- *     summary: 댓글 작성
- *     description: PR에 댓글을 작성합니다. 멘션 포함 시 Notification을 생성합니다.
- *     tags:
- *       - Comment
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       201:
- *         description: 댓글 작성 성공
- *       401:
- *         description: 인증되지 않은 사용자
- *       404:
- *         description: PR을 찾을 수 없음
- *       500:
- *         description: 서버 내부 오류
- */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -104,13 +95,23 @@ export async function POST(
     }
 
     const { id } = await params
+    const pullRequestWhere = await buildAccessiblePullRequestWhere(
+      session.user.id
+    )
 
     const pr = await prisma.pullRequest.findFirst({
-      where: { id, repo: { userId: session.user.id } },
-      select: { id: true, title: true, repo: { select: { userId: true } } },
+      where: {
+        id,
+        ...pullRequestWhere,
+      },
+      select: {
+        id: true,
+        title: true,
+        repoId: true,
+      },
     })
     if (!pr) {
-      return NextResponse.json({ error: "PR을 찾을 수 없습니다." }, { status: 404 })
+      return NextResponse.json({ error: "Pull request not found" }, { status: 404 })
     }
 
     const body = await request.json()
@@ -123,7 +124,7 @@ export async function POST(
     }
 
     if (!content?.trim()) {
-      return NextResponse.json({ error: "댓글 내용을 입력해주세요." }, { status: 400 })
+      return NextResponse.json({ error: "Content is required." }, { status: 400 })
     }
 
     const comment = await prisma.comment.create({
@@ -143,64 +144,53 @@ export async function POST(
       },
     })
 
-    // 소켓 실시간 브로드캐스트
     emitCommentNew(id, { ...comment, replies: [] })
 
-    // 멘션 알림 생성
     if (mentions && mentions.length > 0) {
-      const uniqueMentions = [...new Set(mentions)].filter((uid) => uid !== session.user.id)
-      if (uniqueMentions.length > 0) {
-        const mentionMessage = `${session.user.name ?? "누군가"}님이 댓글에서 회원님을 멘션했습니다.`
+      const uniqueMentions = [...new Set(mentions)].filter(
+        (userId) => userId !== session.user.id
+      )
 
-        // 구독 설정 확인 후 알림 생성 — 배치 조회로 N+1 방지
-        const enabledMentions = await getEnabledUserIds(uniqueMentions, "MENTION")
+      const enabledMentionRecipients = await getEnabledUserIds(
+        uniqueMentions,
+        "MENTION"
+      )
 
-        if (enabledMentions.length > 0) {
-          await prisma.notification.createMany({
-            data: enabledMentions.map((userId) => ({
-              type: "MENTION" as const,
-              title: "댓글에서 멘션되었습니다",
-              message: mentionMessage,
-              userId,
-              prId: id,
-              commentId: comment.id,
-            })),
-            skipDuplicates: true,
-          })
+      if (enabledMentionRecipients.length > 0) {
+        const mentionMessage = `${
+          session.user.name ?? "A teammate"
+        } mentioned you in a comment.`
 
-          for (const userId of enabledMentions) {
-            emitNotification(userId, {
-              id: comment.id,
-              type: "MENTION",
-              title: "댓글에서 멘션되었습니다",
-              message: mentionMessage,
-              isRead: false,
-              userId,
-              prId: id,
-              commentId: comment.id,
-              createdAt: new Date().toISOString(),
-            })
-          }
-        }
+        await createNotificationsForUsers({
+          userIds: enabledMentionRecipients,
+          type: "MENTION",
+          title: "You were mentioned in a comment",
+          message: mentionMessage,
+          prId: id,
+          commentId: comment.id,
+        })
       }
     }
 
-    // COMMENT 알림 - 댓글 작성자가 PR 소유자가 아닐 때
-    const prOwnerId = pr.repo.userId
-    if (prOwnerId !== session.user.id && await isNotificationEnabled(prOwnerId, "COMMENT_REPLY")) {
-      const commentNotification = await prisma.notification.create({
-        data: {
-          type: "COMMENT_REPLY",
-          title: "새 댓글이 달렸습니다",
-          message: `${session.user.name ?? "누군가"}님이 "${pr.title}"에 댓글을 남겼습니다.`,
-          userId: prOwnerId,
-          prId: id,
-          commentId: comment.id,
-        },
-      })
-      emitNotification(prOwnerId, {
-        ...commentNotification,
-        createdAt: commentNotification.createdAt.toISOString(),
+    const connectedUserIds = (await getRepositoryMemberIds(pr.repoId)).filter(
+      (userId) => userId !== session.user.id
+    )
+
+    const enabledCommentRecipients = await getEnabledUserIds(
+      connectedUserIds,
+      "COMMENT_REPLY"
+    )
+
+    if (enabledCommentRecipients.length > 0) {
+      await createNotificationsForUsers({
+        userIds: enabledCommentRecipients,
+        type: "COMMENT_REPLY",
+        title: "A new comment was added",
+        message: `${
+          session.user.name ?? "A teammate"
+        } commented on "${pr.title}".`,
+        prId: id,
+        commentId: comment.id,
       })
     }
 
