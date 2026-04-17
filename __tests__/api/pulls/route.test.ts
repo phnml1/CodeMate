@@ -1,6 +1,7 @@
 import { GET } from "@/app/api/pulls/route"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
@@ -15,9 +16,15 @@ jest.mock("@/lib/prisma", () => ({
   },
 }))
 
+jest.mock("@/lib/repository-access", () => ({
+  buildAccessiblePullRequestWhere: jest.fn(),
+}))
+
 const mockedAuth = auth as jest.Mock
 const mockedCount = prisma.pullRequest.count as jest.Mock
 const mockedFindMany = prisma.pullRequest.findMany as jest.Mock
+const mockedBuildAccessiblePullRequestWhere =
+  buildAccessiblePullRequestWhere as jest.Mock
 
 function createRequest(params?: Record<string, string>) {
   const url = new URL("http://localhost/api/pulls")
@@ -29,7 +36,7 @@ function createRequest(params?: Record<string, string>) {
 
 const samplePR = {
   id: "pr-1",
-  githubId: 1001,
+  githubId: BigInt(1001),
   number: 45,
   title: "feat: Implement real-time monitoring",
   description: null,
@@ -54,7 +61,7 @@ describe("GET /api/pulls", () => {
     jest.clearAllMocks()
   })
 
-  it("미인증 사용자는 401을 반환한다", async () => {
+  it("returns 401 for anonymous users", async () => {
     mockedAuth.mockResolvedValue(null)
 
     const response = await GET(createRequest())
@@ -64,8 +71,11 @@ describe("GET /api/pulls", () => {
     expect(body.error).toBe("Unauthorized")
   })
 
-  it("기본 조회 시 pagination과 함께 PR 목록을 반환한다", async () => {
+  it("returns paginated pull requests", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
+      repoId: { in: ["repo-1"] },
+    })
     mockedCount.mockResolvedValue(1)
     mockedFindMany.mockResolvedValue([samplePR])
 
@@ -75,36 +85,38 @@ describe("GET /api/pulls", () => {
     expect(response.status).toBe(200)
     expect(body.pullRequests).toHaveLength(1)
     expect(body.pullRequests[0].title).toBe("feat: Implement real-time monitoring")
+    expect(body.pullRequests[0].githubId).toBe(1001)
     expect(body.pagination).toEqual({ total: 1, page: 1, limit: 20, totalPages: 1 })
     expect(mockedFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { repo: { userId: "user-1" } },
-        orderBy: [
-          { githubCreatedAt: { sort: "desc", nulls: "last" } },
-          { number: "desc" },
-        ],
+        where: { repoId: { in: ["repo-1"] } },
         skip: 0,
         take: 20,
       })
     )
   })
 
-  it("repoId 파라미터로 저장소 필터링이 동작한다", async () => {
+  it("passes repoId into the accessibility filter", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
+      repoId: { in: ["repo-1"] },
+    })
     mockedCount.mockResolvedValue(1)
     mockedFindMany.mockResolvedValue([samplePR])
 
     await GET(createRequest({ repoId: "repo-1" }))
 
-    expect(mockedFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { repo: { userId: "user-1" }, repoId: "repo-1" },
-      })
+    expect(mockedBuildAccessiblePullRequestWhere).toHaveBeenCalledWith(
+      "user-1",
+      "repo-1"
     )
   })
 
-  it("status 파라미터로 상태 필터링이 동작한다", async () => {
+  it("applies status filters on top of accessible PR filters", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
+      repoId: { in: ["repo-1"] },
+    })
     mockedCount.mockResolvedValue(1)
     mockedFindMany.mockResolvedValue([samplePR])
 
@@ -112,23 +124,26 @@ describe("GET /api/pulls", () => {
 
     expect(mockedFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { repo: { userId: "user-1" }, status: "OPEN" },
+        where: { repoId: { in: ["repo-1"] }, status: "OPEN" },
       })
     )
   })
 
-  it("유효하지 않은 status 값은 400을 반환한다", async () => {
+  it("returns 400 for invalid statuses", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
 
     const response = await GET(createRequest({ status: "INVALID" }))
     const body = await response.json()
 
     expect(response.status).toBe(400)
-    expect(body.error).toContain("유효하지 않은")
+    expect(body.error).toContain("Invalid status")
   })
 
-  it("page/limit 파라미터로 페이지네이션이 동작한다", async () => {
+  it("supports page and limit parameters", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
+      repoId: { in: ["repo-1"] },
+    })
     mockedCount.mockResolvedValue(50)
     mockedFindMany.mockResolvedValue([])
 
@@ -142,8 +157,11 @@ describe("GET /api/pulls", () => {
     )
   })
 
-  it("limit은 최대 50을 초과할 수 없다", async () => {
+  it("caps limit at 50", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
+      repoId: { in: ["repo-1"] },
+    })
     mockedCount.mockResolvedValue(0)
     mockedFindMany.mockResolvedValue([])
 
@@ -154,9 +172,9 @@ describe("GET /api/pulls", () => {
     )
   })
 
-  it("서버 에러 시 500을 반환한다", async () => {
+  it("returns 500 on unexpected errors", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
-    mockedCount.mockRejectedValue(new Error("DB error"))
+    mockedBuildAccessiblePullRequestWhere.mockRejectedValue(new Error("DB error"))
 
     const response = await GET(createRequest())
     const body = await response.json()

@@ -1,6 +1,12 @@
 import { DELETE } from "@/app/api/repositories/[id]/route"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import {
+  detachRepositoryFromUser,
+  getRepositoryMemberCount,
+  isRepositoryAccessibleToUser,
+  isRepositoryMembershipMigrationError,
+} from "@/lib/repository-access"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
@@ -19,9 +25,22 @@ jest.mock("@/lib/prisma", () => ({
   },
 }))
 
+jest.mock("@/lib/repository-access", () => ({
+  detachRepositoryFromUser: jest.fn(),
+  getRepositoryMemberCount: jest.fn(),
+  isRepositoryAccessibleToUser: jest.fn(),
+  isRepositoryMembershipMigrationError: jest.fn(() => false),
+}))
+
 const mockedAuth = auth as jest.Mock
 const mockedFindUnique = prisma.repository.findUnique as jest.Mock
 const mockedDelete = prisma.repository.delete as jest.Mock
+const mockedDetachRepositoryFromUser = detachRepositoryFromUser as jest.Mock
+const mockedGetRepositoryMemberCount = getRepositoryMemberCount as jest.Mock
+const mockedIsRepositoryAccessibleToUser =
+  isRepositoryAccessibleToUser as jest.Mock
+const mockedIsRepositoryMembershipMigrationError =
+  isRepositoryMembershipMigrationError as jest.Mock
 
 function createRequest(id: string) {
   return {
@@ -35,15 +54,18 @@ function createRequest(id: string) {
 describe("DELETE /api/repositories/[id]", () => {
   afterEach(() => {
     jest.clearAllMocks()
+    mockedIsRepositoryMembershipMigrationError.mockReturnValue(false)
   })
 
-  it("Repository 해제에 성공하면 200을 반환한다", async () => {
+  it("removes the repository record when this user is the last member", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
     mockedFindUnique.mockResolvedValue({
       id: "repo-1",
-      githubId: 12345,
-      userId: "user-1",
+      fullName: "user/repo-1",
+      webhookId: null,
     })
+    mockedIsRepositoryAccessibleToUser.mockResolvedValue(true)
+    mockedGetRepositoryMemberCount.mockResolvedValue(1)
     mockedDelete.mockResolvedValue({})
 
     const { request, params } = createRequest("repo-1")
@@ -51,11 +73,11 @@ describe("DELETE /api/repositories/[id]", () => {
     const body = await response.json()
 
     expect(response.status).toBe(200)
-    expect(body.message).toContain("해제")
+    expect(body.message).toContain("removed")
     expect(mockedDelete).toHaveBeenCalledWith({ where: { id: "repo-1" } })
   })
 
-  it("미인증 사용자는 401을 반환한다", async () => {
+  it("returns 401 for anonymous users", async () => {
     mockedAuth.mockResolvedValue(null)
 
     const { request, params } = createRequest("repo-1")
@@ -66,35 +88,60 @@ describe("DELETE /api/repositories/[id]", () => {
     expect(body.error).toBe("Unauthorized")
   })
 
-  it("존재하지 않는 Repository는 404를 반환한다", async () => {
+  it("returns 404 when the repository does not exist", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
     mockedFindUnique.mockResolvedValue(null)
 
-    const { request, params } = createRequest("nonexistent")
+    const { request, params } = createRequest("missing")
     const response = await DELETE(request, { params })
     const body = await response.json()
 
     expect(response.status).toBe(404)
-    expect(body.error).toContain("찾을 수 없습니다")
+    expect(body.error).toContain("not found")
   })
 
-  it("다른 사용자의 Repository는 403을 반환한다", async () => {
+  it("returns 403 when the user is not connected to the repository", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
     mockedFindUnique.mockResolvedValue({
       id: "repo-1",
-      githubId: 12345,
-      userId: "user-2",
+      fullName: "user/repo-1",
+      webhookId: null,
     })
+    mockedIsRepositoryAccessibleToUser.mockResolvedValue(false)
 
     const { request, params } = createRequest("repo-1")
     const response = await DELETE(request, { params })
     const body = await response.json()
 
     expect(response.status).toBe(403)
-    expect(body.error).toContain("권한")
+    expect(body.error).toBe("Forbidden")
   })
 
-  it("서버 에러 시 500을 반환한다", async () => {
+  it("removes only the membership when other members remain", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedFindUnique.mockResolvedValue({
+      id: "repo-1",
+      fullName: "user/repo-1",
+      webhookId: null,
+    })
+    mockedIsRepositoryAccessibleToUser.mockResolvedValue(true)
+    mockedGetRepositoryMemberCount.mockResolvedValue(2)
+    mockedDetachRepositoryFromUser.mockResolvedValue(undefined)
+
+    const { request, params } = createRequest("repo-1")
+    const response = await DELETE(request, { params })
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.message).toContain("connection removed")
+    expect(mockedDetachRepositoryFromUser).toHaveBeenCalledWith(
+      "user-1",
+      "repo-1"
+    )
+    expect(mockedDelete).not.toHaveBeenCalled()
+  })
+
+  it("returns 500 on unexpected errors", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
     mockedFindUnique.mockRejectedValue(new Error("DB error"))
 

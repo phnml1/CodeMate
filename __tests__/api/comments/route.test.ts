@@ -1,6 +1,7 @@
 import { GET } from "@/app/api/comments/route"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { buildAccessibleRepositoryWhere } from "@/lib/repository-access"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
@@ -16,12 +17,18 @@ jest.mock("@/lib/prisma", () => ({
   },
 }))
 
+jest.mock("@/lib/repository-access", () => ({
+  buildAccessibleRepositoryWhere: jest.fn(),
+}))
+
 const mockedAuth = auth as jest.Mock
 const mockedTransaction = prisma.$transaction as jest.Mock
+const mockedBuildAccessibleRepositoryWhere =
+  buildAccessibleRepositoryWhere as jest.Mock
 
 const sampleComment = {
   id: "comment-1",
-  content: "좋은 코드입니다.",
+  content: "Nice code",
   lineNumber: null,
   filePath: null,
   isResolved: false,
@@ -32,10 +39,10 @@ const sampleComment = {
   reactions: {},
   createdAt: new Date("2024-01-01T00:00:00.000Z"),
   updatedAt: new Date("2024-01-01T00:00:00.000Z"),
-  author: { id: "user-1", name: "홍길동", image: null },
+  author: { id: "user-1", name: "Tester", image: null },
   pullRequest: {
     id: "pr-1",
-    title: "feat: 대시보드 추가",
+    title: "feat: Add dashboard",
     number: 42,
     repoId: "repo-1",
     repo: { name: "awesome-app" },
@@ -55,7 +62,7 @@ describe("GET /api/comments", () => {
     jest.clearAllMocks()
   })
 
-  it("미인증 사용자는 401을 반환한다", async () => {
+  it("returns 401 for anonymous users", async () => {
     mockedAuth.mockResolvedValue(null)
 
     const response = await GET(createRequest())
@@ -65,8 +72,9 @@ describe("GET /api/comments", () => {
     expect(body.error).toBe("Unauthorized")
   })
 
-  it("전체 댓글 목록을 최신순으로 반환한다", async () => {
+  it("returns paginated comments", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessibleRepositoryWhere.mockResolvedValue({ id: { in: ["repo-1"] } })
     mockedTransaction.mockResolvedValue([[sampleComment], 1])
 
     const response = await GET(createRequest())
@@ -83,21 +91,25 @@ describe("GET /api/comments", () => {
     })
   })
 
-  it("repoId 필터를 적용하면 해당 저장소 댓글만 조회한다", async () => {
+  it("supports repoId filters", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessibleRepositoryWhere.mockResolvedValue({ id: { in: ["repo-1"] } })
     mockedTransaction.mockResolvedValue([[sampleComment], 1])
 
     const response = await GET(createRequest({ repoId: "repo-1" }))
     const body = await response.json()
 
     expect(response.status).toBe(200)
-    expect(mockedTransaction).toHaveBeenCalledTimes(1)
-    // $transaction은 [findMany promise, count promise]를 인자로 받음
+    expect(mockedBuildAccessibleRepositoryWhere).toHaveBeenCalledWith(
+      "user-1",
+      "repo-1"
+    )
     expect(body.pagination.total).toBe(1)
   })
 
-  it("authorId 필터를 적용하면 해당 작성자의 댓글만 조회한다", async () => {
+  it("supports authorId filters", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessibleRepositoryWhere.mockResolvedValue({ id: { in: ["repo-1"] } })
     mockedTransaction.mockResolvedValue([[sampleComment], 1])
 
     const response = await GET(createRequest({ authorId: "user-1" }))
@@ -107,8 +119,9 @@ describe("GET /api/comments", () => {
     expect(body.comments[0].authorId).toBe("user-1")
   })
 
-  it("댓글이 없으면 빈 배열과 pagination을 반환한다", async () => {
+  it("returns empty pagination when there are no comments", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessibleRepositoryWhere.mockResolvedValue({ id: { in: ["repo-1"] } })
     mockedTransaction.mockResolvedValue([[], 0])
 
     const response = await GET(createRequest())
@@ -120,8 +133,9 @@ describe("GET /api/comments", () => {
     expect(body.pagination.totalPages).toBe(0)
   })
 
-  it("page/limit 쿼리 파라미터를 처리한다", async () => {
+  it("supports page and limit parameters", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessibleRepositoryWhere.mockResolvedValue({ id: { in: ["repo-1"] } })
     mockedTransaction.mockResolvedValue([[sampleComment], 25])
 
     const response = await GET(createRequest({ page: "2", limit: "10" }))
@@ -133,8 +147,9 @@ describe("GET /api/comments", () => {
     expect(body.pagination.totalPages).toBe(3)
   })
 
-  it("서버 오류 시 500을 반환한다", async () => {
+  it("returns 500 on unexpected errors", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessibleRepositoryWhere.mockResolvedValue({ id: { in: ["repo-1"] } })
     mockedTransaction.mockRejectedValue(new Error("DB error"))
 
     const response = await GET(createRequest())

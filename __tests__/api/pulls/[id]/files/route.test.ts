@@ -2,6 +2,7 @@ import { GET } from "@/app/api/pulls/[id]/files/route"
 import { auth } from "@/lib/auth"
 import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
+import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
@@ -19,9 +20,15 @@ jest.mock("@/lib/prisma", () => ({
   },
 }))
 
+jest.mock("@/lib/repository-access", () => ({
+  buildAccessiblePullRequestWhere: jest.fn(),
+}))
+
 const mockedAuth = auth as jest.Mock
 const mockedGetOctokit = getOctokit as jest.Mock
 const mockedFindFirst = prisma.pullRequest.findFirst as jest.Mock
+const mockedBuildAccessiblePullRequestWhere =
+  buildAccessiblePullRequestWhere as jest.Mock
 
 const createRequest = () => new Request("http://localhost/api/pulls/pr-1/files")
 const createParams = (id = "pr-1") =>
@@ -55,7 +62,7 @@ const sampleFiles = [
     additions: 0,
     deletions: 5,
     changes: 5,
-    patch: undefined, // patch가 없는 경우
+    patch: undefined,
   },
 ]
 
@@ -64,7 +71,7 @@ describe("GET /api/pulls/[id]/files", () => {
     jest.clearAllMocks()
   })
 
-  it("미인증 사용자는 401을 반환한다", async () => {
+  it("returns 401 for anonymous users", async () => {
     mockedAuth.mockResolvedValue(null)
 
     const response = await GET(createRequest(), createParams())
@@ -74,19 +81,25 @@ describe("GET /api/pulls/[id]/files", () => {
     expect(body.error).toBe("Unauthorized")
   })
 
-  it("존재하지 않는 PR은 404를 반환한다", async () => {
+  it("returns 404 when the PR does not exist", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
+      repoId: { in: ["repo-1"] },
+    })
     mockedFindFirst.mockResolvedValue(null)
 
     const response = await GET(createRequest(), createParams())
     const body = await response.json()
 
     expect(response.status).toBe(404)
-    expect(body.error).toBe("PR을 찾을 수 없습니다.")
+    expect(body.error).toBe("Pull request not found")
   })
 
-  it("정상 조회 시 파일 목록(filename, status, additions, deletions, changes, patch)을 반환한다", async () => {
+  it("returns transformed file data", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
+      repoId: { in: ["repo-1"] },
+    })
     mockedFindFirst.mockResolvedValue(samplePR)
 
     const mockOctokit = {
@@ -111,8 +124,11 @@ describe("GET /api/pulls/[id]/files", () => {
     })
   })
 
-  it("patch가 없는 파일은 null로 반환한다", async () => {
+  it("normalizes missing patch values to null", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
+      repoId: { in: ["repo-1"] },
+    })
     mockedFindFirst.mockResolvedValue(samplePR)
 
     const mockOctokit = {
@@ -128,8 +144,11 @@ describe("GET /api/pulls/[id]/files", () => {
     expect(body.files[2].patch).toBeNull()
   })
 
-  it("owner/repo를 fullName에서 올바르게 파싱해 GitHub API를 호출한다", async () => {
+  it("parses owner/repo from fullName", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
+      repoId: { in: ["repo-1"] },
+    })
     mockedFindFirst.mockResolvedValue(samplePR)
 
     const mockListFiles = jest.fn().mockResolvedValue({ data: [] })
@@ -145,9 +164,9 @@ describe("GET /api/pulls/[id]/files", () => {
     })
   })
 
-  it("서버 에러 시 500을 반환한다", async () => {
+  it("returns 500 on unexpected errors", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
-    mockedFindFirst.mockRejectedValue(new Error("DB error"))
+    mockedBuildAccessiblePullRequestWhere.mockRejectedValue(new Error("DB error"))
 
     const response = await GET(createRequest(), createParams())
     const body = await response.json()
