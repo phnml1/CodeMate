@@ -115,10 +115,15 @@ export default function PRDetailLayout({
   useEffect(() => {
     const filePath = searchParams.get("filePath");
     const lineNumber = searchParams.get("lineNumber");
+    const reviewParam = searchParams.get("review");
     const prId = pr.id;
 
     // 이미 처리했으면 스킵
     if (initializedRef.current === prId) return;
+
+    if (reviewParam === "open") {
+      setReviewOpen(true);
+    }
 
     if (!filePath || !lineNumber) {
       initializedRef.current = prId;

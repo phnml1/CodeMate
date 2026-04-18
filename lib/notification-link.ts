@@ -17,6 +17,7 @@ export function getNotificationLink(notification: Notification): string | null {
         ? `${base}#comment-${notification.commentId}`
         : base
     case "NEW_REVIEW":
+      return `${base}?review=open`
     case "PR_MERGED":
       return base
     default:

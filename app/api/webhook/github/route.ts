@@ -39,6 +39,8 @@ async function notifyUsers(params: {
   title: string
   message: string
   prId: string
+  prTitle: string
+  prNumber: number
 }) {
   const recipients = await getEnabledUserIds(params.userIds, params.type)
 
@@ -57,6 +59,8 @@ async function notifyUsers(params: {
       emitNotification(userId, {
         ...notification,
         createdAt: notification.createdAt.toISOString(),
+        prTitle: params.prTitle,
+        prNumber: params.prNumber,
       })
     })
   )
@@ -158,6 +162,8 @@ export async function POST(request: Request) {
           title: isMerged ? "PR merged" : "PR closed",
           message: `"${pr.title}" was ${isMerged ? "merged" : "closed"}.`,
           prId: pullRequest.id,
+          prTitle: pr.title,
+          prNumber: pr.number,
         })
       }
 
@@ -178,6 +184,8 @@ export async function POST(request: Request) {
           title: "AI review is ready",
           message: `The AI review for "${pr.title}" is complete.`,
           prId: pullRequest.id,
+          prTitle: pr.title,
+          prNumber: pr.number,
         })
       } catch (error) {
         console.error("[webhook] analyzeReview failed:", error)
@@ -191,6 +199,8 @@ export async function POST(request: Request) {
             title: "AI review failed",
             message: `The AI review for "${pr.title}" could not be completed.`,
             prId: pullRequest.id,
+            prTitle: pr.title,
+            prNumber: pr.number,
           })
         } catch (notifyError) {
           console.error(
