@@ -2,10 +2,23 @@
 
 import { useEffect, useCallback, useMemo } from "react"
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { useSocket } from "./useSocket"
-import type { BaseNotification, Notification, NotificationsResponse, NotificationFilterType, NotificationFilterRead } from "@/types/notification"
+import type {
+  BaseNotification,
+  Notification,
+  NotificationsResponse,
+  NotificationFilterType,
+  NotificationFilterRead,
+} from "@/types/notification"
+import {
+  recordHandlerInvocation,
+  recordHandlerRegistered,
+  recordHandlerRemoved,
+} from "@/lib/measurements/socketMetrics"
 
 const isSocketMode = process.env.NEXT_PUBLIC_REALTIME_MODE === "socket"
+const toastedNotificationIds = new Set<string>()
 
 async function fetchNotifications(
   type?: NotificationFilterType,
@@ -33,6 +46,72 @@ async function deleteNotificationApi(id: string): Promise<void> {
   await fetch(`/api/notifications/${id}`, { method: "DELETE" })
 }
 
+function getToastMessage(notification: BaseNotification) {
+  const prTitle =
+    notification.prTitle && notification.prTitle.trim().length > 0
+      ? notification.prTitle
+      : null
+
+  if (notification.type === "NEW_REVIEW") {
+    return {
+      title: prTitle ? `AI review is ready for "${prTitle}"` : "AI review is ready",
+      description: notification.message ?? "Open the PR to review the result.",
+      kind: "success" as const,
+    }
+  }
+
+  if (notification.type === "REVIEW_FAILED") {
+    return {
+      title: "AI review failed",
+      description: notification.message ?? "The review process hit an error.",
+      kind: "error" as const,
+    }
+  }
+
+  return {
+    title: notification.title,
+    description: notification.message ?? "You have a new notification.",
+    kind: "default" as const,
+  }
+}
+
+function showNotificationToast(notification: BaseNotification) {
+  const toastContent = getToastMessage(notification)
+  const action =
+    notification.prId && notification.type === "NEW_REVIEW"
+      ? {
+          label: "Open PR",
+          onClick: () => {
+            window.location.assign(`/pulls/${notification.prId}?review=open`)
+          },
+        }
+      : undefined
+
+  if (toastContent.kind === "success") {
+    toast.success(toastContent.title, {
+      description: toastContent.description,
+      duration: 5000,
+      action,
+    })
+    return
+  }
+
+  if (toastContent.kind === "error") {
+    toast.error(toastContent.title, {
+      description: toastContent.description,
+      duration: 5000,
+      action,
+    })
+    return
+  }
+
+  toast(toastContent.title, {
+    description: toastContent.description,
+    duration: 5000,
+    action,
+  })
+}
+
 export function useNotifications(
   typeFilter?: NotificationFilterType,
   readFilter?: NotificationFilterRead
@@ -51,13 +130,20 @@ export function useNotifications(
 
   const handleNew = useCallback(
     (base: BaseNotification) => {
-      // 소켓에서 받은 BaseNotification을 Notification으로 확장
+      recordHandlerInvocation("notification:new")
+
+      if (!toastedNotificationIds.has(base.id)) {
+        toastedNotificationIds.add(base.id)
+        showNotificationToast(base)
+      }
+
       const notification: Notification = {
         ...base,
         prTitle: null,
         prNumber: null,
         repoFullName: null,
       }
+
       queryClient.setQueryData<NotificationsResponse>(
         ["notifications", typeFilter, readFilter],
         (old) => {
@@ -69,7 +155,7 @@ export function useNotifications(
           }
         }
       )
-      // 전체 데이터를 다시 가져와서 PR 상세 정보 포함
+
       queryClient.invalidateQueries({ queryKey: ["notifications"] })
     },
     [queryClient, typeFilter, readFilter]
@@ -78,9 +164,11 @@ export function useNotifications(
   useEffect(() => {
     if (!socket) return
 
+    recordHandlerRegistered("notification:new")
     socket.on("notification:new", handleNew)
     return () => {
       socket.off("notification:new", handleNew)
+      recordHandlerRemoved("notification:new")
     }
   }, [socket, handleNew])
 

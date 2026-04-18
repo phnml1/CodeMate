@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       select: {
         id: true,
         title: true,
+        number: true,
         repoId: true,
       },
     })
@@ -56,6 +57,8 @@ export async function POST(request: Request) {
             emitNotification(userId, {
               ...notification,
               createdAt: notification.createdAt.toISOString(),
+              prTitle: pr.title,
+              prNumber: pr.number,
             })
           })
         )
