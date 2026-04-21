@@ -271,7 +271,9 @@ export default function CommentList({
   prId,
   currentUserId,
 }: CommentListProps) {
-  recordRender("CommentList")
+  useEffect(() => {
+    recordRender("CommentList")
+  })
 
   const { data: allComments = [], isLoading } = useRealtimeComments(prId)
   const createComment = useCreateComment(prId)
