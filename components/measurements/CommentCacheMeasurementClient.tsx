@@ -53,13 +53,25 @@ export default function CommentCacheMeasurementClient() {
     renderDiff,
     renderReductionRate,
     summaryReport,
+    documentDraft,
   } = useCommentCacheMeasurement(prId, iterations, delayMs, false)
+
+  const [copyState, setCopyState] = useState<"idle" | "done" | "error">("idle")
 
   const latestIds =
     commentsQuery.data
       ?.slice(-3)
       .map((comment) => comment.id.slice(-6))
       .join(", ") ?? ""
+
+  const handleCopyDraft = async () => {
+    try {
+      await navigator.clipboard.writeText(documentDraft)
+      setCopyState("done")
+    } catch {
+      setCopyState("error")
+    }
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -86,6 +98,28 @@ export default function CommentCacheMeasurementClient() {
           </Link>
         </div>
       </header>
+
+      {prId ? (
+        <section className={`${panelClass} ${panelPaddingClass}`}>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-950 dark:text-slate-50">
+                Secondary Reinforcement
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Open the real PR detail page with render counters enabled to capture CommentList and
+                CommentItem counts.
+              </p>
+            </div>
+            <Link
+              href={`/pulls/${prId}?measureRenders=1`}
+              className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+            >
+              Open 2nd pass UI probe
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <section className={`grid md:grid-cols-3 ${gridGapClass} ${panelClass} ${panelPaddingClass}`}>
         <label className="flex flex-col gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -250,8 +284,32 @@ export default function CommentCacheMeasurementClient() {
       </section>
 
       <section className={`${panelClass} ${panelPaddingClass}`}>
-        <h2 className="text-lg font-bold text-slate-950 dark:text-slate-50">
-        </h2>
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950 dark:text-slate-50">Document Draft</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Paste this block into section 3 of the measurement markdown document.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopyDraft}
+            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            {copyState === "done"
+              ? "Draft copied"
+              : copyState === "error"
+                ? "Copy failed"
+                : "Copy draft"}
+          </button>
+        </div>
+        <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-md bg-slate-950 p-4 text-sm leading-6 text-slate-100">
+          {documentDraft}
+        </pre>
+      </section>
+
+      <section className={`${panelClass} ${panelPaddingClass}`}>
+        <h2 className="text-lg font-bold text-slate-950 dark:text-slate-50">Measurement Summary</h2>
         <pre className="mt-4 overflow-x-auto whitespace-pre-wrap rounded-md bg-slate-950 p-4 text-sm leading-6 text-slate-100">
           {summaryReport}
         </pre>
