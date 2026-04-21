@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { formatDistanceToNow } from "date-fns"
 import { ko } from "date-fns/locale"
 import { Pencil, Trash2, CheckCheck, MessageSquare } from "lucide-react"
@@ -52,8 +52,10 @@ export default function CommentItem({
   onReply,
   isUpdating = false,
 }: CommentItemProps) {
-  recordRender("CommentItem")
-  recordRender(comment.parentId ? "CommentItem:reply" : "CommentItem:root")
+  useEffect(() => {
+    recordRender("CommentItem")
+    recordRender(comment.parentId ? "CommentItem:reply" : "CommentItem:root")
+  })
 
   const [editing, setEditing] = useState(false)
   const isOwner = comment.authorId === currentUserId
