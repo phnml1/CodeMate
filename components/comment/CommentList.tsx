@@ -20,8 +20,10 @@ import { usePRDetail } from "@/hooks/usePRDetail"
 import { useRealtimeComments } from "@/hooks/useRealtimeComments"
 import { useSocket } from "@/hooks/useSocket"
 import { useTypingIndicator } from "@/hooks/useTypingIndicator"
+import { recordRender } from "@/lib/measurements/renderCounter"
 import { cn } from "@/lib/utils"
 import type { CommentWithAuthor, MentionUser } from "@/types/comment"
+import CommentRenderMetricsPanel from "./CommentRenderMetricsPanel"
 
 interface CommentListProps {
   prId: string
@@ -269,6 +271,8 @@ export default function CommentList({
   prId,
   currentUserId,
 }: CommentListProps) {
+  recordRender("CommentList")
+
   const { data: allComments = [], isLoading } = useRealtimeComments(prId)
   const createComment = useCreateComment(prId)
   const { names: typingNames, onTyping, onTypingStop } = useTypingIndicator(prId)
@@ -475,6 +479,8 @@ export default function CommentList({
           </div>
         </>
       )}
+
+      <CommentRenderMetricsPanel prId={prId} />
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns"
 import { ko } from "date-fns/locale"
 import { Pencil, Trash2, CheckCheck, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { recordRender } from "@/lib/measurements/renderCounter"
 import ReactionBar from "./ReactionBar"
 import CommentInput from "./CommentInput"
 import type { CommentWithAuthor, ReactionEmoji, MentionUser } from "@/types/comment"
@@ -51,6 +52,9 @@ export default function CommentItem({
   onReply,
   isUpdating = false,
 }: CommentItemProps) {
+  recordRender("CommentItem")
+  recordRender(comment.parentId ? "CommentItem:reply" : "CommentItem:root")
+
   const [editing, setEditing] = useState(false)
   const isOwner = comment.authorId === currentUserId
 
