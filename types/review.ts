@@ -13,6 +13,7 @@ export interface Review {
   severity: ReviewSeverity;
   issueCount: number;
   status: ReviewStatus;
+  failureReason: string | null;
   aiSuggestions: AIReviewResponse;
   reviewedAt: string;
 }
