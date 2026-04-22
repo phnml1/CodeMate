@@ -1,9 +1,11 @@
 export type NotificationType = "MENTION" | "NEW_REVIEW" | "PR_MERGED" | "COMMENT_REPLY" | "REVIEW_FAILED"
+export type NotificationReviewStatus = "PENDING" | "COMPLETED" | "FAILED"
 
 /** 소켓/DB에서 사용되는 기본 알림 타입 */
 export interface BaseNotification {
   id: string
   type: NotificationType
+  reviewStatus: NotificationReviewStatus | null
   title: string
   message: string | null
   isRead: boolean

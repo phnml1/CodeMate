@@ -2,11 +2,11 @@ import { POST } from "@/app/api/review/analyze/route"
 import { prisma } from "@/lib/prisma"
 import * as analyzeModule from "@/lib/ai/analyze"
 import { getRepositoryMemberIds } from "@/lib/repository-access"
+import * as reviewNotificationsModule from "@/lib/review-notifications"
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     pullRequest: { findUnique: jest.fn() },
-    notification: { create: jest.fn() },
   },
 }))
 
@@ -26,10 +26,15 @@ jest.mock("@/lib/repository-access", () => ({
   getRepositoryMemberIds: jest.fn().mockResolvedValue(["user-1"]),
 }))
 
+jest.mock("@/lib/review-notifications", () => ({
+  upsertReviewNotifications: jest.fn().mockResolvedValue(undefined),
+}))
+
 const mockedFindUnique = prisma.pullRequest.findUnique as jest.Mock
-const mockedNotificationCreate = prisma.notification.create as jest.Mock
 const mockedAnalyze = analyzeModule.analyzeReview as jest.Mock
 const mockedGetRepositoryMemberIds = getRepositoryMemberIds as jest.Mock
+const mockedUpsertReviewNotifications =
+  reviewNotificationsModule.upsertReviewNotifications as jest.Mock
 
 function makeRequest(body: object) {
   return new Request("http://localhost/api/review/analyze", {
@@ -42,6 +47,7 @@ function makeRequest(body: object) {
 const mockPR = {
   id: "pr-1",
   title: "Fix bug",
+  number: 42,
   repoId: "repo-1",
 }
 
@@ -50,18 +56,7 @@ describe("POST /api/review/analyze", () => {
 
   it("starts review analysis and returns PENDING", async () => {
     mockedFindUnique.mockResolvedValue(mockPR)
-    mockedAnalyze.mockResolvedValue(undefined)
-    mockedNotificationCreate.mockResolvedValue({
-      id: "notif-1",
-      type: "NEW_REVIEW",
-      title: "AI review is ready",
-      message: "done",
-      isRead: false,
-      userId: "user-1",
-      prId: "pr-1",
-      commentId: null,
-      createdAt: new Date(),
-    })
+    mockedAnalyze.mockResolvedValue({ status: "COMPLETED" })
 
     const res = await POST(makeRequest({ pullRequestId: "pr-1" }))
     const body = await res.json()
@@ -70,6 +65,13 @@ describe("POST /api/review/analyze", () => {
     expect(body.status).toBe("PENDING")
     expect(mockedAnalyze).toHaveBeenCalledWith("pr-1")
     expect(mockedGetRepositoryMemberIds).toHaveBeenCalledWith("repo-1")
+    expect(mockedUpsertReviewNotifications).toHaveBeenCalledWith({
+      userIds: ["user-1"],
+      prId: "pr-1",
+      prTitle: "Fix bug",
+      prNumber: 42,
+      status: "PENDING",
+    })
   })
 
   it("returns 400 when pullRequestId is missing", async () => {

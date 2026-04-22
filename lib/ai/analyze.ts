@@ -8,6 +8,11 @@ import { getRepositoryPrimaryUser } from "@/lib/repository-access"
 import { calculateScore } from "@/lib/scoring"
 import type { ReviewStage } from "@/types/review"
 
+export type AnalyzeReviewResult =
+  | { status: "COMPLETED" }
+  | { status: "FAILED" }
+  | { status: "SKIPPED_ACTIVE" }
+
 function isActiveReviewConflict(err: unknown): boolean {
   return (
     err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -33,7 +38,9 @@ async function updateReviewStage(
   })
 }
 
-export async function analyzeReview(pullRequestId: string): Promise<void> {
+export async function analyzeReview(
+  pullRequestId: string
+): Promise<AnalyzeReviewResult> {
   let reviewId: string | null = null
 
   try {
@@ -56,7 +63,7 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
         console.info(
           `[analyzeReview] already active for PR ${pullRequestId}, skipping.`
         )
-        return
+        return { status: "SKIPPED_ACTIVE" }
       }
 
       throw error
@@ -158,6 +165,8 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
         stage: "COMPLETED",
       },
     })
+
+    return { status: "COMPLETED" }
   } catch (error) {
     console.error("[analyzeReview] failed:", error)
 
@@ -170,5 +179,7 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
         },
       })
     }
+
+    return { status: "FAILED" }
   }
 }

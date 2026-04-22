@@ -5,6 +5,7 @@ function makeNotification(overrides: Partial<Notification> = {}): Notification {
   return {
     id: "notif-1",
     type: "NEW_REVIEW",
+    reviewStatus: "COMPLETED",
     title: "Test",
     message: null,
     isRead: false,

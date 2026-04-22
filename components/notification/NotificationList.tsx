@@ -1,9 +1,18 @@
-"use client"
+"use client";
 
-import { formatDistanceToNow } from "date-fns"
-import { ko } from "date-fns/locale"
-import { AtSign, MessageSquare, GitPullRequest, GitMerge, X } from "lucide-react"
-import type { Notification } from "@/types/notification"
+import { formatDistanceToNow } from "date-fns";
+import { ko } from "date-fns/locale";
+import {
+  AlertCircle,
+  AtSign,
+  CheckCircle2,
+  GitMerge,
+  GitPullRequest,
+  Loader2,
+  MessageSquare,
+  X,
+} from "lucide-react";
+import type { Notification } from "@/types/notification";
 
 const typeConfig: Record<
   string,
@@ -22,15 +31,51 @@ const typeConfig: Record<
     color: "text-purple-500",
     bgColor: "bg-purple-50",
   },
-  PR_MERGED: { icon: GitMerge, label: "머지", color: "text-orange-500", bgColor: "bg-orange-50" },
+  PR_MERGED: {
+    icon: GitMerge,
+    label: "머지",
+    color: "text-orange-500",
+    bgColor: "bg-orange-50",
+  },
+};
+
+function getReviewStatusMeta(notification: Notification) {
+  switch (notification.reviewStatus) {
+    case "PENDING":
+      return {
+        icon: Loader2,
+        label: "AI 리뷰 대기 중",
+        color: "text-blue-500",
+        bgColor: "bg-blue-50",
+        iconClassName: "animate-spin",
+      };
+    case "FAILED":
+      return {
+        icon: AlertCircle,
+        label: "AI 리뷰 실패",
+        color: "text-rose-500",
+        bgColor: "bg-rose-50",
+        iconClassName: "",
+      };
+    case "COMPLETED":
+      return {
+        icon: CheckCircle2,
+        label: "AI 리뷰 완료",
+        color: "text-emerald-500",
+        bgColor: "bg-emerald-50",
+        iconClassName: "",
+      };
+    default:
+      return null;
+  }
 }
 
 interface NotificationListProps {
-  notifications: Notification[]
-  onClickItem: (notification: Notification) => void
-  onMarkAllRead: () => void
-  onDelete?: (id: string) => void
-  showHeader?: boolean
+  notifications: Notification[];
+  onClickItem: (notification: Notification) => void;
+  onMarkAllRead: () => void;
+  onDelete?: (id: string) => void;
+  showHeader?: boolean;
 }
 
 export default function NotificationList({
@@ -45,90 +90,107 @@ export default function NotificationList({
       <div className="px-4 py-8 text-center text-sm text-slate-400">
         알림이 없습니다
       </div>
-    )
+    );
   }
 
   return (
     <div>
       {showHeader && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100">
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
           <span className="text-xs font-semibold text-slate-500">알림</span>
           <button
             onClick={onMarkAllRead}
-            className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+            className="text-xs text-blue-500 transition-colors hover:text-blue-700"
           >
             모두 읽음
           </button>
         </div>
       )}
       <div className="max-h-80 overflow-y-auto">
-        {notifications.map((n) => {
-          const config = typeConfig[n.type] ?? typeConfig.MENTION
-          const Icon = config.icon
+        {notifications.map((notification) => {
+          const reviewStatusMeta =
+            notification.type === "NEW_REVIEW"
+              ? getReviewStatusMeta(notification)
+              : null;
+          const config =
+            reviewStatusMeta ?? typeConfig[notification.type] ?? typeConfig.MENTION;
+          const Icon = config.icon;
+
           return (
             <div
-              key={n.id}
-              className={`group relative w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors border-b border-slate-50 ${
-                !n.isRead ? "bg-blue-50/50" : ""
+              key={notification.id}
+              className={`group relative flex w-full items-start gap-3 border-b border-slate-50 px-4 py-3 text-left transition-colors hover:bg-slate-50 ${
+                !notification.isRead ? "bg-blue-50/50" : ""
               }`}
             >
               <button
-                onClick={() => onClickItem(n)}
-                className="flex items-start gap-3 flex-1 min-w-0 text-left"
+                onClick={() => onClickItem(notification)}
+                className="flex min-w-0 flex-1 items-start gap-3 text-left"
               >
                 <div
-                  className={`mt-0.5 shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${config.bgColor} ${config.color}`}
+                  className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${config.bgColor} ${config.color}`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <Icon className={`h-3.5 w-3.5 ${reviewStatusMeta?.iconClassName ?? ""}`} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p
-                    className={`text-sm leading-snug ${!n.isRead ? "font-medium text-slate-900" : "text-slate-600"}`}
-                  >
-                    {n.title}
-                  </p>
-                  {n.prTitle && (
-                    <p className="text-xs text-blue-500 mt-0.5 truncate">
-                      {n.repoFullName && (
-                        <span className="text-slate-400">{n.repoFullName} </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p
+                      className={`text-sm leading-snug ${
+                        !notification.isRead
+                          ? "font-medium text-slate-900"
+                          : "text-slate-600"
+                      }`}
+                    >
+                      {notification.title}
+                    </p>
+                    {reviewStatusMeta && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${reviewStatusMeta.bgColor} ${reviewStatusMeta.color}`}
+                      >
+                        {reviewStatusMeta.label}
+                      </span>
+                    )}
+                  </div>
+                  {notification.prTitle && (
+                    <p className="mt-0.5 truncate text-xs text-blue-500">
+                      {notification.repoFullName && (
+                        <span className="text-slate-400">{notification.repoFullName} </span>
                       )}
-                      #{n.prNumber} {n.prTitle}
+                      #{notification.prNumber} {notification.prTitle}
                     </p>
                   )}
-                  {n.message && (
-                    <p className="text-xs text-slate-400 mt-0.5 truncate">
-                      {n.message}
+                  {notification.message && (
+                    <p className="mt-0.5 truncate text-xs text-slate-400">
+                      {notification.message}
                     </p>
                   )}
-                  <p className="text-xs text-slate-300 mt-1">
-                    {formatDistanceToNow(new Date(n.createdAt), {
+                  <p className="mt-1 text-xs text-slate-300">
+                    {formatDistanceToNow(new Date(notification.createdAt), {
                       addSuffix: true,
                       locale: ko,
                     })}
                   </p>
                 </div>
               </button>
-              <div className="flex items-center gap-1 shrink-0 mt-1">
-                {!n.isRead && (
-                  <div className="w-2 h-2 rounded-full bg-blue-500" />
-                )}
+              <div className="mt-1 flex shrink-0 items-center gap-1">
+                {!notification.isRead && <div className="h-2 w-2 rounded-full bg-blue-500" />}
                 {onDelete && (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onDelete(n.id)
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete(notification.id);
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-200 rounded transition-all"
+                    className="rounded p-0.5 opacity-0 transition-all group-hover:opacity-100 hover:bg-slate-200"
                     title="알림 삭제"
                   >
-                    <X className="w-3.5 h-3.5 text-slate-400" />
+                    <X className="h-3.5 w-3.5 text-slate-400" />
                   </button>
                 )}
               </div>
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }

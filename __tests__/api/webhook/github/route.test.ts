@@ -2,8 +2,8 @@ import { POST } from "@/app/api/webhook/github/route"
 import { prisma } from "@/lib/prisma"
 import * as webhookValidator from "@/lib/webhook-validator"
 import * as analyzeModule from "@/lib/ai/analyze"
-import * as emitterModule from "@/lib/socket/emitter"
 import { getRepositoryMemberIds } from "@/lib/repository-access"
+import * as reviewNotificationsModule from "@/lib/review-notifications"
 import crypto from "crypto"
 
 const afterQueue: Array<() => Promise<void>> = []
@@ -51,12 +51,17 @@ jest.mock("@/lib/repository-access", () => ({
   getRepositoryMemberIds: jest.fn(),
 }))
 
+jest.mock("@/lib/review-notifications", () => ({
+  upsertReviewNotifications: jest.fn().mockResolvedValue(undefined),
+}))
+
 const mockedVerify = webhookValidator.verifyWebhookSignature as jest.Mock
 const mockedFindFirst = prisma.repository.findFirst as jest.Mock
 const mockedUpsert = prisma.pullRequest.upsert as jest.Mock
 const mockedAnalyzeReview = analyzeModule.analyzeReview as jest.Mock
-const mockedEmitNotification = emitterModule.emitNotification as jest.Mock
 const mockedGetRepositoryMemberIds = getRepositoryMemberIds as jest.Mock
+const mockedUpsertReviewNotifications =
+  reviewNotificationsModule.upsertReviewNotifications as jest.Mock
 
 function makeSignature(payload: string): string {
   const hmac = crypto.createHmac("sha256", "test-secret")
@@ -104,11 +109,13 @@ describe("POST /api/webhook/github", () => {
     mockedFindFirst.mockResolvedValue({ id: "repo-1" })
     mockedUpsert.mockResolvedValue({ id: "pr-1" })
     mockedGetRepositoryMemberIds.mockResolvedValue(["user-1"])
+    mockedAnalyzeReview.mockResolvedValue({ status: "COMPLETED" })
     ;(prisma.notification.create as jest.Mock).mockResolvedValue({
       id: "notif-1",
-      type: "NEW_REVIEW",
-      title: "AI review is ready",
+      type: "PR_MERGED",
+      title: "PR merged",
       message: null,
+      reviewStatus: null,
       isRead: false,
       userId: "user-1",
       prId: "pr-1",
@@ -135,55 +142,42 @@ describe("POST /api/webhook/github", () => {
     await flushAfter()
 
     expect(mockedAnalyzeReview).toHaveBeenCalledWith("pr-1")
-    expect(prisma.notification.create).toHaveBeenCalledTimes(1)
+    expect(mockedUpsertReviewNotifications).toHaveBeenCalledWith({
+      userIds: ["user-1"],
+      prId: "pr-1",
+      prTitle: "Fix bug",
+      prNumber: 42,
+      status: "PENDING",
+    })
   })
 
-  it("sends NEW_REVIEW notifications after successful analysis", async () => {
+  it("updates the review notification to COMPLETED after successful analysis", async () => {
     await POST(createRequest(prPayload))
     await flushAfter()
 
-    expect(prisma.notification.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          type: "NEW_REVIEW",
-          userId: "user-1",
-          prId: "pr-1",
-        }),
-      })
-    )
-    expect(mockedEmitNotification).toHaveBeenCalledWith(
-      "user-1",
-      expect.objectContaining({ type: "NEW_REVIEW" })
-    )
+    expect(mockedUpsertReviewNotifications).toHaveBeenNthCalledWith(2, {
+      userIds: ["user-1"],
+      prId: "pr-1",
+      prTitle: "Fix bug",
+      prNumber: 42,
+      status: "COMPLETED",
+    })
   })
 
-  it("sends REVIEW_FAILED notifications when analysis fails", async () => {
-    mockedAnalyzeReview.mockRejectedValueOnce(new Error("Claude timeout"))
-    ;(prisma.notification.create as jest.Mock).mockResolvedValue({
-      id: "notif-fail",
-      type: "REVIEW_FAILED",
-      title: "AI review failed",
-      message: null,
-      isRead: false,
-      userId: "user-1",
-      prId: "pr-1",
-      commentId: null,
-      createdAt: new Date(),
-    })
+  it("updates the review notification to FAILED when analysis fails", async () => {
+    mockedAnalyzeReview.mockResolvedValueOnce({ status: "FAILED" })
 
     const response = await POST(createRequest(prPayload))
     await flushAfter()
 
     expect(response.status).toBe(200)
-    expect(prisma.notification.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ type: "REVIEW_FAILED", userId: "user-1" }),
-      })
-    )
-    expect(mockedEmitNotification).toHaveBeenCalledWith(
-      "user-1",
-      expect.objectContaining({ type: "REVIEW_FAILED" })
-    )
+    expect(mockedUpsertReviewNotifications).toHaveBeenNthCalledWith(2, {
+      userIds: ["user-1"],
+      prId: "pr-1",
+      prTitle: "Fix bug",
+      prNumber: 42,
+      status: "FAILED",
+    })
   })
 
   it("returns 401 for invalid signatures", async () => {
@@ -215,18 +209,6 @@ describe("POST /api/webhook/github", () => {
   })
 
   it("creates PR_MERGED notifications for closed actions", async () => {
-    ;(prisma.notification.create as jest.Mock).mockResolvedValue({
-      id: "notif-1",
-      type: "PR_MERGED",
-      title: "PR merged",
-      message: null,
-      isRead: false,
-      userId: "user-1",
-      prId: "pr-1",
-      commentId: null,
-      createdAt: new Date(),
-    })
-
     const closedPayload = {
       ...prPayload,
       action: "closed",

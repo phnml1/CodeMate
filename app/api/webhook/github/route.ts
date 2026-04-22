@@ -4,6 +4,7 @@ import { analyzeReview } from "@/lib/ai/analyze"
 import { getEnabledUserIds } from "@/lib/notification-settings"
 import { prisma } from "@/lib/prisma"
 import { getRepositoryMemberIds } from "@/lib/repository-access"
+import { upsertReviewNotifications } from "@/lib/review-notifications"
 import { emitNotification } from "@/lib/socket/emitter"
 import { verifyWebhookSignature } from "@/lib/webhook-validator"
 
@@ -173,41 +174,38 @@ export async function POST(request: Request) {
 
     after(async () => {
       try {
-        await analyzeReview(pullRequest.id)
-        recipientIds.forEach((userId) => safeRevalidateDashboard(userId))
+        const pendingRecipients = await getEnabledUserIds(
+          recipientIds,
+          "NEW_REVIEW"
+        )
 
-        if (recipientIds.length === 0) return
-
-        await notifyUsers({
-          userIds: recipientIds,
-          type: "NEW_REVIEW",
-          title: "AI review is ready",
-          message: `The AI review for "${pr.title}" is complete.`,
+        await upsertReviewNotifications({
+          userIds: pendingRecipients,
           prId: pullRequest.id,
           prTitle: pr.title,
           prNumber: pr.number,
+          status: "PENDING",
+        })
+
+        const result = await analyzeReview(pullRequest.id)
+        recipientIds.forEach((userId) => safeRevalidateDashboard(userId))
+
+        if (result.status === "SKIPPED_ACTIVE") return
+
+        const targetRecipients =
+          result.status === "FAILED"
+            ? await getEnabledUserIds(recipientIds, "REVIEW_FAILED")
+            : pendingRecipients
+
+        await upsertReviewNotifications({
+          userIds: targetRecipients,
+          prId: pullRequest.id,
+          prTitle: pr.title,
+          prNumber: pr.number,
+          status: result.status,
         })
       } catch (error) {
         console.error("[webhook] analyzeReview failed:", error)
-
-        try {
-          if (recipientIds.length === 0) return
-
-          await notifyUsers({
-            userIds: recipientIds,
-            type: "REVIEW_FAILED",
-            title: "AI review failed",
-            message: `The AI review for "${pr.title}" could not be completed.`,
-            prId: pullRequest.id,
-            prTitle: pr.title,
-            prNumber: pr.number,
-          })
-        } catch (notifyError) {
-          console.error(
-            "[webhook] failed to send failure notification:",
-            notifyError
-          )
-        }
       }
     })
 

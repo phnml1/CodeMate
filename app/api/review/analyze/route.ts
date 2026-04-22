@@ -1,20 +1,20 @@
-import { NextResponse } from "next/server"
-import { analyzeReview } from "@/lib/ai/analyze"
-import { getEnabledUserIds } from "@/lib/notification-settings"
-import { prisma } from "@/lib/prisma"
-import { getRepositoryMemberIds } from "@/lib/repository-access"
-import { emitNotification } from "@/lib/socket/emitter"
+import { NextResponse } from "next/server";
+import { analyzeReview } from "@/lib/ai/analyze";
+import { getEnabledUserIds } from "@/lib/notification-settings";
+import { prisma } from "@/lib/prisma";
+import { getRepositoryMemberIds } from "@/lib/repository-access";
+import { upsertReviewNotifications } from "@/lib/review-notifications";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const { pullRequestId } = body as { pullRequestId?: string }
+    const body = await request.json();
+    const { pullRequestId } = body as { pullRequestId?: string };
 
     if (!pullRequestId) {
       return NextResponse.json(
         { error: "pullRequestId is required" },
         { status: 400 }
-      )
+      );
     }
 
     const pr = await prisma.pullRequest.findUnique({
@@ -25,51 +25,55 @@ export async function POST(request: Request) {
         number: true,
         repoId: true,
       },
-    })
+    });
 
     if (!pr) {
       return NextResponse.json(
         { error: "Pull request not found" },
         { status: 404 }
-      )
+      );
     }
 
+    const repositoryUserIds = [...new Set(await getRepositoryMemberIds(pr.repoId))];
+    const pendingRecipientIds = await getEnabledUserIds(
+      repositoryUserIds,
+      "NEW_REVIEW"
+    );
+
+    await upsertReviewNotifications({
+      userIds: pendingRecipientIds,
+      prId: pullRequestId,
+      prTitle: pr.title,
+      prNumber: pr.number,
+      status: "PENDING",
+    });
+
     analyzeReview(pullRequestId)
-      .then(async () => {
-        const repositoryUserIds = await getRepositoryMemberIds(pr.repoId)
-        const recipientIds = await getEnabledUserIds(
-          [...new Set(repositoryUserIds)],
-          "NEW_REVIEW"
-        )
+      .then(async (result) => {
+        if (result.status === "SKIPPED_ACTIVE") {
+          return;
+        }
 
-        await Promise.all(
-          recipientIds.map(async (userId) => {
-            const notification = await prisma.notification.create({
-              data: {
-                type: "NEW_REVIEW",
-                title: "AI review is ready",
-                message: `The AI review for "${pr.title}" is complete.`,
-                userId,
-                prId: pullRequestId,
-              },
-            })
+        const targetRecipients =
+          result.status === "FAILED"
+            ? await getEnabledUserIds(repositoryUserIds, "REVIEW_FAILED")
+            : pendingRecipientIds;
 
-            emitNotification(userId, {
-              ...notification,
-              createdAt: notification.createdAt.toISOString(),
-              prTitle: pr.title,
-              prNumber: pr.number,
-            })
-          })
-        )
+        await upsertReviewNotifications({
+          userIds: targetRecipients,
+          prId: pullRequestId,
+          prTitle: pr.title,
+          prNumber: pr.number,
+          status: result.status,
+        });
       })
-      .catch((error) => console.error("[analyze] analyzeReview failed:", error))
+      .catch((error) => console.error("[analyze] analyzeReview failed:", error));
 
-    return NextResponse.json({ status: "PENDING" })
+    return NextResponse.json({ status: "PENDING" });
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
-    )
+    );
   }
 }

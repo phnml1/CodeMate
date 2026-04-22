@@ -51,7 +51,11 @@ export default function PRDetailContainer({
                 issueCount: 0,
                 status: "PENDING",
                 stage: "QUEUED",
-                aiSuggestions: { issues: [] },
+                aiSuggestions: {
+                  issues: [],
+                  summary: "",
+                  overallAssessment: "COMMENT",
+                },
                 reviewedAt: new Date().toISOString(),
               }
         );
