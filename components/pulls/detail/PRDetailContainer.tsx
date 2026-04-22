@@ -41,9 +41,23 @@ export default function PRDetailContainer({
             ? {
                 ...current,
                 status: "PENDING",
-                failureReason: null,
+                stage: "QUEUED",
               }
-            : current
+            : {
+                id: `pending-${id}`,
+                pullRequestId: id,
+                qualityScore: 0,
+                severity: "LOW",
+                issueCount: 0,
+                status: "PENDING",
+                stage: "QUEUED",
+                aiSuggestions: {
+                  issues: [],
+                  summary: "",
+                  overallAssessment: "COMMENT",
+                },
+                reviewedAt: new Date().toISOString(),
+              }
         );
 
         await queryClient.invalidateQueries({ queryKey: ["review", id] });
@@ -75,7 +89,7 @@ export default function PRDetailContainer({
             PR 정보를 불러오는 데 실패했습니다.
           </p>
           <p className="text-xs text-slate-400 dark:text-slate-500">
-            잠시 후 다시 시도해 주세요.
+            잠시 후 다시 시도해주세요.
           </p>
         </div>
       </div>

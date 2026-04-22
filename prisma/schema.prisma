@@ -167,7 +167,7 @@ model Review {
   severity        Severity     @default(LOW)
   issueCount      Int          @default(0)
   status          ReviewStatus @default(PENDING)
-  failureReason   String?      @db.Text
+  stage           ReviewStage  @default(QUEUED)
 
   // Relations
   pullRequest     PullRequest  @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
@@ -192,6 +192,15 @@ enum Severity {
 enum ReviewStatus {
   PENDING
   IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum ReviewStage {
+  QUEUED
+  FETCHING_FILES
+  ANALYZING
+  FINALIZING
   COMPLETED
   FAILED
 }
@@ -235,6 +244,7 @@ model Comment {
 model Notification {
   id        String           @id @default(cuid())
   type      NotificationType
+  reviewStatus NotificationReviewStatus?
   title     String
   message   String?
   isRead    Boolean          @default(false)
@@ -283,4 +293,10 @@ enum NotificationType {
   PR_MERGED
   COMMENT_REPLY
   REVIEW_FAILED
+}
+
+enum NotificationReviewStatus {
+  PENDING
+  COMPLETED
+  FAILED
 }

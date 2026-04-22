@@ -8,10 +8,10 @@ import {
   Loader2,
   RotateCcw,
 } from "lucide-react";
-import type { Review, ReviewIssue } from "@/types/review";
-import type { AIReviewIssue } from "@/lib/ai/parsers";
 import { SEVERITY_ORDER } from "@/constants/review";
+import type { AIReviewIssue } from "@/lib/ai/parsers";
 import { ASSESSMENT_LABEL } from "@/lib/review-ui";
+import type { Review, ReviewIssue, ReviewStage } from "@/types/review";
 import ReviewScore from "./ReviewScore";
 import SuggestionCard from "./SuggestionCard";
 
@@ -21,6 +21,103 @@ interface ReviewPanelProps {
   onRequestReview: () => void;
   isRequesting?: boolean;
   onIssueClick?: (issue: ReviewIssue) => void;
+}
+
+const REVIEW_STAGE_META: Record<
+  ReviewStage,
+  {
+    label: string;
+    description: string;
+  }
+> = {
+  QUEUED: {
+    label: "대기 중",
+    description: "리뷰 작업을 준비하고 있습니다.",
+  },
+  FETCHING_FILES: {
+    label: "파일 수집 중",
+    description: "PR 변경 파일과 diff를 가져오고 있습니다.",
+  },
+  ANALYZING: {
+    label: "AI 분석 중",
+    description: "AI가 코드와 변경 맥락을 분석하고 있습니다.",
+  },
+  FINALIZING: {
+    label: "결과 정리 중",
+    description: "점수와 이슈 목록을 정리하고 있습니다.",
+  },
+  COMPLETED: {
+    label: "완료",
+    description: "리뷰 결과가 준비되었습니다.",
+  },
+  FAILED: {
+    label: "실패",
+    description: "리뷰를 완료하지 못했습니다.",
+  },
+};
+
+const REVIEW_PROGRESS_STEPS: ReviewStage[] = [
+  "QUEUED",
+  "FETCHING_FILES",
+  "ANALYZING",
+  "FINALIZING",
+  "COMPLETED",
+];
+
+function ReviewProgressSteps({ stage }: { stage: ReviewStage }) {
+  const normalizedStage = REVIEW_PROGRESS_STEPS.includes(stage) ? stage : "QUEUED";
+  const activeIndex = REVIEW_PROGRESS_STEPS.indexOf(normalizedStage);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-2 sm:grid-cols-5">
+        {REVIEW_PROGRESS_STEPS.map((step, index) => {
+          const isCompleted = activeIndex > index;
+          const isActive = activeIndex === index;
+
+          return (
+            <div
+              key={step}
+              className={`rounded-2xl border px-3 py-3 transition-colors ${
+                isCompleted
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300"
+                  : isActive
+                    ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-300"
+                    : "border-slate-200 bg-white text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                    isCompleted
+                      ? "bg-emerald-500 text-white"
+                      : isActive
+                        ? "bg-blue-500 text-white"
+                        : "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                  }`}
+                >
+                  {isCompleted ? "✓" : index + 1}
+                </span>
+                <span className="text-xs font-semibold">{REVIEW_STAGE_META[step].label}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900/50 dark:bg-blue-950/20">
+        <div className="flex items-center gap-2">
+          <Loader2 size={16} className="animate-spin text-blue-500" />
+          <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+            {REVIEW_STAGE_META[normalizedStage].label}
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-blue-700/80 dark:text-blue-300/80">
+          {REVIEW_STAGE_META[normalizedStage].description}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export default function ReviewPanel({
@@ -37,7 +134,7 @@ export default function ReviewPanel({
     return (
       <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
         <Loader2 size={18} className="animate-spin" />
-        <span className="text-sm">리뷰 데이터를 불러오는 중입니다...</span>
+        <span className="text-sm">리뷰 데이터를 불러오는 중입니다.</span>
       </div>
     );
   }
@@ -48,10 +145,10 @@ export default function ReviewPanel({
         <BotMessageSquare size={36} className="text-slate-300 dark:text-slate-600" />
         <div className="text-center">
           <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
-            AI 리뷰가 없습니다
+            AI 리뷰가 아직 없습니다
           </p>
           <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-            AI가 이 PR의 코드를 분석하게 합니다
+            요청하면 AI가 이 PR을 분석해서 리뷰를 생성합니다.
           </p>
         </div>
         <button
@@ -86,7 +183,7 @@ export default function ReviewPanel({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-rose-800 dark:text-rose-200">
-                AI 리뷰에 실패했습니다
+                AI 리뷰가 실패했습니다
               </p>
               <p className="mt-1 text-sm text-rose-700 dark:text-rose-300">
                 {review.failureReason ?? "원인을 확인할 수 없었습니다. 다시 시도해 주세요."}
@@ -104,7 +201,7 @@ export default function ReviewPanel({
           {isRequesting ? (
             <>
               <Loader2 size={14} className="animate-spin" />
-              재시도 중...
+              다시 실행 중...
             </>
           ) : (
             <>
@@ -119,14 +216,8 @@ export default function ReviewPanel({
 
   if (review.status === "PENDING" || review.status === "IN_PROGRESS") {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 py-10">
-        <Loader2 size={32} className="animate-spin text-blue-500" />
-        <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
-          AI가 코드를 분석하고 있습니다...
-        </p>
-        <p className="text-xs text-slate-400 dark:text-slate-500">
-          잠시 후 결과가 표시됩니다
-        </p>
+      <div className="space-y-4 py-2">
+        <ReviewProgressSteps stage={review.stage} />
       </div>
     );
   }
@@ -143,16 +234,16 @@ export default function ReviewPanel({
   const filtered =
     filterSeverity === "ALL"
       ? indexedSuggestions
-      : indexedSuggestions.filter((suggestion) => suggestion.severity === filterSeverity);
+      : indexedSuggestions.filter((issue) => issue.severity === filterSeverity);
 
   const sorted = [...filtered].sort(
     (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
   );
 
   const counts = {
-    HIGH: suggestions.filter((suggestion) => suggestion.severity === "HIGH").length,
-    MEDIUM: suggestions.filter((suggestion) => suggestion.severity === "MEDIUM").length,
-    LOW: suggestions.filter((suggestion) => suggestion.severity === "LOW").length,
+    HIGH: suggestions.filter((issue) => issue.severity === "HIGH").length,
+    MEDIUM: suggestions.filter((issue) => issue.severity === "MEDIUM").length,
+    LOW: suggestions.filter((issue) => issue.severity === "LOW").length,
   };
 
   const assessmentMeta = assessment ? ASSESSMENT_LABEL[assessment] : null;
@@ -196,20 +287,17 @@ export default function ReviewPanel({
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             요약
           </p>
-          <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-            {summary}
-          </p>
+          <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">{summary}</p>
         </div>
       )}
 
       {suggestions.length > 0 && (
         <div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              필터:
-            </span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">필터:</span>
             {(["ALL", "HIGH", "MEDIUM", "LOW"] as const).map((severity) => {
               const count = severity === "ALL" ? suggestions.length : counts[severity];
+
               return (
                 <button
                   key={severity}
