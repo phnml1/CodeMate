@@ -1,5 +1,8 @@
 import { auth } from "@/lib/auth"
-import { getOctokit } from "@/lib/github"
+import {
+  getOctokit,
+  isGitHubReconnectRequiredError,
+} from "@/lib/github"
 import { prisma } from "@/lib/prisma"
 import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
 import { NextResponse } from "next/server"
@@ -57,7 +60,18 @@ export async function GET(
     )
 
     return NextResponse.json({ files })
-  } catch {
+  } catch (error) {
+    if (isGitHubReconnectRequiredError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            "GitHub authorization expired. Please log out and sign in again.",
+          code: "GITHUB_REAUTH_REQUIRED",
+        },
+        { status: 401 }
+      )
+    }
+
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
