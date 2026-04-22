@@ -4,7 +4,7 @@ export interface PullRequestRepo {
   id: string;
   name: string;
   fullName: string;
-  owner: { id: string; name: string | null; image: string | null };
+  owner: { id: string; name: string | null; image: string | null } | null;
 }
 
 export interface PullRequest {
