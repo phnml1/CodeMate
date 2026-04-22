@@ -1,16 +1,18 @@
-"use client"
+"use client";
 
-import { formatDistanceToNow } from "date-fns"
-import { ko } from "date-fns/locale"
+import { formatDistanceToNow } from "date-fns";
+import { ko } from "date-fns/locale";
 import {
-  AlertTriangle,
+  AlertCircle,
   AtSign,
+  CheckCircle2,
   GitMerge,
   GitPullRequest,
+  Loader2,
   MessageSquare,
   X,
-} from "lucide-react"
-import type { Notification } from "@/types/notification"
+} from "lucide-react";
+import type { Notification } from "@/types/notification";
 
 const typeConfig: Record<
   string,
@@ -34,26 +36,51 @@ const typeConfig: Record<
     color: "text-purple-500",
     bgColor: "bg-purple-50",
   },
-  REVIEW_FAILED: {
-    icon: AlertTriangle,
-    label: "리뷰 실패",
-    color: "text-rose-500",
-    bgColor: "bg-rose-50",
-  },
   PR_MERGED: {
     icon: GitMerge,
     label: "머지",
     color: "text-orange-500",
     bgColor: "bg-orange-50",
   },
+};
+
+function getReviewStatusMeta(notification: Notification) {
+  switch (notification.reviewStatus) {
+    case "PENDING":
+      return {
+        icon: Loader2,
+        label: "AI 리뷰 대기 중",
+        color: "text-blue-500",
+        bgColor: "bg-blue-50",
+        iconClassName: "animate-spin",
+      };
+    case "FAILED":
+      return {
+        icon: AlertCircle,
+        label: "AI 리뷰 실패",
+        color: "text-rose-500",
+        bgColor: "bg-rose-50",
+        iconClassName: "",
+      };
+    case "COMPLETED":
+      return {
+        icon: CheckCircle2,
+        label: "AI 리뷰 완료",
+        color: "text-emerald-500",
+        bgColor: "bg-emerald-50",
+        iconClassName: "",
+      };
+    default:
+      return null;
+  }
 }
 
 interface NotificationListProps {
-  notifications: Notification[]
-  onClickItem: (notification: Notification) => void
-  onMarkAllRead: () => void
-  onDelete?: (id: string) => void
-  showHeader?: boolean
+  notifications: Notification[];
+  onClickItem: (notification: Notification) => void;
+  onMarkAllRead: () => void;
+  onDelete?: (id: string) => void;
+  showHeader?: boolean;
 }
 
 export default function NotificationList({
@@ -68,7 +95,7 @@ export default function NotificationList({
       <div className="px-4 py-8 text-center text-sm text-slate-400">
         알림이 없습니다
       </div>
-    )
+    );
   }
 
   return (
@@ -86,8 +113,13 @@ export default function NotificationList({
       )}
       <div className="max-h-80 overflow-y-auto">
         {notifications.map((notification) => {
-          const config = typeConfig[notification.type] ?? typeConfig.MENTION
-          const Icon = config.icon
+          const reviewStatusMeta =
+            notification.type === "NEW_REVIEW"
+              ? getReviewStatusMeta(notification)
+              : null;
+          const config =
+            reviewStatusMeta ?? typeConfig[notification.type] ?? typeConfig.MENTION;
+          const Icon = config.icon;
 
           return (
             <div
@@ -103,16 +135,27 @@ export default function NotificationList({
                 <div
                   className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${config.bgColor} ${config.color}`}
                 >
-                  <Icon className="h-3.5 w-3.5" />
+                  <Icon className={`h-3.5 w-3.5 ${reviewStatusMeta?.iconClassName ?? ""}`} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p
-                    className={`text-sm leading-snug ${
-                      !notification.isRead ? "font-medium text-slate-900" : "text-slate-600"
-                    }`}
-                  >
-                    {notification.title}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p
+                      className={`text-sm leading-snug ${
+                        !notification.isRead
+                          ? "font-medium text-slate-900"
+                          : "text-slate-600"
+                      }`}
+                    >
+                      {notification.title}
+                    </p>
+                    {reviewStatusMeta && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${reviewStatusMeta.bgColor} ${reviewStatusMeta.color}`}
+                      >
+                        {reviewStatusMeta.label}
+                      </span>
+                    )}
+                  </div>
                   {notification.prTitle && (
                     <p className="mt-0.5 truncate text-xs text-blue-500">
                       {notification.repoFullName && (
@@ -139,10 +182,10 @@ export default function NotificationList({
                 {onDelete && (
                   <button
                     onClick={(event) => {
-                      event.stopPropagation()
-                      onDelete(notification.id)
+                      event.stopPropagation();
+                      onDelete(notification.id);
                     }}
-                    className="rounded p-0.5 opacity-0 transition-all hover:bg-slate-200 group-hover:opacity-100"
+                    className="rounded p-0.5 opacity-0 transition-all group-hover:opacity-100 hover:bg-slate-200"
                     title="알림 삭제"
                   >
                     <X className="h-3.5 w-3.5 text-slate-400" />
@@ -150,9 +193,9 @@ export default function NotificationList({
                 )}
               </div>
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }

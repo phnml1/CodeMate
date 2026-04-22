@@ -4,6 +4,13 @@ import type { AIReviewIssue, AIReviewResponse } from "@/lib/ai/parsers";
 export type ReviewIssue = AIReviewIssue & { originalIndex: number };
 
 export type ReviewStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
+export type ReviewStage =
+  | "QUEUED"
+  | "FETCHING_FILES"
+  | "ANALYZING"
+  | "FINALIZING"
+  | "COMPLETED"
+  | "FAILED";
 export type ReviewSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 export interface Review {
@@ -13,7 +20,8 @@ export interface Review {
   severity: ReviewSeverity;
   issueCount: number;
   status: ReviewStatus;
-  failureReason: string | null;
+  stage: ReviewStage;
+  failureReason?: string | null;
   aiSuggestions: AIReviewResponse;
   reviewedAt: string;
 }

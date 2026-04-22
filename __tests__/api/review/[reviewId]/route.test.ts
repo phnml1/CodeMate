@@ -13,6 +13,7 @@ const mockReview = {
   id: "review-1",
   pullRequestId: "pr-1",
   status: "COMPLETED",
+  stage: "COMPLETED",
   aiSuggestions: { issues: [], summary: "ok", overallAssessment: "APPROVE" },
   qualityScore: 100,
   severity: "LOW",
@@ -31,7 +32,7 @@ function makeRequest(reviewId: string) {
 describe("GET /api/review/[reviewId]", () => {
   afterEach(() => jest.clearAllMocks())
 
-  it("유효한 reviewId로 리뷰 결과를 반환한다", async () => {
+  it("returns the requested review with stage information", async () => {
     mockedFindUnique.mockResolvedValue(mockReview)
 
     const { request, params } = makeRequest("review-1")
@@ -41,12 +42,17 @@ describe("GET /api/review/[reviewId]", () => {
     expect(res.status).toBe(200)
     expect(body.id).toBe("review-1")
     expect(body.status).toBe("COMPLETED")
+    expect(body.stage).toBe("COMPLETED")
     expect(body.qualityScore).toBe(100)
     expect(body.pullRequest.number).toBe(1)
   })
 
-  it("PENDING 상태 리뷰도 status 포함하여 반환한다", async () => {
-    mockedFindUnique.mockResolvedValue({ ...mockReview, status: "PENDING" })
+  it("returns stage information for pending reviews", async () => {
+    mockedFindUnique.mockResolvedValue({
+      ...mockReview,
+      status: "PENDING",
+      stage: "FETCHING_FILES",
+    })
 
     const { request, params } = makeRequest("review-1")
     const res = await GET(request, { params })
@@ -54,9 +60,10 @@ describe("GET /api/review/[reviewId]", () => {
 
     expect(res.status).toBe(200)
     expect(body.status).toBe("PENDING")
+    expect(body.stage).toBe("FETCHING_FILES")
   })
 
-  it("존재하지 않는 reviewId면 404를 반환한다", async () => {
+  it("returns 404 for missing reviews", async () => {
     mockedFindUnique.mockResolvedValue(null)
 
     const { request, params } = makeRequest("not-exist")
@@ -67,7 +74,7 @@ describe("GET /api/review/[reviewId]", () => {
     expect(body.error).toBe("Review not found")
   })
 
-  it("서버 에러 시 500을 반환한다", async () => {
+  it("returns 500 on unexpected errors", async () => {
     mockedFindUnique.mockRejectedValue(new Error("DB error"))
 
     const { request, params } = makeRequest("review-1")

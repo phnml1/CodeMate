@@ -18,7 +18,7 @@ import {
 } from "@/lib/measurements/socketMetrics"
 
 const isSocketMode = process.env.NEXT_PUBLIC_REALTIME_MODE === "socket"
-const toastedNotificationIds = new Set<string>()
+const toastedNotificationKeys = new Set<string>()
 
 async function fetchNotifications(
   type?: NotificationFilterType,
@@ -53,6 +53,19 @@ function getToastMessage(notification: BaseNotification) {
       : null
 
   if (notification.type === "NEW_REVIEW") {
+    if (notification.reviewStatus === "PENDING") {
+      return null
+    }
+
+    if (notification.reviewStatus === "FAILED") {
+      return {
+        title: "AI review failed",
+        description:
+          notification.message ?? "The review process hit an error.",
+        kind: "error" as const,
+      }
+    }
+
     return {
       title: prTitle ? `AI review is ready for "${prTitle}"` : "AI review is ready",
       description: notification.message ?? "Open the PR to review the result.",
@@ -77,6 +90,10 @@ function getToastMessage(notification: BaseNotification) {
 
 function showNotificationToast(notification: BaseNotification) {
   const toastContent = getToastMessage(notification)
+  if (!toastContent) {
+    return
+  }
+
   const action =
     notification.prId &&
     (notification.type === "NEW_REVIEW" ||
@@ -134,26 +151,58 @@ export function useNotifications(
     (base: BaseNotification) => {
       recordHandlerInvocation("notification:new")
 
-      if (!toastedNotificationIds.has(base.id)) {
-        toastedNotificationIds.add(base.id)
+      const toastKey = `${base.id}:${base.reviewStatus ?? "none"}`
+      if (!toastedNotificationKeys.has(toastKey)) {
+        toastedNotificationKeys.add(toastKey)
         showNotificationToast(base)
       }
 
       const notification: Notification = {
         ...base,
-        prTitle: null,
-        prNumber: null,
-        repoFullName: null,
+        prTitle: base.prTitle ?? null,
+        prNumber: base.prNumber ?? null,
+        repoFullName: base.repoFullName ?? null,
       }
 
       queryClient.setQueryData<NotificationsResponse>(
         ["notifications", typeFilter, readFilter],
         (old) => {
-          if (!old) return { notifications: [notification], unreadCount: 1, total: 1 }
+          if (!old) {
+            return {
+              notifications: [notification],
+              unreadCount: notification.isRead ? 0 : 1,
+              total: 1,
+            }
+          }
+
+          const existingIndex = old.notifications.findIndex((n) => n.id === notification.id)
+
+          if (existingIndex === -1) {
+            return {
+              notifications: [notification, ...old.notifications],
+              unreadCount: old.unreadCount + (notification.isRead ? 0 : 1),
+              total: old.total + 1,
+            }
+          }
+
+          const existing = old.notifications[existingIndex]
+          const nextNotifications = [...old.notifications]
+          nextNotifications[existingIndex] = notification
+
+          const unreadDelta =
+            existing.isRead === notification.isRead
+              ? 0
+              : notification.isRead
+                ? -1
+                : 1
+
           return {
-            notifications: [notification, ...old.notifications],
-            unreadCount: old.unreadCount + 1,
-            total: old.total + 1,
+            notifications: [
+              notification,
+              ...nextNotifications.filter((item) => item.id !== notification.id),
+            ],
+            unreadCount: old.unreadCount + unreadDelta,
+            total: old.total,
           }
         }
       )
