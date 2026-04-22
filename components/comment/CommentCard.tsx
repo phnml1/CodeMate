@@ -5,6 +5,7 @@ import { formatDistanceToNow } from "date-fns"
 import { ko } from "date-fns/locale"
 import { MessageSquare, GitPullRequest, FileCode } from "lucide-react"
 import { Card } from "@/components/ui/card"
+import { surfaceStyles } from "@/lib/styles"
 import { cn } from "@/lib/utils"
 import type { CommentWithPR } from "@/types/comment"
 
@@ -24,9 +25,8 @@ export default function CommentCard({ comment, onClick, animationDelay = 0 }: Co
     <Card
       onClick={() => onClick(comment)}
       className={cn(
-        "group relative rounded-[24px] p-4 md:p-5 border-slate-200 shadow-none cursor-pointer",
-        "hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/5",
-        "transition-all duration-300",
+        "group relative cursor-pointer",
+        surfaceStyles.interactiveCard,
         "animate-in fade-in slide-in-from-bottom-4 fill-mode-both"
       )}
       style={{ animationDelay: `${animationDelay}ms` }}

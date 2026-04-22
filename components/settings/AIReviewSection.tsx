@@ -1,6 +1,8 @@
 "use client"
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { controlStyles, surfaceStyles, textStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 
 interface ReviewSettings {
   autoReview: boolean
@@ -52,16 +54,16 @@ export default function AIReviewSection() {
 
   if (isLoading) {
     return (
-      <section className="bg-white rounded-xl border border-slate-200 p-6">
-        <h2 className="text-base font-semibold text-slate-800 mb-4">AI 리뷰 설정</h2>
+      <section className={cn(surfaceStyles.panel, surfaceStyles.panelPadding)}>
+        <h2 className={cn(textStyles.sectionTitle, "mb-4")}>AI 리뷰 설정</h2>
         <p className="text-sm text-slate-400">설정을 불러오는 중...</p>
       </section>
     )
   }
 
   return (
-    <section className="bg-white rounded-xl border border-slate-200 p-6">
-      <h2 className="text-base font-semibold text-slate-800 mb-4">AI 리뷰 설정</h2>
+    <section className={cn(surfaceStyles.panel, surfaceStyles.panelPadding)}>
+      <h2 className={cn(textStyles.sectionTitle, "mb-4")}>AI 리뷰 설정</h2>
       <div className="space-y-5">
         {/* 자동 리뷰 토글 */}
         <div className="flex items-center justify-between">
@@ -94,11 +96,11 @@ export default function AIReviewSection() {
               <button
                 key={lang}
                 onClick={() => save({ ...settings, language: lang })}
-                className={`px-3 py-1 text-xs font-medium rounded-lg border transition-colors ${
+                className={cn(controlStyles.filterButton, "rounded-lg border",
                   settings.language === lang
                     ? "bg-blue-500 text-white border-blue-500"
                     : "text-slate-600 border-slate-300 hover:bg-slate-50"
-                }`}
+                )}
               >
                 {lang === "ko" ? "한국어" : "English"}
               </button>
@@ -123,11 +125,11 @@ export default function AIReviewSection() {
               <button
                 key={opt.value}
                 onClick={() => save({ ...settings, severityLevel: opt.value })}
-                className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-colors text-center ${
+                className={cn("flex-1 rounded-lg border px-3 py-2 text-center text-xs font-medium transition-colors",
                   settings.severityLevel === opt.value
                     ? "bg-blue-500 text-white border-blue-500"
                     : "text-slate-600 border-slate-300 hover:bg-slate-50"
-                }`}
+                )}
               >
                 <span className="block">{opt.label}</span>
                 <span className={`block mt-0.5 font-normal ${settings.severityLevel === opt.value ? "text-blue-100" : "text-slate-400"}`}>

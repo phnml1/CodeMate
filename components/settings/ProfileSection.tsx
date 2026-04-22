@@ -1,5 +1,7 @@
 import Image from "next/image"
 import { User } from "lucide-react"
+import { surfaceStyles, textStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 
 interface ProfileSectionProps {
   name: string | null
@@ -9,8 +11,8 @@ interface ProfileSectionProps {
 
 export default function ProfileSection({ name, email, image }: ProfileSectionProps) {
   return (
-    <section className="bg-white rounded-xl border border-slate-200 p-6">
-      <h2 className="text-base font-semibold text-slate-800 mb-4">프로필</h2>
+    <section className={cn(surfaceStyles.panel, surfaceStyles.panelPadding)}>
+      <h2 className={cn(textStyles.sectionTitle, "mb-4")}>프로필</h2>
       <div className="flex items-center gap-4">
         {image ? (
           <Image

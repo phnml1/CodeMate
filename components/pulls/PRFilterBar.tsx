@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { surfaceStyles } from "@/lib/styles";
 import PRStatusFilter from "./PRStatusFilter";
 
 function PRStatusFilterFallback() {
@@ -15,7 +16,7 @@ function PRStatusFilterFallback() {
 
 export default function PRFilterBar() {
   return (
-    <div className="bg-white border border-slate-200 p-2 rounded-[24px] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 shadow-sm">
+    <div className={`${surfaceStyles.toolbar} flex flex-col items-stretch justify-between gap-4 md:flex-row md:items-center`}>
       <Suspense fallback={<PRStatusFilterFallback />}>
         <PRStatusFilter />
       </Suspense>

@@ -1,14 +1,15 @@
 import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
 import {
-  fetchDashboardStats,
-  fetchDashboardQualityTrend,
-  fetchDashboardIssueSeverity,
-  fetchDashboardRecentPRs,
+  getCachedDashboardStats,
+  getCachedDashboardQualityTrend,
+  getCachedDashboardIssueSeverity,
+  getCachedDashboardRecentPRs,
 } from "@/lib/dashboard"
 import StatCards from "@/components/dashboard/stat-cards/StatCards"
 import ChartsSection from "@/components/dashboard/charts/ChartsSection"
 import RecentPRSection from "@/components/dashboard/recent-prs/RecentPRSection"
+import { PageContainer } from "@/components/layout/PageContainer"
 
 export const metadata: Metadata = {
   title: "대시보드",
@@ -20,17 +21,17 @@ export default async function Page() {
   if (!session?.user?.id) return null
 
   const [stats, qualityTrend, issueSeverity, recentPRs] = await Promise.all([
-    fetchDashboardStats(session.user.id),
-    fetchDashboardQualityTrend(session.user.id),
-    fetchDashboardIssueSeverity(session.user.id),
-    fetchDashboardRecentPRs(session.user.id),
+    getCachedDashboardStats(session.user.id),
+    getCachedDashboardQualityTrend(session.user.id),
+    getCachedDashboardIssueSeverity(session.user.id),
+    getCachedDashboardRecentPRs(session.user.id),
   ])
 
   return (
-    <div className="max-w-350 mx-auto space-y-4 sm:space-y-6">
+    <PageContainer size="wide">
       <StatCards stats={stats} />
       <ChartsSection qualityTrend={qualityTrend} issueSeverity={issueSeverity} />
       <RecentPRSection prs={recentPRs} />
-    </div>
+    </PageContainer>
   )
 }

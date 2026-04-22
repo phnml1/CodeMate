@@ -1,9 +1,11 @@
 "use client"
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
-import { textStyles } from "@/lib/styles"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 import { CircleDot } from "lucide-react"
+
+import { Skeleton } from "@/components/ui/skeleton"
+import { surfaceStyles, textStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 import type { PRTrendItem } from "@/lib/stats"
 
 const STATUS_COLORS: Record<string, string> = {
@@ -29,33 +31,28 @@ export default function PRStatusChart({ data, loading }: PRStatusChartProps) {
   const total = statusData.reduce((s, d) => s + d.value, 0)
 
   return (
-    <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 md:p-8">
+    <div className={cn("lg:col-span-2", surfaceStyles.panel, surfaceStyles.panelPadding)}>
       <h3 className={`${textStyles.sectionTitle} mb-4 sm:mb-6`}>
         PR 상태 분포
       </h3>
       {loading ? (
         <div className="flex flex-col items-center gap-6">
-          <Skeleton className="w-48 h-48 rounded-full" />
-          <div className="space-y-3 w-full">
+          <Skeleton className="size-48 rounded-full" />
+          <div className="w-full space-y-3">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-4 w-full rounded" />
             ))}
           </div>
         </div>
       ) : statusData.length === 0 ? (
-        <div className="h-70 flex flex-col items-center justify-center text-slate-400">
-          <CircleDot className="w-10 h-10 mb-3 text-slate-300" />
+        <div className="flex h-70 flex-col items-center justify-center text-slate-400">
+          <CircleDot className="mb-3 size-10 text-slate-300" />
           <p className="text-sm font-medium">데이터가 없습니다</p>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-6">
-          <div className="relative w-55 h-55 sm:w-65 sm:h-65">
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-              minHeight={200}
-              minWidth={200}
-            >
+          <div className="relative h-55 w-55 sm:h-65 sm:w-65">
+            <ResponsiveContainer width="100%" height="100%" minHeight={200} minWidth={200}>
               <PieChart>
                 <Pie
                   data={statusData}
@@ -69,32 +66,27 @@ export default function PRStatusChart({ data, loading }: PRStatusChartProps) {
                   strokeWidth={0}
                 >
                   {statusData.map((entry) => (
-                    <Cell
-                      key={entry.name}
-                      fill={STATUS_COLORS[entry.name]}
-                    />
+                    <Cell key={entry.name} fill={STATUS_COLORS[entry.name]} />
                   ))}
                 </Pie>
                 <Tooltip
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null
                     const { name, value } = payload[0].payload
+
                     return (
-                      <div className="rounded-lg border bg-white px-3 py-2 shadow-md">
+                      <div className="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-md dark:border-slate-800 dark:bg-slate-950">
                         <div className="flex items-center gap-2">
                           <div
-                            className="h-3 w-3 rounded-full"
-                            style={{
-                              backgroundColor: STATUS_COLORS[name],
-                            }}
+                            className="size-3 rounded-full"
+                            style={{ backgroundColor: STATUS_COLORS[name] }}
                           />
-                          <span className="text-sm font-semibold text-slate-700">
+                          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                             {name}
                           </span>
                         </div>
-                        <p className="mt-1 text-sm text-slate-600">
-                          {value}건 ({Math.round((value / total) * 100)}
-                          %)
+                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                          {value}건 ({Math.round((value / total) * 100)}%)
                         </p>
                       </div>
                     )
@@ -103,30 +95,25 @@ export default function PRStatusChart({ data, loading }: PRStatusChartProps) {
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-slate-900 text-3xl sm:text-4xl font-bold">
+              <span className="text-3xl font-bold text-slate-900 dark:text-slate-50 sm:text-4xl">
                 {total}건
               </span>
-              <span className="text-slate-400 text-xs sm:text-sm">
-                전체 PR
-              </span>
+              <span className="text-xs text-slate-400 sm:text-sm">전체 PR</span>
             </div>
           </div>
-          <div className="space-y-3 sm:space-y-4 w-full">
+          <div className="w-full space-y-3 sm:space-y-4">
             {statusData.map((item) => (
-              <div
-                key={item.name}
-                className="flex items-center justify-between"
-              >
+              <div key={item.name} className="flex items-center justify-between">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div
-                    className="w-3 h-3 sm:w-4 sm:h-4 rounded-full shadow-sm"
+                    className="size-3 rounded-full shadow-sm sm:size-4"
                     style={{ backgroundColor: STATUS_COLORS[item.name] }}
                   />
-                  <span className="text-xs sm:text-sm font-semibold text-slate-700">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 sm:text-sm">
                     {item.name}
                   </span>
                 </div>
-                <span className="text-xs sm:text-sm font-bold text-slate-900">
+                <span className="text-xs font-bold text-slate-900 dark:text-slate-50 sm:text-sm">
                   {item.value}건
                 </span>
               </div>

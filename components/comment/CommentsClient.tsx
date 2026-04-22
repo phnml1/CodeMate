@@ -6,6 +6,7 @@ import { useAllComments } from "@/hooks/useComments"
 import AllCommentList from "@/components/comment/AllCommentList"
 import CommentFilter from "@/components/comment/CommentFilter"
 import CommentsHeader from "@/components/comment/CommentsHeader"
+import { PageContainer } from "@/components/layout/PageContainer"
 import type { CommentWithPR } from "@/types/comment"
 import type { ConnectedRepo } from "@/lib/comments"
 
@@ -50,26 +51,24 @@ export default function CommentsClient({ repos, userId }: CommentsClientProps) {
   }
 
   return (
-    <div className="w-full flex justify-center">
-      <div className="w-full max-w-4xl space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-        <CommentsHeader totalCount={totalCount} isLoading={isLoading} />
-        <CommentFilter
-          repos={repos}
-          selectedRepoId={selectedRepoId}
-          myOnly={myOnly}
-          onRepoChange={setSelectedRepoId}
-          onMyOnlyChange={setMyOnly}
-        />
-        <AllCommentList
-          comments={comments}
-          isLoading={isLoading}
-          isError={isError}
-          hasNextPage={hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          onLoadMore={fetchNextPage}
-          onClickComment={handleClickComment}
-        />
-      </div>
-    </div>
+    <PageContainer>
+      <CommentsHeader totalCount={totalCount} isLoading={isLoading} />
+      <CommentFilter
+        repos={repos}
+        selectedRepoId={selectedRepoId}
+        myOnly={myOnly}
+        onRepoChange={setSelectedRepoId}
+        onMyOnlyChange={setMyOnly}
+      />
+      <AllCommentList
+        comments={comments}
+        isLoading={isLoading}
+        isError={isError}
+        hasNextPage={hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        onLoadMore={fetchNextPage}
+        onClickComment={handleClickComment}
+      />
+    </PageContainer>
   )
 }

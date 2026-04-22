@@ -1,8 +1,10 @@
 import { Card } from "@/components/ui/card"
+import { surfaceStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 
 export default function CommentCardSkeleton() {
   return (
-    <Card className="rounded-[24px] p-4 md:p-5 border-slate-200 shadow-none animate-pulse">
+    <Card className={cn(surfaceStyles.card, "animate-pulse")}>
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">

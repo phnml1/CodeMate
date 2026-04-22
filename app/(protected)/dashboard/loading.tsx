@@ -1,12 +1,15 @@
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageContainer } from "@/components/layout/PageContainer"
+import { layoutStyles, surfaceStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 
 export default function DashboardLoading() {
   return (
-    <div className="max-w-350 mx-auto space-y-4 sm:space-y-6">
+    <PageContainer size="wide">
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${layoutStyles.gridGap}`}>
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm">
+          <div key={i} className={cn(surfaceStyles.panel, surfaceStyles.panelPadding, "space-y-4")}>
             <div className="flex items-center justify-between">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-8 w-8 rounded-lg" />
@@ -18,20 +21,20 @@ export default function DashboardLoading() {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
+      <div className={`grid grid-cols-1 lg:grid-cols-2 ${layoutStyles.gridGap}`}>
+        <div className={cn(surfaceStyles.panel, surfaceStyles.panelPadding, "space-y-4")}>
           <Skeleton className="h-5 w-32" />
           <Skeleton className="h-56 w-full rounded-xl" />
         </div>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
+        <div className={cn(surfaceStyles.panel, surfaceStyles.panelPadding, "space-y-4")}>
           <Skeleton className="h-5 w-32" />
           <Skeleton className="h-56 w-full rounded-xl" />
         </div>
       </div>
 
       {/* Recent PRs */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
-        <div className="p-4 sm:p-6 md:p-8 border-b border-slate-200 dark:border-slate-800">
+      <div className={cn(surfaceStyles.panel, "overflow-hidden")}>
+        <div className="border-b border-slate-200 p-4 sm:p-6 dark:border-slate-800">
           <Skeleton className="h-5 w-40" />
         </div>
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -47,6 +50,6 @@ export default function DashboardLoading() {
           ))}
         </div>
       </div>
-    </div>
+    </PageContainer>
   )
 }

@@ -1,8 +1,11 @@
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageContainer } from "@/components/layout/PageContainer"
+import { surfaceStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 
 export default function NotificationsLoading() {
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-6">
+    <PageContainer>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="space-y-2">
@@ -20,7 +23,7 @@ export default function NotificationsLoading() {
       </div>
 
       {/* Notification List */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm divide-y divide-slate-100 dark:divide-slate-800">
+      <div className={cn(surfaceStyles.panel, "divide-y divide-slate-100 overflow-hidden dark:divide-slate-800")}>
         {Array.from({ length: 7 }).map((_, i) => (
           <div key={i} className="flex items-start gap-4 p-4">
             <Skeleton className="h-9 w-9 rounded-full shrink-0" />
@@ -32,6 +35,6 @@ export default function NotificationsLoading() {
           </div>
         ))}
       </div>
-    </div>
+    </PageContainer>
   )
 }
