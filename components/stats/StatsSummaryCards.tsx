@@ -7,6 +7,7 @@ import {
   TrendingUp,
 } from "lucide-react"
 import type { StatsOverview } from "@/lib/stats"
+import { layoutStyles, surfaceStyles } from "@/lib/styles"
 
 interface StatsSummaryCardsProps {
   overview: StatsOverview
@@ -67,11 +68,11 @@ export default function StatsSummaryCards({
   ]
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+    <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${layoutStyles.gridGap}`}>
       {cards.map((card, i) => (
         <div
           key={i}
-          className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-8 hover:shadow-lg hover:-translate-y-1 transition-all duration-200"
+          className={surfaceStyles.interactiveCard}
         >
           <div className="flex items-start justify-between mb-4 sm:mb-6">
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-linear-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30">

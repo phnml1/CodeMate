@@ -6,6 +6,9 @@ import GitHubConnectionSection from "@/components/settings/GitHubConnectionSecti
 import AIReviewSection from "@/components/settings/AIReviewSection"
 import NotificationSection from "@/components/settings/NotificationSection"
 import DangerZoneSection from "@/components/settings/DangerZoneSection"
+import { PageContainer } from "@/components/layout/PageContainer"
+import { PageHeader } from "@/components/layout/PageHeader"
+import { layoutStyles } from "@/lib/styles"
 
 interface SettingsClientProps {
   user: {
@@ -20,19 +23,20 @@ interface SettingsClientProps {
 
 export default function SettingsClient({ user, githubConnected, githubScope }: SettingsClientProps) {
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Settings className="w-6 h-6 text-slate-700" />
-        <h1 className="text-xl font-bold text-slate-900">설정</h1>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="설정"
+        description="계정 정보와 GitHub 연동 상태를 관리하세요."
+        icon={<Settings className="size-5" aria-hidden />}
+      />
 
-      <div className="space-y-4">
+      <div className={layoutStyles.listStack}>
         <ProfileSection name={user.name} email={user.email} image={user.image} />
         <GitHubConnectionSection isConnected={githubConnected} githubId={user.githubId} scope={githubScope} />
         <AIReviewSection />
         <NotificationSection />
         <DangerZoneSection />
       </div>
-    </div>
+    </PageContainer>
   )
 }

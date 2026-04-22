@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { surfaceStyles } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 import type { PullRequest } from "@/types/pulls";
 
@@ -35,14 +36,13 @@ export default function PRCard({
   return (
     <Card
       className={cn(
-        "group relative rounded-[24px] p-4 md:p-5 border-slate-200 shadow-none",
-        "hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/5",
-        "transition-all duration-300 cursor-pointer",
+        "group relative cursor-pointer",
+        surfaceStyles.interactiveCard,
         "animate-in fade-in slide-in-from-bottom-4 fill-mode-both"
       )}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
-      <Link href={`/pulls/${id}`} className="absolute inset-0 z-0 rounded-[24px]" aria-label={title} />
+      <Link href={`/pulls/${id}`} className="absolute inset-0 z-0 rounded-md" aria-label={title} />
 
       <div className="flex flex-col gap-3 h-full">
         {/* Header: Status badge + PR number */}

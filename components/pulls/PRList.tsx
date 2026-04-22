@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { InfiniteScrollTrigger } from "@/components/ui/InfiniteScrollTrigger";
 import { FILTER_TAB_TO_STATUS, type PRFilterTab } from "@/constants";
 import { usePullRequests } from "@/hooks/usePullRequests";
+import { layoutStyles, surfaceStyles } from "@/lib/styles";
 import PRCard from "./PRCard";
 import PRCardSkeleton from "./PRCardSkeleton";
 import PREmptyState from "./PREmptyState";
@@ -26,7 +27,7 @@ export default function PRList() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className={layoutStyles.listStack}>
         {Array.from({ length: 3 }).map((_, i) => (
           <PRCardSkeleton key={i} />
         ))}
@@ -36,7 +37,7 @@ export default function PRList() {
 
   if (isError) {
     return (
-      <div className="py-20 text-center text-sm text-slate-400 font-medium">
+      <div className={surfaceStyles.emptyState}>
         PR 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
       </div>
     );
@@ -49,7 +50,7 @@ export default function PRList() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className={layoutStyles.listStack}>
         {pullRequests.map((pr, index) => (
           <PRCard key={pr.id} {...pr} animationDelay={index * 75} />
         ))}
@@ -59,7 +60,7 @@ export default function PRList() {
           hasNextPage={hasNextPage}
           isFetchingNextPage={isFetchingNextPage}
           loadingFallback={
-            <div className="space-y-4">
+            <div className={layoutStyles.listStack}>
               <PRCardSkeleton />
               <PRCardSkeleton />
             </div>

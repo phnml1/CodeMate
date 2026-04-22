@@ -27,6 +27,7 @@ export function useConnectRepository() {
     mutationFn: connectRepository,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["repositories"] })
+      queryClient.invalidateQueries({ queryKey: ["githubRepos"] })
     },
   })
 }

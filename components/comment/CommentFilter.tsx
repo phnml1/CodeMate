@@ -1,6 +1,8 @@
 "use client"
 
 import { User } from "lucide-react"
+import { controlStyles, surfaceStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 
 interface ConnectedRepo {
   id: string
@@ -24,16 +26,16 @@ export default function CommentFilter({
   onMyOnlyChange,
 }: CommentFilterProps) {
   return (
-    <div className="flex flex-col sm:flex-row gap-3">
+    <div className={cn(surfaceStyles.toolbar, "flex flex-col gap-3 sm:flex-row")}>
       {/* 저장소 필터 */}
-      <div className="flex gap-1 flex-wrap">
+      <div className="flex flex-wrap gap-1">
         <button
           onClick={() => onRepoChange(undefined)}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+          className={cn(controlStyles.filterButton,
             !selectedRepoId
               ? "bg-blue-100 text-blue-700"
               : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-          }`}
+          )}
         >
           전체 저장소
         </button>
@@ -41,11 +43,11 @@ export default function CommentFilter({
           <button
             key={repo.id}
             onClick={() => onRepoChange(repo.id)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+            className={cn(controlStyles.filterButton,
               selectedRepoId === repo.id
                 ? "bg-blue-100 text-blue-700"
                 : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-            }`}
+            )}
           >
             {repo.name}
           </button>
@@ -55,11 +57,11 @@ export default function CommentFilter({
       {/* 내 댓글만 토글 */}
       <button
         onClick={() => onMyOnlyChange(!myOnly)}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors self-start ${
+        className={cn(controlStyles.filterButton, "self-start",
           myOnly
             ? "bg-blue-100 text-blue-700"
             : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-        }`}
+        )}
       >
         <User className="w-3 h-3" />
         내 댓글만

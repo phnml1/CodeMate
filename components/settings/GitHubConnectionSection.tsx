@@ -2,6 +2,8 @@
 
 import { Github, RefreshCw } from "lucide-react"
 import { signIn } from "next-auth/react"
+import { controlStyles, surfaceStyles, textStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 
 interface GitHubConnectionSectionProps {
   isConnected: boolean
@@ -24,8 +26,8 @@ export default function GitHubConnectionSection({ isConnected, githubId, scope }
   }
 
   return (
-    <section className="bg-white rounded-xl border border-slate-200 p-6">
-      <h2 className="text-base font-semibold text-slate-800 mb-4">GitHub 연결</h2>
+    <section className={cn(surfaceStyles.panel, surfaceStyles.panelPadding)}>
+      <h2 className={cn(textStyles.sectionTitle, "mb-4")}>GitHub 연결</h2>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0">
@@ -44,7 +46,7 @@ export default function GitHubConnectionSection({ isConnected, githubId, scope }
         </div>
         <button
           onClick={handleReconnect}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors flex-shrink-0"
+          className={cn("flex h-9 flex-shrink-0 items-center gap-1.5 px-3 text-sm", controlStyles.secondaryAction)}
         >
           <RefreshCw className="w-3.5 h-3.5" />
           재연결

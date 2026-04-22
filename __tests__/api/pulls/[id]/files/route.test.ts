@@ -10,6 +10,11 @@ jest.mock("@/lib/auth", () => ({
 
 jest.mock("@/lib/github", () => ({
   getOctokit: jest.fn(),
+  isGitHubReconnectRequiredError: (error: unknown) =>
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    error.status === 401,
 }))
 
 jest.mock("@/lib/prisma", () => ({

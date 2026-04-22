@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { signOut } from "next-auth/react"
 import { AlertTriangle } from "lucide-react"
+import { surfaceStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 
 export default function DangerZoneSection() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -36,7 +38,7 @@ export default function DangerZoneSection() {
   }
 
   return (
-    <section className="bg-white rounded-xl border border-red-200 p-6">
+    <section className={cn(surfaceStyles.panel, surfaceStyles.panelPadding, "border-red-200")}>
       <div className="flex items-center gap-2 mb-4">
         <AlertTriangle className="w-4 h-4 text-red-500" />
         <h2 className="text-base font-semibold text-red-600">위험 구역</h2>
@@ -80,7 +82,7 @@ export default function DangerZoneSection() {
       {/* 삭제 확인 다이얼로그 */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+          <div className={cn(surfaceStyles.panel, surfaceStyles.panelPadding, "w-full max-w-sm shadow-xl")}>
             <div className="flex items-center gap-2 mb-3">
               <AlertTriangle className="w-5 h-5 text-red-500" />
               <h3 className="text-base font-semibold text-slate-900">계정 삭제</h3>

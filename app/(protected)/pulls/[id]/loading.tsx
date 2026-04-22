@@ -1,10 +1,11 @@
 import { Skeleton } from "@/components/ui/skeleton"
+import { layoutStyles } from "@/lib/styles"
 
 export default function PRDetailLoading() {
   return (
-    <div className="flex h-[calc(100svh-6.5rem)] md:h-[calc(100svh-8.5rem)] lg:h-[calc(100svh-9.5rem)] bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-[24px] shadow-sm mt-2">
+    <div className={layoutStyles.detailFrame}>
       {/* Sidebar */}
-      <div className="w-72 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 rounded-l-[24px] p-4 space-y-3">
+      <div className="w-72 shrink-0 space-y-3 rounded-l-md border-r border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
         <Skeleton className="h-4 w-24" />
         {Array.from({ length: 8 }).map((_, i) => (
           <Skeleton key={i} className="h-9 w-full rounded-lg" />
