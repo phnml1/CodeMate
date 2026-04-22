@@ -2,6 +2,8 @@
 
 import { useNotificationSettings } from "@/hooks/useNotificationSettings"
 import type { NotificationSetting } from "@/types/notification"
+import { surfaceStyles, textStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 
 const settingItems: { key: keyof NotificationSetting; label: string; description: string }[] = [
   {
@@ -31,16 +33,16 @@ export default function NotificationSection() {
 
   if (isLoading) {
     return (
-      <section className="bg-white rounded-xl border border-slate-200 p-6">
-        <h2 className="text-base font-semibold text-slate-800 mb-4">알림 설정</h2>
+      <section className={cn(surfaceStyles.panel, surfaceStyles.panelPadding)}>
+        <h2 className={cn(textStyles.sectionTitle, "mb-4")}>알림 설정</h2>
         <p className="text-sm text-slate-400">설정을 불러오는 중...</p>
       </section>
     )
   }
 
   return (
-    <section className="bg-white rounded-xl border border-slate-200 p-6">
-      <h2 className="text-base font-semibold text-slate-800 mb-4">알림 설정</h2>
+    <section className={cn(surfaceStyles.panel, surfaceStyles.panelPadding)}>
+      <h2 className={cn(textStyles.sectionTitle, "mb-4")}>알림 설정</h2>
       <div className="space-y-1">
         {settingItems.map((item) => (
           <div

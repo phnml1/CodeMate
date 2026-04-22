@@ -1,9 +1,11 @@
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageContainer } from "@/components/layout/PageContainer"
+import { layoutStyles, surfaceStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 
 export default function PullsLoading() {
   return (
-    <div className="w-full flex justify-center">
-      <div className="w-full max-w-4xl space-y-6">
+    <PageContainer>
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2">
@@ -24,9 +26,9 @@ export default function PullsLoading() {
         </div>
 
         {/* PR List */}
-        <div className="space-y-3">
+        <div className={layoutStyles.listStack}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
+            <div key={i} className={cn(surfaceStyles.card, "space-y-3")}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 flex-1">
                   <Skeleton className="h-5 w-5 rounded-full shrink-0" />
@@ -42,7 +44,6 @@ export default function PullsLoading() {
             </div>
           ))}
         </div>
-      </div>
-    </div>
+    </PageContainer>
   )
 }

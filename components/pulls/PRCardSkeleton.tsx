@@ -1,8 +1,10 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { surfaceStyles } from "@/lib/styles";
+import { cn } from "@/lib/utils";
 
 export default function PRCardSkeleton() {
   return (
-    <div className="bg-white border border-slate-200 rounded-[24px] p-6 md:p-8 space-y-3">
+    <div className={cn(surfaceStyles.card, "space-y-3")}>
       <div className="flex items-center gap-3">
         <Skeleton className="h-5 w-14 rounded-full" />
         <Skeleton className="h-4 w-8" />

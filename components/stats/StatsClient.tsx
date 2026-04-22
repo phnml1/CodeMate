@@ -11,6 +11,8 @@ import type {
 } from "@/lib/stats"
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PageContainer } from "@/components/layout/PageContainer"
+import { layoutStyles } from "@/lib/styles"
 import StatsHeader from "./StatsHeader"
 import StatsSummaryCards from "./StatsSummaryCards"
 
@@ -86,7 +88,7 @@ export default function StatsClient({
   }, [fetchAllData])
 
   return (
-    <div className="max-w-350 mx-auto space-y-4 sm:space-y-6">
+    <PageContainer size="wide">
       <StatsHeader
         range={range}
         onRangeChange={setRange}
@@ -100,13 +102,13 @@ export default function StatsClient({
       </div>
 
       {/* PR 활동 추이 + PR 상태 분포 */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
+      <div className={`grid grid-cols-1 lg:grid-cols-5 ${layoutStyles.gridGap}`}>
         <PRTrendChart data={prTrend} loading={loading} />
         <PRStatusChart data={prTrend} loading={loading} />
       </div>
 
       {/* 코드 품질 추이 + 이슈 심각도 분포 */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
+      <div className={`grid grid-cols-1 lg:grid-cols-5 ${layoutStyles.gridGap}`}>
         <QualityTrendChart data={qualityTrend} loading={loading} />
         <IssueSeverityChart
           data={issueDistribution.bySeverity}
@@ -122,6 +124,6 @@ export default function StatsClient({
         data={issueDistribution.byCategory}
         loading={loading}
       />
-    </div>
+    </PageContainer>
   )
 }

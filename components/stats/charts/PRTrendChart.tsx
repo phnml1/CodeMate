@@ -1,16 +1,18 @@
 "use client"
 
 import {
-  AreaChart,
   Area,
+  AreaChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  ResponsiveContainer,
 } from "recharts"
-import { textStyles } from "@/lib/styles"
-import { Skeleton } from "@/components/ui/skeleton"
 import { BarChart3 } from "lucide-react"
+
+import { Skeleton } from "@/components/ui/skeleton"
+import { surfaceStyles, textStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 import type { PRTrendItem } from "@/lib/stats"
 
 interface PRTrendChartProps {
@@ -28,17 +30,22 @@ function CustomTooltip({
   label?: string
 }) {
   if (!active || !payload?.length) return null
+
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-slate-200 px-5 py-3">
-      <div className="text-slate-900 font-bold text-sm mb-2">{label}</div>
+    <div className="rounded-md border border-slate-200 bg-white px-5 py-3 shadow-lg dark:border-slate-800 dark:bg-slate-950">
+      <div className="mb-2 text-sm font-bold text-slate-900 dark:text-slate-50">
+        {label}
+      </div>
       {payload.map((entry) => (
         <div key={entry.name} className="flex items-center gap-2 text-xs">
           <div
-            className="w-2.5 h-2.5 rounded-full"
+            className="size-2.5 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-slate-600">{entry.name}:</span>
-          <span className="font-semibold text-slate-900">
+          <span className="text-slate-600 dark:text-slate-400">
+            {entry.name}:
+          </span>
+          <span className="font-semibold text-slate-900 dark:text-slate-50">
             {entry.value}건
           </span>
         </div>
@@ -49,68 +56,38 @@ function CustomTooltip({
 
 export default function PRTrendChart({ data, loading }: PRTrendChartProps) {
   return (
-    <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 md:p-8">
+    <div className={cn("lg:col-span-3", surfaceStyles.panel, surfaceStyles.panelPadding)}>
       <h3 className={`${textStyles.sectionTitle} mb-4 sm:mb-6`}>
         PR 활동 추이
       </h3>
       {loading ? (
-        <div className="w-full h-70 sm:h-85">
-          <Skeleton className="w-full h-full rounded-lg" />
+        <div className="h-70 w-full sm:h-85">
+          <Skeleton className="h-full w-full rounded-md" />
         </div>
       ) : data.length === 0 ? (
-        <div className="w-full h-70 sm:h-85 flex flex-col items-center justify-center text-slate-400">
-          <BarChart3 className="w-10 h-10 mb-3 text-slate-300" />
+        <div className="flex h-70 w-full flex-col items-center justify-center text-slate-400 sm:h-85">
+          <BarChart3 className="mb-3 size-10 text-slate-300" />
           <p className="text-sm font-medium">데이터가 없습니다</p>
         </div>
       ) : (
-        <div className="w-full h-70 sm:h-85">
+        <div className="h-70 w-full sm:h-85">
           <ResponsiveContainer width="100%" height="100%" minHeight={200}>
             <AreaChart
               data={data}
               margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
             >
               <defs>
-                <linearGradient
-                  id="openGradient"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
+                <linearGradient id="openGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
-                  <stop
-                    offset="100%"
-                    stopColor="#3b82f6"
-                    stopOpacity={0.05}
-                  />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05} />
                 </linearGradient>
-                <linearGradient
-                  id="mergedGradient"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
+                <linearGradient id="mergedGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
-                  <stop
-                    offset="100%"
-                    stopColor="#22c55e"
-                    stopOpacity={0.05}
-                  />
+                  <stop offset="100%" stopColor="#22c55e" stopOpacity={0.05} />
                 </linearGradient>
-                <linearGradient
-                  id="closedGradient"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
+                <linearGradient id="closedGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.3} />
-                  <stop
-                    offset="100%"
-                    stopColor="#94a3b8"
-                    stopOpacity={0.05}
-                  />
+                  <stop offset="100%" stopColor="#94a3b8" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
               <XAxis

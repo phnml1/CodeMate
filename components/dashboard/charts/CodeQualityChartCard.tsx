@@ -1,6 +1,7 @@
 import { type QualityTrendItem } from "@/lib/dashboard"
 import CodeQualityChart from "./CodeQualityChart"
-import { textStyles } from "@/lib/styles"
+import { surfaceStyles, textStyles } from "@/lib/styles"
+import { cn } from "@/lib/utils"
 
 export default function CodeQualityChartCard({
   qualityTrend,
@@ -8,7 +9,7 @@ export default function CodeQualityChartCard({
   qualityTrend: QualityTrendItem[]
 }) {
   return (
-    <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 md:p-8">
+    <div className={cn("lg:col-span-3", surfaceStyles.panel, surfaceStyles.panelPadding)}>
       <h3 className={`${textStyles.sectionTitle} mb-4 sm:mb-6`}>
         코드 품질 추이 (최근 30일)
       </h3>
