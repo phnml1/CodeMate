@@ -58,6 +58,7 @@ export async function GET(request: Request) {
           },
         },
         orderBy: [
+          { githubUpdatedAt: { sort: "desc", nulls: "last" } },
           { githubCreatedAt: { sort: "desc", nulls: "last" } },
           { number: "desc" },
         ],

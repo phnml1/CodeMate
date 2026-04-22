@@ -11,8 +11,9 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { useSyncRepository } from "@/hooks/useSyncRepository"
 import { controlStyles, surfaceStyles } from "@/lib/styles"
 import { cn } from "@/lib/utils"
@@ -53,6 +54,7 @@ export default function RepoCard({
   connectError = null,
 }: RepoCardProps) {
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
   const { mutate: sync, isPending: isSyncing } = useSyncRepository()
   const dotColor = language ? (LANGUAGE_COLORS[language] ?? "bg-slate-400") : null
 
@@ -60,7 +62,7 @@ export default function RepoCard({
     <div className={cn("group relative", surfaceStyles.interactiveCard)}>
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex items-start gap-4">
-          <div className="h-12 w-12 shrink-0 rounded-2xl border border-slate-100 bg-slate-50 text-slate-400 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600 flex items-center justify-center">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 text-slate-400 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600">
             <FolderGit2 size={22} aria-hidden />
           </div>
 
@@ -89,7 +91,7 @@ export default function RepoCard({
             <>
               <Badge className="gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-600">
                 <Check size={12} aria-hidden />
-                연동됨
+                연결됨
               </Badge>
               {syncMessage && (
                 <span className="text-xs font-medium text-slate-500">{syncMessage}</span>
@@ -101,32 +103,47 @@ export default function RepoCard({
                 onClick={() => {
                   if (!repositoryId) return
 
+                  setSyncError(null)
+                  setSyncMessage("동기화 중...")
+
                   sync(repositoryId, {
-                    onSuccess: ({ updated, total }) => {
+                    onSuccess: ({ updated, total, detailHydrated }) => {
                       setSyncMessage(
-                        total === 0 ? "보정할 PR 없음" : `${updated}/${total}건 보정 완료`
+                        total === 0
+                          ? "동기화할 PR이 없습니다."
+                          : detailHydrated && detailHydrated > 0
+                            ? `PR ${updated}건 동기화, 상세 ${detailHydrated}건 보정 완료`
+                            : `PR ${updated}건 동기화 완료`
                       )
                       setTimeout(() => setSyncMessage(null), 3000)
                     },
-                    onError: () => {
-                      setSyncMessage("동기화 실패")
-                      setTimeout(() => setSyncMessage(null), 3000)
+                    onError: (error) => {
+                      setSyncMessage(null)
+                      setSyncError(
+                        error instanceof Error
+                          ? error.message
+                          : "저장소 동기화에 실패했습니다."
+                      )
                     },
                   })
                 }}
-                title="코드 변경량 동기화"
+                title="GitHub에서 최신 PR 목록 동기화"
                 className={cn(
                   controlStyles.iconButton,
                   "text-slate-400 hover:border-blue-100 hover:bg-blue-50 hover:text-blue-500 disabled:opacity-40"
                 )}
               >
-                <RefreshCw size={18} className={isSyncing ? "animate-spin" : ""} aria-hidden />
+                <RefreshCw
+                  size={18}
+                  className={isSyncing ? "animate-spin" : ""}
+                  aria-hidden
+                />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onDisconnect}
-                title="연동 해제"
+                title="저장소 연결 해제"
                 className={cn(
                   controlStyles.iconButton,
                   "text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-500"
@@ -145,12 +162,12 @@ export default function RepoCard({
               {isConnecting ? (
                 <>
                   <Loader2 size={14} className="animate-spin" aria-hidden />
-                  연동 중...
+                  연결 중...
                 </>
               ) : (
                 <>
                   <Plus size={14} aria-hidden />
-                  연동
+                  연결
                 </>
               )}
             </Button>
@@ -162,6 +179,13 @@ export default function RepoCard({
         <div className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600">
           <AlertCircle size={13} aria-hidden />
           {connectError}
+        </div>
+      )}
+
+      {syncError && isConnected && (
+        <div className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600">
+          <AlertCircle size={13} aria-hidden />
+          {syncError}
         </div>
       )}
 
