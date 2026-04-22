@@ -5,8 +5,34 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+function createPrismaClient() {
+  const connectionString =
+    process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter })
+  if (!connectionString) {
+    throw new Error('DATABASE_URL or DIRECT_DATABASE_URL must be set')
+  }
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+  // Supabase pooler URLs can terminate long-lived auth/session queries unexpectedly.
+  // Prefer a direct connection when available and only fall back to DATABASE_URL.
+  const adapter = new PrismaPg({ connectionString, max: 5 })
+
+  return new PrismaClient({ adapter })
+}
+
+function getPrismaClient() {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrismaClient()
+  }
+
+  return globalForPrisma.prisma
+}
+
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    const client = getPrismaClient()
+    const value = Reflect.get(client, prop)
+
+    return typeof value === 'function' ? value.bind(client) : value
+  },
+})

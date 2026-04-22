@@ -5,9 +5,9 @@ import GitHub from "next-auth/providers/github"
 import { prisma } from "./prisma"
 
 export const authConfig = {
-  adapter: PrismaAdapter(
-    prisma as unknown as Parameters<typeof PrismaAdapter>[0]
-  ),
+  // PrismaPg driver adapter usage changes the inferred adapter signature.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adapter: PrismaAdapter(prisma as any),
   providers: [
     GitHub({
       clientId: process.env.GITHUB_ID!,
@@ -21,7 +21,7 @@ export const authConfig = {
   ],
   events: {
     async signIn({ user, account }) {
-      // 매 로그인마다 최신 access_token으로 갱신
+      // 마지막 로그인마다 최신 access_token으로 갱신
       if (account?.provider === 'github' && account.access_token) {
         await prisma.user.update({
           where: { id: user.id },
@@ -65,6 +65,7 @@ export const authConfig = {
   session: {
     strategy: 'database',
   },
+  trustHost: true,
 } satisfies NextAuthConfig
 
 export const { auth, handlers, signIn, signOut } = NextAuth(authConfig)
