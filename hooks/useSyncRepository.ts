@@ -1,8 +1,9 @@
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 
 interface SyncResult {
   updated: number
   total: number
+  detailHydrated?: number
 }
 
 async function syncRepository(repositoryId: string): Promise<SyncResult> {
@@ -17,7 +18,12 @@ async function syncRepository(repositoryId: string): Promise<SyncResult> {
 }
 
 export function useSyncRepository() {
+  const queryClient = useQueryClient()
+
   return useMutation({
     mutationFn: syncRepository,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pullRequests"] })
+    },
   })
 }

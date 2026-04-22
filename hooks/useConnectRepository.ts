@@ -28,6 +28,7 @@ export function useConnectRepository() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["repositories"] })
       queryClient.invalidateQueries({ queryKey: ["githubRepos"] })
+      queryClient.invalidateQueries({ queryKey: ["pullRequests"] })
     },
   })
 }
