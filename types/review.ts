@@ -21,6 +21,7 @@ export interface Review {
   issueCount: number;
   status: ReviewStatus;
   stage: ReviewStage;
+  failureReason?: string | null;
   aiSuggestions: AIReviewResponse;
   reviewedAt: string;
 }

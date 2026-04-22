@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { BotMessageSquare, CheckCircle, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  BotMessageSquare,
+  CheckCircle,
+  Loader2,
+  RotateCcw,
+} from "lucide-react";
 import { SEVERITY_ORDER } from "@/constants/review";
 import type { AIReviewIssue } from "@/lib/ai/parsers";
 import { ASSESSMENT_LABEL } from "@/lib/review-ui";
@@ -177,7 +183,7 @@ export default function ReviewPanel({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-rose-800 dark:text-rose-200">
-                AI 리뷰에 실패했습니다
+                AI 리뷰가 실패했습니다
               </p>
               <p className="mt-1 text-sm text-rose-700 dark:text-rose-300">
                 {review.failureReason ?? "원인을 확인할 수 없었습니다. 다시 시도해 주세요."}
@@ -195,7 +201,7 @@ export default function ReviewPanel({
           {isRequesting ? (
             <>
               <Loader2 size={14} className="animate-spin" />
-              재시도 중...
+              다시 실행 중...
             </>
           ) : (
             <>
@@ -247,9 +253,7 @@ export default function ReviewPanel({
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <ReviewScore score={review.qualityScore} />
         {assessmentMeta && (
-          <div
-            className={`inline-flex items-center gap-1.5 text-sm font-semibold ${assessmentMeta.color}`}
-          >
+          <div className={`inline-flex items-center gap-1.5 text-sm font-semibold ${assessmentMeta.color}`}>
             {assessmentMeta.icon}
             {assessmentMeta.label}
           </div>

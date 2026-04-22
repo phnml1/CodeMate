@@ -1,7 +1,6 @@
 import { POST } from "@/app/api/review/analyze/route"
 import { prisma } from "@/lib/prisma"
 import * as analyzeModule from "@/lib/ai/analyze"
-import * as emitterModule from "@/lib/socket/emitter"
 import { getRepositoryMemberIds } from "@/lib/repository-access"
 import * as reviewNotificationsModule from "@/lib/review-notifications"
 
@@ -33,7 +32,6 @@ jest.mock("@/lib/review-notifications", () => ({
 
 const mockedFindUnique = prisma.pullRequest.findUnique as jest.Mock
 const mockedAnalyze = analyzeModule.analyzeReview as jest.Mock
-const mockedEmitNotification = emitterModule.emitNotification as jest.Mock
 const mockedGetRepositoryMemberIds = getRepositoryMemberIds as jest.Mock
 const mockedUpsertReviewNotifications =
   reviewNotificationsModule.upsertReviewNotifications as jest.Mock
