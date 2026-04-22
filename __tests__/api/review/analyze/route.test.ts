@@ -1,6 +1,7 @@
 import { POST } from "@/app/api/review/analyze/route"
 import { prisma } from "@/lib/prisma"
 import * as analyzeModule from "@/lib/ai/analyze"
+import * as emitterModule from "@/lib/socket/emitter"
 import { getRepositoryMemberIds } from "@/lib/repository-access"
 import * as reviewNotificationsModule from "@/lib/review-notifications"
 
@@ -32,6 +33,7 @@ jest.mock("@/lib/review-notifications", () => ({
 
 const mockedFindUnique = prisma.pullRequest.findUnique as jest.Mock
 const mockedAnalyze = analyzeModule.analyzeReview as jest.Mock
+const mockedEmitNotification = emitterModule.emitNotification as jest.Mock
 const mockedGetRepositoryMemberIds = getRepositoryMemberIds as jest.Mock
 const mockedUpsertReviewNotifications =
   reviewNotificationsModule.upsertReviewNotifications as jest.Mock
@@ -42,6 +44,11 @@ function makeRequest(body: object) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   })
+}
+
+async function flushPromises() {
+  await Promise.resolve()
+  await Promise.resolve()
 }
 
 const mockPR = {
@@ -60,6 +67,7 @@ describe("POST /api/review/analyze", () => {
 
     const res = await POST(makeRequest({ pullRequestId: "pr-1" }))
     const body = await res.json()
+    await flushPromises()
 
     expect(res.status).toBe(200)
     expect(body.status).toBe("PENDING")

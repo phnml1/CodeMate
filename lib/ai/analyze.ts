@@ -18,7 +18,9 @@ function isActiveReviewConflict(err: unknown): boolean {
     err instanceof Prisma.PrismaClientKnownRequestError &&
     err.code === "P2002" &&
     Array.isArray(err.meta?.target) &&
-    (err.meta.target as string[]).includes("review_active_unique")
+    (err.meta.target as string[]).some(
+      (target) => target === "review_active_unique" || target === "pullRequestId"
+    )
   )
 }
 
@@ -44,6 +46,25 @@ export async function analyzeReview(
   let reviewId: string | null = null
 
   try {
+    const activeReview = await prisma.review.findFirst({
+      where: {
+        pullRequestId,
+        status: { in: ["PENDING", "IN_PROGRESS"] },
+      },
+      select: { id: true },
+      orderBy: { reviewedAt: "desc" },
+    })
+
+    if (activeReview) {
+      console.info(
+        `[analyzeReview] already active for PR ${pullRequestId}, skipping.`
+      )
+      return {
+        status: "SKIPPED_ACTIVE",
+        reviewId: null,
+      }
+    }
+
     let review: { id: string }
     try {
       review = await prisma.review.create({
@@ -65,8 +86,6 @@ export async function analyzeReview(
         )
         return { status: "SKIPPED_ACTIVE" }
       }
-
-      throw error
     }
 
     reviewId = review.id
@@ -168,6 +187,7 @@ export async function analyzeReview(
 
     return { status: "COMPLETED" }
   } catch (error) {
+    const failureReason = getFailureReason(error)
     console.error("[analyzeReview] failed:", error)
 
     if (reviewId) {

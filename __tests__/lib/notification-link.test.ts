@@ -31,6 +31,11 @@ describe("getNotificationLink", () => {
     expect(link).toBe("/pulls/pr-1?review=open")
   })
 
+  it("routes REVIEW_FAILED to the PR detail review panel", () => {
+    const link = getNotificationLink(makeNotification({ type: "REVIEW_FAILED" }))
+    expect(link).toBe("/pulls/pr-1?review=open")
+  })
+
   it("routes PR_MERGED to the PR detail page", () => {
     const link = getNotificationLink(makeNotification({ type: "PR_MERGED" }))
     expect(link).toBe("/pulls/pr-1")

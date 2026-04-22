@@ -18,10 +18,15 @@ const typeConfig: Record<
   string,
   { icon: typeof AtSign; label: string; color: string; bgColor: string }
 > = {
-  MENTION: { icon: AtSign, label: "멘션", color: "text-blue-500", bgColor: "bg-blue-50" },
+  MENTION: {
+    icon: AtSign,
+    label: "멘션",
+    color: "text-blue-500",
+    bgColor: "bg-blue-50",
+  },
   COMMENT_REPLY: {
     icon: MessageSquare,
-    label: "답글",
+    label: "댓글",
     color: "text-green-500",
     bgColor: "bg-green-50",
   },

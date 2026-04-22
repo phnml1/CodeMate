@@ -5,6 +5,45 @@ import { prisma } from "@/lib/prisma";
 import { getRepositoryMemberIds } from "@/lib/repository-access";
 import { upsertReviewNotifications } from "@/lib/review-notifications";
 
+async function notifyReviewResult(params: {
+  pullRequestId: string
+  repoId: string
+  prNumber: number
+  prTitle: string
+  type: "NEW_REVIEW" | "REVIEW_FAILED"
+  message: string
+}) {
+  const repositoryUserIds = await getRepositoryMemberIds(params.repoId)
+  const recipientIds = await getEnabledUserIds(
+    [...new Set(repositoryUserIds)],
+    params.type
+  )
+
+  await Promise.all(
+    recipientIds.map(async (userId) => {
+      const notification = await prisma.notification.create({
+        data: {
+          type: params.type,
+          title:
+            params.type === "NEW_REVIEW"
+              ? "AI review is ready"
+              : "AI review failed",
+          message: params.message,
+          userId,
+          prId: params.pullRequestId,
+        },
+      })
+
+      emitNotification(userId, {
+        ...notification,
+        createdAt: notification.createdAt.toISOString(),
+        prTitle: params.prTitle,
+        prNumber: params.prNumber,
+      })
+    })
+  )
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();

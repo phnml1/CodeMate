@@ -36,7 +36,10 @@ jest.mock("@/lib/webhook-validator", () => ({
 }))
 
 jest.mock("@/lib/ai/analyze", () => ({
-  analyzeReview: jest.fn().mockResolvedValue(undefined),
+  analyzeReview: jest.fn().mockResolvedValue({
+    status: "COMPLETED",
+    reviewId: "review-1",
+  }),
 }))
 
 jest.mock("@/lib/socket/emitter", () => ({
