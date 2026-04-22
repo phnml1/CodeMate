@@ -167,6 +167,7 @@ model Review {
   severity        Severity     @default(LOW)
   issueCount      Int          @default(0)
   status          ReviewStatus @default(PENDING)
+  stage           ReviewStage  @default(QUEUED)
 
   // Relations
   pullRequest     PullRequest  @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
@@ -191,6 +192,15 @@ enum Severity {
 enum ReviewStatus {
   PENDING
   IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum ReviewStage {
+  QUEUED
+  FETCHING_FILES
+  ANALYZING
+  FINALIZING
   COMPLETED
   FAILED
 }

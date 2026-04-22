@@ -6,6 +6,7 @@ import { SYSTEM_PROMPT, buildUserPrompt } from "@/lib/ai/prompts"
 import { parseAIReviewResponse } from "@/lib/ai/parsers"
 import { getRepositoryPrimaryUser } from "@/lib/repository-access"
 import { calculateScore } from "@/lib/scoring"
+import type { ReviewStage } from "@/types/review"
 
 function isActiveReviewConflict(err: unknown): boolean {
   return (
@@ -14,6 +15,22 @@ function isActiveReviewConflict(err: unknown): boolean {
     Array.isArray(err.meta?.target) &&
     (err.meta.target as string[]).includes("review_active_unique")
   )
+}
+
+async function updateReviewStage(
+  reviewId: string,
+  params: {
+    status?: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED"
+    stage: ReviewStage
+  }
+) {
+  await prisma.review.update({
+    where: { id: reviewId },
+    data: {
+      stage: params.stage,
+      ...(params.status ? { status: params.status } : {}),
+    },
+  })
 }
 
 export async function analyzeReview(pullRequestId: string): Promise<void> {
@@ -26,6 +43,7 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
         data: {
           pullRequestId,
           status: "PENDING",
+          stage: "QUEUED",
           aiSuggestions: {},
           qualityScore: 0,
           severity: "LOW",
@@ -46,9 +64,9 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
 
     reviewId = review.id
 
-    await prisma.review.update({
-      where: { id: reviewId },
-      data: { status: "IN_PROGRESS" },
+    await updateReviewStage(reviewId, {
+      status: "IN_PROGRESS",
+      stage: "FETCHING_FILES",
     })
 
     const pr = await prisma.pullRequest.findUnique({
@@ -93,6 +111,11 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
       diff += chunk
     }
 
+    await updateReviewStage(reviewId, {
+      status: "IN_PROGRESS",
+      stage: "ANALYZING",
+    })
+
     const response = await getAnthropicClient().messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 8192,
@@ -119,6 +142,11 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
     const parsed = parseAIReviewResponse(text)
     const { score, overallSeverity, issueCount } = calculateScore(parsed.issues)
 
+    await updateReviewStage(reviewId, {
+      status: "IN_PROGRESS",
+      stage: "FINALIZING",
+    })
+
     await prisma.review.update({
       where: { id: reviewId },
       data: {
@@ -127,6 +155,7 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
         severity: overallSeverity,
         issueCount,
         status: "COMPLETED",
+        stage: "COMPLETED",
       },
     })
   } catch (error) {
@@ -135,7 +164,10 @@ export async function analyzeReview(pullRequestId: string): Promise<void> {
     if (reviewId) {
       await prisma.review.update({
         where: { id: reviewId },
-        data: { status: "FAILED" },
+        data: {
+          status: "FAILED",
+          stage: "FAILED",
+        },
       })
     }
   }
