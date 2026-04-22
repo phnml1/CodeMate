@@ -36,7 +36,10 @@ jest.mock("@/lib/webhook-validator", () => ({
 }))
 
 jest.mock("@/lib/ai/analyze", () => ({
-  analyzeReview: jest.fn().mockResolvedValue(undefined),
+  analyzeReview: jest.fn().mockResolvedValue({
+    status: "COMPLETED",
+    reviewId: "review-1",
+  }),
 }))
 
 jest.mock("@/lib/socket/emitter", () => ({
@@ -158,12 +161,16 @@ describe("POST /api/webhook/github", () => {
   })
 
   it("sends REVIEW_FAILED notifications when analysis fails", async () => {
-    mockedAnalyzeReview.mockRejectedValueOnce(new Error("Claude timeout"))
+    mockedAnalyzeReview.mockResolvedValueOnce({
+      status: "FAILED",
+      reviewId: "review-1",
+      failureReason: "Claude timeout",
+    })
     ;(prisma.notification.create as jest.Mock).mockResolvedValue({
       id: "notif-fail",
       type: "REVIEW_FAILED",
       title: "AI review failed",
-      message: null,
+      message: "Claude timeout",
       isRead: false,
       userId: "user-1",
       prId: "pr-1",

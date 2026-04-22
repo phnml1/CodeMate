@@ -5,6 +5,45 @@ import { prisma } from "@/lib/prisma"
 import { getRepositoryMemberIds } from "@/lib/repository-access"
 import { emitNotification } from "@/lib/socket/emitter"
 
+async function notifyReviewResult(params: {
+  pullRequestId: string
+  repoId: string
+  prNumber: number
+  prTitle: string
+  type: "NEW_REVIEW" | "REVIEW_FAILED"
+  message: string
+}) {
+  const repositoryUserIds = await getRepositoryMemberIds(params.repoId)
+  const recipientIds = await getEnabledUserIds(
+    [...new Set(repositoryUserIds)],
+    params.type
+  )
+
+  await Promise.all(
+    recipientIds.map(async (userId) => {
+      const notification = await prisma.notification.create({
+        data: {
+          type: params.type,
+          title:
+            params.type === "NEW_REVIEW"
+              ? "AI review is ready"
+              : "AI review failed",
+          message: params.message,
+          userId,
+          prId: params.pullRequestId,
+        },
+      })
+
+      emitNotification(userId, {
+        ...notification,
+        createdAt: notification.createdAt.toISOString(),
+        prTitle: params.prTitle,
+        prNumber: params.prNumber,
+      })
+    })
+  )
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -34,34 +73,32 @@ export async function POST(request: Request) {
       )
     }
 
-    analyzeReview(pullRequestId)
-      .then(async () => {
-        const repositoryUserIds = await getRepositoryMemberIds(pr.repoId)
-        const recipientIds = await getEnabledUserIds(
-          [...new Set(repositoryUserIds)],
-          "NEW_REVIEW"
-        )
+    void analyzeReview(pullRequestId)
+      .then(async (result) => {
+        if (result.status === "SKIPPED_ACTIVE") {
+          return
+        }
 
-        await Promise.all(
-          recipientIds.map(async (userId) => {
-            const notification = await prisma.notification.create({
-              data: {
-                type: "NEW_REVIEW",
-                title: "AI review is ready",
-                message: `The AI review for "${pr.title}" is complete.`,
-                userId,
-                prId: pullRequestId,
-              },
-            })
-
-            emitNotification(userId, {
-              ...notification,
-              createdAt: notification.createdAt.toISOString(),
-              prTitle: pr.title,
-              prNumber: pr.number,
-            })
+        if (result.status === "COMPLETED") {
+          await notifyReviewResult({
+            pullRequestId,
+            repoId: pr.repoId,
+            prNumber: pr.number,
+            prTitle: pr.title,
+            type: "NEW_REVIEW",
+            message: `The AI review for "${pr.title}" is complete.`,
           })
-        )
+          return
+        }
+
+        await notifyReviewResult({
+          pullRequestId,
+          repoId: pr.repoId,
+          prNumber: pr.number,
+          prTitle: pr.title,
+          type: "REVIEW_FAILED",
+          message: result.failureReason,
+        })
       })
       .catch((error) => console.error("[analyze] analyzeReview failed:", error))
 

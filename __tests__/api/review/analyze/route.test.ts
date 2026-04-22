@@ -1,6 +1,7 @@
 import { POST } from "@/app/api/review/analyze/route"
 import { prisma } from "@/lib/prisma"
 import * as analyzeModule from "@/lib/ai/analyze"
+import * as emitterModule from "@/lib/socket/emitter"
 import { getRepositoryMemberIds } from "@/lib/repository-access"
 
 jest.mock("@/lib/prisma", () => ({
@@ -29,6 +30,7 @@ jest.mock("@/lib/repository-access", () => ({
 const mockedFindUnique = prisma.pullRequest.findUnique as jest.Mock
 const mockedNotificationCreate = prisma.notification.create as jest.Mock
 const mockedAnalyze = analyzeModule.analyzeReview as jest.Mock
+const mockedEmitNotification = emitterModule.emitNotification as jest.Mock
 const mockedGetRepositoryMemberIds = getRepositoryMemberIds as jest.Mock
 
 function makeRequest(body: object) {
@@ -39,9 +41,15 @@ function makeRequest(body: object) {
   })
 }
 
+async function flushPromises() {
+  await Promise.resolve()
+  await Promise.resolve()
+}
+
 const mockPR = {
   id: "pr-1",
   title: "Fix bug",
+  number: 42,
   repoId: "repo-1",
 }
 
@@ -50,7 +58,10 @@ describe("POST /api/review/analyze", () => {
 
   it("starts review analysis and returns PENDING", async () => {
     mockedFindUnique.mockResolvedValue(mockPR)
-    mockedAnalyze.mockResolvedValue(undefined)
+    mockedAnalyze.mockResolvedValue({
+      status: "COMPLETED",
+      reviewId: "review-1",
+    })
     mockedNotificationCreate.mockResolvedValue({
       id: "notif-1",
       type: "NEW_REVIEW",
@@ -65,11 +76,74 @@ describe("POST /api/review/analyze", () => {
 
     const res = await POST(makeRequest({ pullRequestId: "pr-1" }))
     const body = await res.json()
+    await flushPromises()
 
     expect(res.status).toBe(200)
     expect(body.status).toBe("PENDING")
     expect(mockedAnalyze).toHaveBeenCalledWith("pr-1")
     expect(mockedGetRepositoryMemberIds).toHaveBeenCalledWith("repo-1")
+    expect(mockedNotificationCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ type: "NEW_REVIEW", userId: "user-1" }),
+      })
+    )
+    expect(mockedEmitNotification).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({ type: "NEW_REVIEW" })
+    )
+  })
+
+  it("sends REVIEW_FAILED notifications when analysis fails", async () => {
+    mockedFindUnique.mockResolvedValue(mockPR)
+    mockedAnalyze.mockResolvedValue({
+      status: "FAILED",
+      reviewId: "review-1",
+      failureReason: "Claude timeout",
+    })
+    mockedNotificationCreate.mockResolvedValue({
+      id: "notif-fail",
+      type: "REVIEW_FAILED",
+      title: "AI review failed",
+      message: "Claude timeout",
+      isRead: false,
+      userId: "user-1",
+      prId: "pr-1",
+      commentId: null,
+      createdAt: new Date(),
+    })
+
+    const res = await POST(makeRequest({ pullRequestId: "pr-1" }))
+    await flushPromises()
+
+    expect(res.status).toBe(200)
+    expect(mockedNotificationCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: "REVIEW_FAILED",
+          message: "Claude timeout",
+          userId: "user-1",
+        }),
+      })
+    )
+    expect(mockedEmitNotification).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({ type: "REVIEW_FAILED" })
+    )
+  })
+
+  it("does not notify when an active review already exists", async () => {
+    mockedFindUnique.mockResolvedValue(mockPR)
+    mockedAnalyze.mockResolvedValue({
+      status: "SKIPPED_ACTIVE",
+      reviewId: null,
+    })
+
+    const res = await POST(makeRequest({ pullRequestId: "pr-1" }))
+    await flushPromises()
+
+    expect(res.status).toBe(200)
+    expect(mockedNotificationCreate).not.toHaveBeenCalled()
+    expect(mockedEmitNotification).not.toHaveBeenCalled()
   })
 
   it("returns 400 when pullRequestId is missing", async () => {

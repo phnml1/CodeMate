@@ -173,10 +173,23 @@ export async function POST(request: Request) {
 
     after(async () => {
       try {
-        await analyzeReview(pullRequest.id)
+        const result = await analyzeReview(pullRequest.id)
         recipientIds.forEach((userId) => safeRevalidateDashboard(userId))
 
-        if (recipientIds.length === 0) return
+        if (recipientIds.length === 0 || result.status === "SKIPPED_ACTIVE") return
+
+        if (result.status === "FAILED") {
+          await notifyUsers({
+            userIds: recipientIds,
+            type: "REVIEW_FAILED",
+            title: "AI review failed",
+            message: result.failureReason,
+            prId: pullRequest.id,
+            prTitle: pr.title,
+            prNumber: pr.number,
+          })
+          return
+        }
 
         await notifyUsers({
           userIds: recipientIds,
@@ -189,25 +202,6 @@ export async function POST(request: Request) {
         })
       } catch (error) {
         console.error("[webhook] analyzeReview failed:", error)
-
-        try {
-          if (recipientIds.length === 0) return
-
-          await notifyUsers({
-            userIds: recipientIds,
-            type: "REVIEW_FAILED",
-            title: "AI review failed",
-            message: `The AI review for "${pr.title}" could not be completed.`,
-            prId: pullRequest.id,
-            prTitle: pr.title,
-            prNumber: pr.number,
-          })
-        } catch (notifyError) {
-          console.error(
-            "[webhook] failed to send failure notification:",
-            notifyError
-          )
-        }
       }
     })
 

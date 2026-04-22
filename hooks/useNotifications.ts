@@ -78,7 +78,9 @@ function getToastMessage(notification: BaseNotification) {
 function showNotificationToast(notification: BaseNotification) {
   const toastContent = getToastMessage(notification)
   const action =
-    notification.prId && notification.type === "NEW_REVIEW"
+    notification.prId &&
+    (notification.type === "NEW_REVIEW" ||
+      notification.type === "REVIEW_FAILED")
       ? {
           label: "Open PR",
           onClick: () => {

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import PRDetailLayout from "@/components/pulls/detail/PRDetailLayout";
 import { usePRDetail } from "@/hooks/usePRDetail";
 import { usePRFiles } from "@/hooks/usePRFiles";
 import { useReview } from "@/hooks/useReview";
-import { useQueryClient } from "@tanstack/react-query";
-import PRDetailLayout from "@/components/pulls/detail/PRDetailLayout";
 import { layoutStyles } from "@/lib/styles";
+import type { Review } from "@/types/review";
 
 interface PRDetailContainerProps {
   id: string;
@@ -33,8 +34,18 @@ export default function PRDetailContainer({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pullRequestId: id }),
       });
+
       if (res.ok) {
-        // PENDING 상태로 즉시 반영 → polling + 소켓 알림이 완료 시 자동 갱신
+        queryClient.setQueryData<Review | null>(["review", id], (current) =>
+          current
+            ? {
+                ...current,
+                status: "PENDING",
+                failureReason: null,
+              }
+            : current
+        );
+
         await queryClient.invalidateQueries({ queryKey: ["review", id] });
       }
     } finally {
@@ -45,12 +56,12 @@ export default function PRDetailContainer({
   if (prPending || filesPending) {
     return (
       <div className={`${layoutStyles.detailFrame} animate-pulse`}>
-        <div className="w-72 shrink-0 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900" />
-        <div className="flex-1 p-6 space-y-4">
-          <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded-xl w-2/3" />
-          <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-xl w-1/3" />
-          <div className="h-48 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
-          <div className="h-48 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
+        <div className="w-72 shrink-0 border-r border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900" />
+        <div className="flex-1 space-y-4 p-6">
+          <div className="h-8 w-2/3 rounded-xl bg-slate-200 dark:bg-slate-800" />
+          <div className="h-4 w-1/3 rounded-xl bg-slate-200 dark:bg-slate-800" />
+          <div className="h-48 rounded-2xl bg-slate-200 dark:bg-slate-800" />
+          <div className="h-48 rounded-2xl bg-slate-200 dark:bg-slate-800" />
         </div>
       </div>
     );
@@ -59,9 +70,13 @@ export default function PRDetailContainer({
   if (prError || filesError || !pr || !files) {
     return (
       <div className={`${layoutStyles.detailFrame} items-center justify-center`}>
-        <div className="text-center space-y-2">
-          <p className="text-slate-500 dark:text-slate-400 text-sm">PR 정보를 불러오는 데 실패했습니다.</p>
-          <p className="text-slate-400 dark:text-slate-500 text-xs">잠시 후 다시 시도해주세요.</p>
+        <div className="space-y-2 text-center">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            PR 정보를 불러오는 데 실패했습니다.
+          </p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            잠시 후 다시 시도해 주세요.
+          </p>
         </div>
       </div>
     );

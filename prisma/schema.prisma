@@ -167,6 +167,7 @@ model Review {
   severity        Severity     @default(LOW)
   issueCount      Int          @default(0)
   status          ReviewStatus @default(PENDING)
+  failureReason   String?      @db.Text
 
   // Relations
   pullRequest     PullRequest  @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
