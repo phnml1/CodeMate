@@ -4,6 +4,7 @@ export const SOCKET_METRIC_EVENTS = [
   "comment:new",
   "comment:updated",
   "comment:deleted",
+  "comment:reaction-updated",
   "notification:new",
   "typing:start",
   "typing:stop",

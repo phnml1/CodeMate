@@ -1,12 +1,17 @@
 import type { Server, Socket } from "socket.io"
 import type { Socket as ClientSocket } from "socket.io-client"
-import type { CommentWithAuthor } from "@/types/comment"
+import type { CommentWithAuthor, Reactions } from "@/types/comment"
 import type { BaseNotification } from "@/types/notification"
 
 export interface ServerToClientEvents {
   "comment:new": (comment: CommentWithAuthor) => void
   "comment:updated": (comment: CommentWithAuthor) => void
   "comment:deleted": (data: { commentId: string; prId: string }) => void
+  "comment:reaction-updated": (data: {
+    commentId: string
+    prId: string
+    reactions: Reactions
+  }) => void
   "typing:start": (data: { userId: string; userName: string }) => void
   "typing:stop": (data: { userId: string }) => void
   "inline:typing:start": (data: { userId: string; userName: string; filePath: string; lineNumber: number }) => void

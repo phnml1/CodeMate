@@ -15,15 +15,24 @@ import {
 import { formatDistanceToNow } from "date-fns"
 import { ko } from "date-fns/locale"
 import { Badge } from "@/components/ui/badge"
-import { useCreateComment, useDeleteComment } from "@/hooks/useComments"
+import {
+  useCreateComment,
+  useDeleteComment,
+  useToggleReaction,
+} from "@/hooks/useComments"
 import { usePRDetail } from "@/hooks/usePRDetail"
 import { useRealtimeComments } from "@/hooks/useRealtimeComments"
 import { useSocket } from "@/hooks/useSocket"
 import { useTypingIndicator } from "@/hooks/useTypingIndicator"
 import { recordRender } from "@/lib/measurements/renderCounter"
 import { cn } from "@/lib/utils"
-import type { CommentWithAuthor, MentionUser } from "@/types/comment"
+import type {
+  CommentWithAuthor,
+  MentionUser,
+  ReactionEmoji,
+} from "@/types/comment"
 import CommentRenderMetricsPanel from "./CommentRenderMetricsPanel"
+import ReactionBar from "./ReactionBar"
 
 interface CommentListProps {
   prId: string
@@ -69,7 +78,7 @@ function ConnectionBadge() {
         className="gap-1 border-slate-200 bg-white/80 text-slate-500 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300"
       >
         <span className="size-1.5 rounded-full bg-slate-400" />
-        폴링 모드
+        Polling
       </Badge>
     )
   }
@@ -78,7 +87,7 @@ function ConnectionBadge() {
     return (
       <Badge className="gap-1 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 dark:bg-emerald-500/15 dark:text-emerald-300">
         <Wifi size={12} />
-        실시간 연결
+        Realtime
       </Badge>
     )
   }
@@ -87,7 +96,7 @@ function ConnectionBadge() {
     return (
       <Badge className="gap-1 bg-blue-500/10 text-blue-700 hover:bg-blue-500/10 dark:bg-blue-500/15 dark:text-blue-300">
         <Loader2 size={12} className="animate-spin" />
-        {connectionStatus === "connecting" ? "연결 중" : "재연결 중"}
+        {connectionStatus === "connecting" ? "Connecting" : "Reconnecting"}
       </Badge>
     )
   }
@@ -96,10 +105,10 @@ function ConnectionBadge() {
     return (
       <Badge
         className="gap-1 bg-rose-500/10 text-rose-700 hover:bg-rose-500/10 dark:bg-rose-500/15 dark:text-rose-300"
-        title={connectionError ?? "소켓 연결 오류"}
+        title={connectionError ?? "Socket connection error"}
       >
         <AlertCircle size={12} />
-        연결 오류
+        Error
       </Badge>
     )
   }
@@ -107,7 +116,7 @@ function ConnectionBadge() {
   return (
     <Badge className="gap-1 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10 dark:bg-amber-500/15 dark:text-amber-300">
       <WifiOff size={12} />
-      연결 끊김
+      Offline
     </Badge>
   )
 }
@@ -118,12 +127,14 @@ function ChatBubble({
   currentUserId,
   prId,
   showName,
+  onReaction,
 }: {
   comment: CommentWithAuthor
   isOwn: boolean
   currentUserId: string
   prId: string
   showName: boolean
+  onReaction: (commentId: string, emoji: ReactionEmoji) => void
 }) {
   const deleteComment = useDeleteComment(prId)
   const isPendingComment = isOptimisticComment(comment.id)
@@ -168,7 +179,7 @@ function ChatBubble({
         <div className={cn("flex items-end gap-1", isOwn ? "flex-row-reverse" : "flex-row")}>
           <div
             className={cn(
-              "relative px-3.5 py-2 text-sm leading-relaxed break-words shadow-sm transition-opacity",
+              "relative break-words px-3.5 py-2 text-sm leading-relaxed shadow-sm transition-opacity",
               isOwn
                 ? "rounded-[18px] rounded-br-[4px] bg-blue-500 text-white"
                 : "rounded-[18px] rounded-bl-[4px] border border-slate-100 bg-white text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100",
@@ -185,7 +196,7 @@ function ChatBubble({
                 )}
               >
                 <Loader2 size={10} className="animate-spin" />
-                전송 중
+                Sending...
               </div>
             )}
           </div>
@@ -198,16 +209,17 @@ function ChatBubble({
               )}
             >
               <Loader2 size={10} className="animate-spin" />
-              삭제 중입니다...
+              Deleting...
             </span>
           )}
 
           {isOwn && !isPendingComment && (
             <button
+              type="button"
               className="mb-1 shrink-0 text-slate-300 opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
               onClick={() => deleteComment.mutate(comment.id)}
               disabled={deleteComment.isPending}
-              title="댓글 삭제"
+              title="Delete comment"
             >
               <Trash2 size={12} />
             </button>
@@ -215,8 +227,18 @@ function ChatBubble({
         </div>
 
         <span className={cn("px-2 text-[9px] text-slate-400", isOwn && "text-right")}>
-          {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: ko })}
+          {formatDistanceToNow(new Date(comment.createdAt), {
+            addSuffix: true,
+            locale: ko,
+          })}
         </span>
+
+        <ReactionBar
+          reactions={comment.reactions ?? {}}
+          currentUserId={currentUserId}
+          onToggle={(emoji) => onReaction(comment.id, emoji)}
+          className={cn("px-2", isOwn && "justify-end")}
+        />
 
         {(comment.replies?.length ?? 0) > 0 && (
           <div
@@ -245,7 +267,7 @@ function ChatBubble({
                       {reply.author.name}
                     </span>
                   )}
-                  {renderContent(reply.content, isOwnReply)}
+                  <div>{renderContent(reply.content, isOwnReply)}</div>
                   {isPendingReply && (
                     <div
                       className={cn(
@@ -254,9 +276,15 @@ function ChatBubble({
                       )}
                     >
                       <Loader2 size={10} className="animate-spin" />
-                      전송 중
+                      Sending...
                     </div>
                   )}
+                  <ReactionBar
+                    reactions={reply.reactions ?? {}}
+                    currentUserId={currentUserId}
+                    onToggle={(emoji) => onReaction(reply.id, emoji)}
+                    className={cn("mt-2", isOwnReply && "justify-end")}
+                  />
                 </div>
               )
             })}
@@ -277,6 +305,7 @@ export default function CommentList({
 
   const { data: allComments = [], isLoading } = useRealtimeComments(prId)
   const createComment = useCreateComment(prId)
+  const toggleReaction = useToggleReaction(prId, currentUserId)
   const { names: typingNames, onTyping, onTypingStop } = useTypingIndicator(prId)
   const { connectionStatus, connectionError } = useSocket()
   const { data: pr } = usePRDetail(prId)
@@ -298,7 +327,9 @@ export default function CommentList({
       pr?.repo.owner,
       ...allComments.flatMap((comment) => [
         comment.author,
-        ...(Array.isArray(comment.replies) ? comment.replies : []).map((reply) => reply.author),
+        ...(Array.isArray(comment.replies) ? comment.replies : []).map(
+          (reply) => reply.author
+        ),
       ]),
     ]
 
@@ -320,7 +351,8 @@ export default function CommentList({
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const element = e.currentTarget
-    isAtBottomRef.current = element.scrollHeight - element.scrollTop <= element.clientHeight + 60
+    isAtBottomRef.current =
+      element.scrollHeight - element.scrollTop <= element.clientHeight + 60
   }
 
   const handleSend = useCallback(() => {
@@ -343,6 +375,13 @@ export default function CommentList({
     }
   }
 
+  const handleReaction = useCallback(
+    (commentId: string, emoji: ReactionEmoji) => {
+      toggleReaction.mutate({ commentId, emoji })
+    },
+    [toggleReaction]
+  )
+
   const shouldShowSocketWarning =
     isSocketMode &&
     (connectionStatus === "error" ||
@@ -358,7 +397,9 @@ export default function CommentList({
       >
         <div className="flex items-center gap-2">
           <MessageSquare size={15} className="text-blue-500" />
-          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">댓글</span>
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            Comments
+          </span>
           {generalComments.length > 0 && (
             <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-600 dark:bg-blue-900/40 dark:text-blue-400">
               {generalComments.length}
@@ -382,8 +423,8 @@ export default function CommentList({
               <AlertCircle size={14} className="shrink-0" />
               <span>
                 {connectionStatus === "reconnecting"
-                  ? "실시간 연결을 다시 시도하고 있습니다."
-                  : "실시간 동기화가 지연될 수 있습니다."}
+                  ? "Realtime connection is reconnecting."
+                  : "Realtime sync may be delayed."}
                 {connectionError ? ` ${connectionError}` : ""}
               </span>
             </div>
@@ -396,12 +437,12 @@ export default function CommentList({
           >
             {isLoading ? (
               <div className="flex h-40 items-center justify-center text-sm text-slate-400">
-                댓글을 불러오는 중입니다...
+                Loading comments...
               </div>
             ) : generalComments.length === 0 ? (
               <div className="flex h-40 flex-col items-center justify-center gap-2 text-slate-400">
                 <MessageSquare size={30} className="opacity-20" />
-                <span className="text-sm">첫 번째 댓글을 남겨보세요.</span>
+                <span className="text-sm">Start the conversation</span>
               </div>
             ) : (
               generalComments.map((comment, index) => {
@@ -417,6 +458,7 @@ export default function CommentList({
                       currentUserId={currentUserId}
                       prId={prId}
                       showName={showName}
+                      onReaction={handleReaction}
                     />
                   </div>
                 )
@@ -429,13 +471,13 @@ export default function CommentList({
             <div className="flex items-center gap-1.5 border-t border-slate-100 bg-slate-50 px-4 py-1.5 text-[11px] text-slate-400 dark:border-slate-800 dark:bg-slate-950">
               <span>
                 {typingNames.length === 1
-                  ? `${typingNames[0]}님이 입력 중입니다`
-                  : `${typingNames[0]} 외 ${typingNames.length - 1}명이 입력 중입니다`}
+                  ? `${typingNames[0]} is typing`
+                  : `${typingNames[0]} and ${typingNames.length - 1} more are typing`}
               </span>
               <span className="flex items-end gap-0.5">
-                <span className="h-1 w-1 rounded-full bg-slate-400 animate-bounce [animation-delay:0ms]" />
-                <span className="h-1 w-1 rounded-full bg-slate-400 animate-bounce [animation-delay:150ms]" />
-                <span className="h-1 w-1 rounded-full bg-slate-400 animate-bounce [animation-delay:300ms]" />
+                <span className="h-1 w-1 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
+                <span className="h-1 w-1 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
+                <span className="h-1 w-1 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
               </span>
             </div>
           )}
@@ -452,9 +494,9 @@ export default function CommentList({
                 }}
                 onBlur={onTypingStop}
                 onKeyDown={handleKeyDown}
-                placeholder="댓글을 입력하세요. Enter 전송, Shift+Enter 줄바꿈"
+                placeholder="Write a comment. Enter to send, Shift+Enter for newline"
                 rows={1}
-                className="flex-1 resize-none overflow-hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 transition focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="flex-1 resize-none overflow-hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 style={{ lineHeight: "1.5", minHeight: 38 }}
               />
               <button
@@ -462,7 +504,7 @@ export default function CommentList({
                 onClick={handleSend}
                 disabled={!input.trim() || createComment.isPending}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white shadow-sm transition-colors hover:bg-blue-600 active:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-                title="댓글 전송"
+                title="Send comment"
               >
                 {createComment.isPending ? (
                   <Loader2 size={15} className="animate-spin" />
@@ -475,7 +517,7 @@ export default function CommentList({
             {createComment.isPending && (
               <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                 <Loader2 size={12} className="animate-spin" />
-                댓글을 반영하는 중입니다...
+                Saving comment...
               </div>
             )}
           </div>
