@@ -1,4 +1,10 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  findCommentInThread,
+  normalizeComment,
+  toggleReactionForUser,
+  updateCommentReactionsInThread,
+} from "@/lib/comments/cache"
 import type {
   CommentWithAuthor,
   CommentsListResponse,
@@ -11,18 +17,6 @@ export interface CommentsFilter {
   repoId?: string
   prId?: string
   authorId?: string
-}
-
-function normalizeComment(comment: CommentWithAuthor): CommentWithAuthor {
-  return {
-    ...comment,
-    author: {
-      id: comment.author?.id ?? comment.authorId,
-      name: comment.author?.name ?? null,
-      image: comment.author?.image ?? null,
-    },
-    replies: Array.isArray(comment.replies) ? comment.replies.map(normalizeComment) : [],
-  }
 }
 
 async function fetchAllCommentsPage(
@@ -119,8 +113,9 @@ export function useDeleteComment(prId: string) {
   })
 }
 
-export function useToggleReaction(prId: string) {
+export function useToggleReaction(prId: string, currentUserId: string) {
   const queryClient = useQueryClient()
+
   return useMutation({
     mutationFn: async ({ commentId, emoji }: { commentId: string; emoji: ReactionEmoji }) => {
       const res = await fetch(`/api/comments/${commentId}/reactions`, {
@@ -130,10 +125,48 @@ export function useToggleReaction(prId: string) {
       })
       if (!res.ok) throw new Error("Failed to toggle reaction.")
       const data = await res.json()
-      return data.comment as CommentWithAuthor
+      return normalizeComment(data.comment as CommentWithAuthor)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["comments", prId] })
+    onMutate: async ({ commentId, emoji }) => {
+      await queryClient.cancelQueries({ queryKey: ["comments", prId] })
+
+      const previousComments = queryClient.getQueryData<CommentWithAuthor[]>([
+        "comments",
+        prId,
+      ])
+
+      if (!previousComments) {
+        return { previousComments }
+      }
+
+      const targetComment = findCommentInThread(previousComments, commentId)
+      if (!targetComment) {
+        return { previousComments }
+      }
+
+      const nextReactions = toggleReactionForUser(
+        targetComment.reactions ?? {},
+        emoji,
+        currentUserId
+      )
+
+      queryClient.setQueryData<CommentWithAuthor[]>(["comments", prId], (old) =>
+        old ? updateCommentReactionsInThread(old, commentId, nextReactions) : old
+      )
+
+      return { previousComments }
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousComments) {
+        queryClient.setQueryData(["comments", prId], context.previousComments)
+      }
+    },
+    onSuccess: (comment) => {
+      queryClient.setQueryData<CommentWithAuthor[]>(["comments", prId], (old) =>
+        old
+          ? updateCommentReactionsInThread(old, comment.id, comment.reactions ?? {})
+          : old
+      )
     },
   })
 }

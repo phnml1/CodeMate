@@ -1,4 +1,4 @@
-import type { CommentWithAuthor } from "@/types/comment"
+import type { CommentWithAuthor, Reactions } from "@/types/comment"
 import type { BaseNotification } from "@/types/notification"
 
 function serialize<T>(data: unknown): T {
@@ -36,6 +36,18 @@ export function emitCommentUpdated(prId: string, comment: unknown) {
 
 export function emitCommentDeleted(prId: string, commentId: string) {
   emitToSocket(`pr:${prId}`, "comment:deleted", { commentId, prId })
+}
+
+export function emitCommentReactionUpdated(
+  prId: string,
+  commentId: string,
+  reactions: Reactions
+) {
+  emitToSocket(`pr:${prId}`, "comment:reaction-updated", {
+    commentId,
+    prId,
+    reactions: serialize<Reactions>(reactions),
+  })
 }
 
 export function emitNotification(userId: string, notification: BaseNotification) {
