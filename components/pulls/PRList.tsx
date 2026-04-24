@@ -2,10 +2,10 @@
 
 import { useSearchParams } from "next/navigation";
 
-import { InfiniteScrollTrigger } from "@/components/ui/InfiniteScrollTrigger";
 import { FILTER_TAB_TO_STATUS, type PRFilterTab } from "@/constants";
 import { usePullRequests } from "@/hooks/usePullRequests";
 import { layoutStyles, surfaceStyles } from "@/lib/styles";
+import { InfiniteScrollTrigger } from "@/components/ui/InfiniteScrollTrigger";
 import PRCard from "./PRCard";
 import PRCardSkeleton from "./PRCardSkeleton";
 import PREmptyState from "./PREmptyState";
