@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import type { CommentWithAuthor } from "@/types/comment"
 import {
@@ -8,6 +8,7 @@ import {
   recordHandlerRegistered,
   recordHandlerRemoved,
 } from "@/lib/measurements/socketMetrics"
+import { useSocket } from "./useSocket"
 import { useSocketRoom } from "./useSocketRoom"
 
 function normalizeComment(comment: CommentWithAuthor): CommentWithAuthor {
@@ -28,8 +29,6 @@ async function fetchComments(prId: string): Promise<CommentWithAuthor[]> {
   const data = await res.json()
   return (data.comments as CommentWithAuthor[]).map(normalizeComment)
 }
-
-const isSocketMode = process.env.NEXT_PUBLIC_REALTIME_MODE === "socket"
 
 function appendComment(
   comments: CommentWithAuthor[],
@@ -57,12 +56,14 @@ function appendComment(
 
 export function useRealtimeComments(prId: string) {
   const socket = useSocketRoom(prId)
+  const { fallbackActive, realtimeEnabled } = useSocket()
   const queryClient = useQueryClient()
+  const previousFallbackRef = useRef(fallbackActive)
 
   const query = useQuery({
     queryKey: ["comments", prId],
     queryFn: () => fetchComments(prId),
-    refetchInterval: isSocketMode ? false : 10_000,
+    refetchInterval: realtimeEnabled && !fallbackActive ? false : 10_000,
   })
 
   const handleNew = useCallback(
@@ -136,6 +137,14 @@ export function useRealtimeComments(prId: string) {
       recordHandlerRemoved("comment:deleted")
     }
   }, [socket, handleDeleted, handleNew, handleUpdated])
+
+  useEffect(() => {
+    if (previousFallbackRef.current && !fallbackActive) {
+      void query.refetch()
+    }
+
+    previousFallbackRef.current = fallbackActive
+  }, [fallbackActive, query])
 
   return query
 }

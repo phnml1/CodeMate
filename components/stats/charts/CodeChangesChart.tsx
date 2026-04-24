@@ -10,15 +10,20 @@ import {
   YAxis,
 } from "recharts"
 import { BarChart3 } from "lucide-react"
-
-import { Skeleton } from "@/components/ui/skeleton"
 import { surfaceStyles, textStyles } from "@/lib/styles"
 import { cn } from "@/lib/utils"
 import type { CodeChangesItem } from "@/lib/stats"
+import {
+  StatsChartEmpty,
+  StatsChartError,
+  StatsChartLoading,
+} from "./StatsChartState"
 
 interface CodeChangesChartProps {
   data: CodeChangesItem[]
   loading: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
 function CustomTooltip({
@@ -44,24 +49,22 @@ function CustomTooltip({
       <div className="space-y-1">
         <div className="flex items-center gap-2 text-xs">
           <div className="size-2.5 rounded-full bg-blue-400" />
-          <span className="text-slate-600 dark:text-slate-400">추가:</span>
+          <span className="text-slate-600 dark:text-slate-400">Additions:</span>
           <span className="font-semibold text-emerald-600">
             +{item?.additions?.toLocaleString() ?? 0}
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <div className="size-2.5 rounded-full bg-red-400" />
-          <span className="text-slate-600 dark:text-slate-400">삭제:</span>
+          <span className="text-slate-600 dark:text-slate-400">Deletions:</span>
           <span className="font-semibold text-rose-600">
             -{item?.deletions?.toLocaleString() ?? 0}
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-600 dark:text-slate-400">
-            변경 파일:
-          </span>
+          <span className="text-slate-600 dark:text-slate-400">Changed files:</span>
           <span className="font-semibold text-slate-900 dark:text-slate-50">
-            {item?.files ?? 0}개
+            {item?.files ?? 0}
           </span>
         </div>
       </div>
@@ -72,21 +75,20 @@ function CustomTooltip({
 export default function CodeChangesChart({
   data,
   loading,
+  error,
+  onRetry,
 }: CodeChangesChartProps) {
   return (
     <div className={cn(surfaceStyles.panel, surfaceStyles.panelPadding)}>
       <h3 className={`${textStyles.sectionTitle} mb-4 sm:mb-6`}>
-        코드 변경량 추이
+        Code Changes
       </h3>
       {loading ? (
-        <div className="h-70 w-full sm:h-85">
-          <Skeleton className="h-full w-full rounded-md" />
-        </div>
+        <StatsChartLoading />
+      ) : error ? (
+        <StatsChartError message={error} onRetry={onRetry} />
       ) : data.length === 0 ? (
-        <div className="flex h-70 w-full flex-col items-center justify-center text-slate-400 sm:h-85">
-          <BarChart3 className="mb-3 size-10 text-slate-300" />
-          <p className="text-sm font-medium">데이터가 없습니다</p>
-        </div>
+        <StatsChartEmpty icon={BarChart3} message="No code change data yet." />
       ) : (
         <div className="h-70 w-full sm:h-85">
           <ResponsiveContainer width="100%" height="100%" minHeight={200}>
@@ -116,14 +118,14 @@ export default function CodeChangesChart({
               />
               <Bar
                 dataKey="additions"
-                name="추가"
+                name="Additions"
                 fill="#60a5fa"
                 radius={[4, 4, 0, 0]}
                 maxBarSize={40}
               />
               <Bar
                 dataKey="deletions"
-                name="삭제"
+                name="Deletions"
                 fill="#f87171"
                 radius={[4, 4, 0, 0]}
                 maxBarSize={40}

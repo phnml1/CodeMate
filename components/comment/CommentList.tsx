@@ -3,34 +3,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import {
-  AlertCircle,
   ChevronDown,
   Loader2,
   MessageSquare,
   Send,
   Trash2,
-  Wifi,
-  WifiOff,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ko } from "date-fns/locale"
-import { Badge } from "@/components/ui/badge"
 import { useCreateComment, useDeleteComment } from "@/hooks/useComments"
 import { usePRDetail } from "@/hooks/usePRDetail"
 import { useRealtimeComments } from "@/hooks/useRealtimeComments"
-import { useSocket } from "@/hooks/useSocket"
 import { useTypingIndicator } from "@/hooks/useTypingIndicator"
 import { recordRender } from "@/lib/measurements/renderCounter"
 import { cn } from "@/lib/utils"
 import type { CommentWithAuthor, MentionUser } from "@/types/comment"
+import {
+  SocketConnectionBadge,
+  SocketConnectionNotice,
+} from "@/components/realtime/SocketConnectionStatus"
 import CommentRenderMetricsPanel from "./CommentRenderMetricsPanel"
 
 interface CommentListProps {
   prId: string
   currentUserId: string
 }
-
-const isSocketMode = process.env.NEXT_PUBLIC_REALTIME_MODE === "socket"
 
 function isOptimisticComment(commentId: string) {
   return commentId.startsWith("optimistic-comment-")
@@ -57,59 +54,6 @@ function renderContent(content: string, isOwn: boolean) {
       </span>
     )
   })
-}
-
-function ConnectionBadge() {
-  const { connectionStatus, connectionError } = useSocket()
-
-  if (!isSocketMode) {
-    return (
-      <Badge
-        variant="outline"
-        className="gap-1 border-slate-200 bg-white/80 text-slate-500 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300"
-      >
-        <span className="size-1.5 rounded-full bg-slate-400" />
-        폴링 모드
-      </Badge>
-    )
-  }
-
-  if (connectionStatus === "connected") {
-    return (
-      <Badge className="gap-1 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 dark:bg-emerald-500/15 dark:text-emerald-300">
-        <Wifi size={12} />
-        실시간 연결
-      </Badge>
-    )
-  }
-
-  if (connectionStatus === "connecting" || connectionStatus === "reconnecting") {
-    return (
-      <Badge className="gap-1 bg-blue-500/10 text-blue-700 hover:bg-blue-500/10 dark:bg-blue-500/15 dark:text-blue-300">
-        <Loader2 size={12} className="animate-spin" />
-        {connectionStatus === "connecting" ? "연결 중" : "재연결 중"}
-      </Badge>
-    )
-  }
-
-  if (connectionStatus === "error") {
-    return (
-      <Badge
-        className="gap-1 bg-rose-500/10 text-rose-700 hover:bg-rose-500/10 dark:bg-rose-500/15 dark:text-rose-300"
-        title={connectionError ?? "소켓 연결 오류"}
-      >
-        <AlertCircle size={12} />
-        연결 오류
-      </Badge>
-    )
-  }
-
-  return (
-    <Badge className="gap-1 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10 dark:bg-amber-500/15 dark:text-amber-300">
-      <WifiOff size={12} />
-      연결 끊김
-    </Badge>
-  )
 }
 
 function ChatBubble({
@@ -168,7 +112,7 @@ function ChatBubble({
         <div className={cn("flex items-end gap-1", isOwn ? "flex-row-reverse" : "flex-row")}>
           <div
             className={cn(
-              "relative px-3.5 py-2 text-sm leading-relaxed break-words shadow-sm transition-opacity",
+              "relative break-words px-3.5 py-2 text-sm leading-relaxed shadow-sm transition-opacity",
               isOwn
                 ? "rounded-[18px] rounded-br-[4px] bg-blue-500 text-white"
                 : "rounded-[18px] rounded-bl-[4px] border border-slate-100 bg-white text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100",
@@ -278,7 +222,6 @@ export default function CommentList({
   const { data: allComments = [], isLoading } = useRealtimeComments(prId)
   const createComment = useCreateComment(prId)
   const { names: typingNames, onTyping, onTypingStop } = useTypingIndicator(prId)
-  const { connectionStatus, connectionError } = useSocket()
   const { data: pr } = usePRDetail(prId)
   const [open, setOpen] = useState(true)
   const [input, setInput] = useState("")
@@ -343,12 +286,6 @@ export default function CommentList({
     }
   }
 
-  const shouldShowSocketWarning =
-    isSocketMode &&
-    (connectionStatus === "error" ||
-      connectionStatus === "disconnected" ||
-      connectionStatus === "reconnecting")
-
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <button
@@ -364,7 +301,7 @@ export default function CommentList({
               {generalComments.length}
             </span>
           )}
-          <ConnectionBadge />
+          <SocketConnectionBadge />
         </div>
         <ChevronDown
           size={15}
@@ -377,17 +314,7 @@ export default function CommentList({
 
       {open && (
         <>
-          {shouldShowSocketWarning && (
-            <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-              <AlertCircle size={14} className="shrink-0" />
-              <span>
-                {connectionStatus === "reconnecting"
-                  ? "실시간 연결을 다시 시도하고 있습니다."
-                  : "실시간 동기화가 지연될 수 있습니다."}
-                {connectionError ? ` ${connectionError}` : ""}
-              </span>
-            </div>
-          )}
+          <SocketConnectionNotice />
 
           <div
             onScroll={handleScroll}

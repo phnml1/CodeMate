@@ -2,11 +2,14 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 import { CircleDot } from "lucide-react"
-
-import { Skeleton } from "@/components/ui/skeleton"
 import { surfaceStyles, textStyles } from "@/lib/styles"
 import { cn } from "@/lib/utils"
 import type { PRTrendItem } from "@/lib/stats"
+import {
+  StatsChartEmpty,
+  StatsChartError,
+  StatsChartLoading,
+} from "./StatsChartState"
 
 const STATUS_COLORS: Record<string, string> = {
   Open: "#22c55e",
@@ -18,41 +21,49 @@ const STATUS_COLORS: Record<string, string> = {
 interface PRStatusChartProps {
   data: PRTrendItem[]
   loading: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
-export default function PRStatusChart({ data, loading }: PRStatusChartProps) {
+export default function PRStatusChart({
+  data,
+  loading,
+  error,
+  onRetry,
+}: PRStatusChartProps) {
   const statusData = [
-    { name: "Open", value: data.reduce((s, w) => s + w.open, 0) },
-    { name: "Merged", value: data.reduce((s, w) => s + w.merged, 0) },
-    { name: "Closed", value: data.reduce((s, w) => s + w.closed, 0) },
-    { name: "Draft", value: data.reduce((s, w) => s + w.draft, 0) },
-  ].filter((d) => d.value > 0)
+    { name: "Open", value: data.reduce((sum, week) => sum + week.open, 0) },
+    { name: "Merged", value: data.reduce((sum, week) => sum + week.merged, 0) },
+    { name: "Closed", value: data.reduce((sum, week) => sum + week.closed, 0) },
+    { name: "Draft", value: data.reduce((sum, week) => sum + week.draft, 0) },
+  ].filter((item) => item.value > 0)
 
-  const total = statusData.reduce((s, d) => s + d.value, 0)
+  const total = statusData.reduce((sum, item) => sum + item.value, 0)
 
   return (
-    <div className={cn("lg:col-span-2", surfaceStyles.panel, surfaceStyles.panelPadding)}>
-      <h3 className={`${textStyles.sectionTitle} mb-4 sm:mb-6`}>
-        PR 상태 분포
-      </h3>
+    <div
+      className={cn(
+        "lg:col-span-2",
+        surfaceStyles.panel,
+        surfaceStyles.panelPadding
+      )}
+    >
+      <h3 className={`${textStyles.sectionTitle} mb-4 sm:mb-6`}>PR Status</h3>
       {loading ? (
-        <div className="flex flex-col items-center gap-6">
-          <Skeleton className="size-48 rounded-full" />
-          <div className="w-full space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-4 w-full rounded" />
-            ))}
-          </div>
-        </div>
+        <StatsChartLoading variant="pie" />
+      ) : error ? (
+        <StatsChartError message={error} onRetry={onRetry} />
       ) : statusData.length === 0 ? (
-        <div className="flex h-70 flex-col items-center justify-center text-slate-400">
-          <CircleDot className="mb-3 size-10 text-slate-300" />
-          <p className="text-sm font-medium">데이터가 없습니다</p>
-        </div>
+        <StatsChartEmpty icon={CircleDot} message="No PR status data yet." />
       ) : (
         <div className="flex flex-col items-center gap-6">
           <div className="relative h-55 w-55 sm:h-65 sm:w-65">
-            <ResponsiveContainer width="100%" height="100%" minHeight={200} minWidth={200}>
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minHeight={200}
+              minWidth={200}
+            >
               <PieChart>
                 <Pie
                   data={statusData}
@@ -86,7 +97,7 @@ export default function PRStatusChart({ data, loading }: PRStatusChartProps) {
                           </span>
                         </div>
                         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                          {value}건 ({Math.round((value / total) * 100)}%)
+                          {value} items ({Math.round((value / total) * 100)}%)
                         </p>
                       </div>
                     )
@@ -96,9 +107,9 @@ export default function PRStatusChart({ data, loading }: PRStatusChartProps) {
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-3xl font-bold text-slate-900 dark:text-slate-50 sm:text-4xl">
-                {total}건
+                {total}
               </span>
-              <span className="text-xs text-slate-400 sm:text-sm">전체 PR</span>
+              <span className="text-xs text-slate-400 sm:text-sm">Total PRs</span>
             </div>
           </div>
           <div className="w-full space-y-3 sm:space-y-4">
@@ -114,7 +125,7 @@ export default function PRStatusChart({ data, loading }: PRStatusChartProps) {
                   </span>
                 </div>
                 <span className="text-xs font-bold text-slate-900 dark:text-slate-50 sm:text-sm">
-                  {item.value}건
+                  {item.value} items
                 </span>
               </div>
             ))}

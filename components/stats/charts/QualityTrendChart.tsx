@@ -9,15 +9,20 @@ import {
   YAxis,
 } from "recharts"
 import { TrendingUp } from "lucide-react"
-
-import { Skeleton } from "@/components/ui/skeleton"
 import { surfaceStyles, textStyles } from "@/lib/styles"
 import { cn } from "@/lib/utils"
 import type { QualityTrendItem } from "@/lib/stats"
+import {
+  StatsChartEmpty,
+  StatsChartError,
+  StatsChartLoading,
+} from "./StatsChartState"
 
 interface QualityTrendChartProps {
   data: QualityTrendItem[]
   loading: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
 function CustomTooltip({
@@ -34,7 +39,7 @@ function CustomTooltip({
   return (
     <div className="rounded-md border border-slate-200 bg-white px-5 py-3 text-center shadow-lg dark:border-slate-800 dark:bg-slate-950">
       <div className="text-sm font-bold text-slate-900 dark:text-slate-50">
-        점수: {payload[0].value}점
+        Score: {payload[0].value}
       </div>
       <div className="mt-1 text-xs text-blue-500">{label}</div>
     </div>
@@ -44,21 +49,26 @@ function CustomTooltip({
 export default function QualityTrendChart({
   data,
   loading,
+  error,
+  onRetry,
 }: QualityTrendChartProps) {
   return (
-    <div className={cn("lg:col-span-3", surfaceStyles.panel, surfaceStyles.panelPadding)}>
+    <div
+      className={cn(
+        "lg:col-span-3",
+        surfaceStyles.panel,
+        surfaceStyles.panelPadding
+      )}
+    >
       <h3 className={`${textStyles.sectionTitle} mb-4 sm:mb-6`}>
-        코드 품질 추이
+        Quality Trend
       </h3>
       {loading ? (
-        <div className="h-70 w-full sm:h-85">
-          <Skeleton className="h-full w-full rounded-md" />
-        </div>
+        <StatsChartLoading />
+      ) : error ? (
+        <StatsChartError message={error} onRetry={onRetry} />
       ) : data.length === 0 ? (
-        <div className="flex h-70 w-full flex-col items-center justify-center text-slate-400 sm:h-85">
-          <TrendingUp className="mb-3 size-10 text-slate-300" />
-          <p className="text-sm font-medium">데이터가 없습니다</p>
-        </div>
+        <StatsChartEmpty icon={TrendingUp} message="No quality review data yet." />
       ) : (
         <div className="h-70 w-full sm:h-85">
           <ResponsiveContainer width="100%" height="100%" minHeight={200}>
