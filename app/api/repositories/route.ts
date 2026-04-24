@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
+import { syncRepositoryPullRequests } from "@/lib/pull-request-sync"
 import {
   buildAccessibleRepositoryWhere,
   connectRepositoryToUser,
@@ -149,53 +150,17 @@ export async function POST(request: Request) {
       }
     }
 
-    const existingPullRequestCount = await prisma.pullRequest.count({
-      where: { repoId: repository.id },
-    })
+    try {
+      const octokit = await getOctokit(session.user.id)
 
-    if (existingPullRequestCount === 0) {
-      try {
-        const octokit = await getOctokit(session.user.id)
-        const { data: prs } = await octokit.rest.pulls.list({
-          owner,
-          repo,
-          state: "all",
-          per_page: 100,
-          sort: "updated",
-          direction: "desc",
-        })
-
-        if (prs.length > 0) {
-          await prisma.pullRequest.createMany({
-            data: prs.map((pr) => ({
-              githubId: BigInt(pr.id),
-              number: pr.number,
-              title: pr.title,
-              description: pr.body ?? null,
-              status: pr.draft
-                ? "DRAFT"
-                : pr.state === "closed"
-                  ? pr.merged_at
-                    ? "MERGED"
-                    : "CLOSED"
-                  : "OPEN",
-              baseBranch: pr.base.ref,
-              headBranch: pr.head.ref,
-              additions: 0,
-              deletions: 0,
-              changedFiles: 0,
-              mergedAt: pr.merged_at ? new Date(pr.merged_at) : null,
-              closedAt: pr.closed_at ? new Date(pr.closed_at) : null,
-              githubCreatedAt: pr.created_at ? new Date(pr.created_at) : null,
-              githubUpdatedAt: pr.updated_at ? new Date(pr.updated_at) : null,
-              repoId: repository.id,
-            })),
-            skipDuplicates: true,
-          })
-        }
-      } catch (error) {
-        console.error("[Backfill] failed:", error)
-      }
+      await syncRepositoryPullRequests({
+        octokit,
+        owner,
+        repo,
+        repositoryId: repository.id,
+      })
+    } catch (error) {
+      console.error("[Repository PR sync] failed:", error)
     }
 
     return NextResponse.json(

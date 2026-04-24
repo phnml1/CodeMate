@@ -26,7 +26,7 @@ export default function CommentThread({ comment, prId, currentUserId, mentionUse
   const createComment = useCreateComment(prId)
   const updateComment = useUpdateComment(prId)
   const deleteComment = useDeleteComment(prId)
-  const toggleReaction = useToggleReaction(prId)
+  const toggleReaction = useToggleReaction(prId, currentUserId)
   const toggleResolve = useToggleResolve(prId)
 
   const handleUpdate = (commentId: string, content: string) => {

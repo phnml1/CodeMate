@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useRef } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  appendCommentToThread,
+  normalizeComment,
+  removeCommentFromThread,
+  replaceCommentInThread,
+  updateCommentReactionsInThread,
+} from "@/lib/comments/cache"
 import type { CommentWithAuthor } from "@/types/comment"
 import {
   recordHandlerInvocation,
@@ -10,18 +17,6 @@ import {
 } from "@/lib/measurements/socketMetrics"
 import { useSocket } from "./useSocket"
 import { useSocketRoom } from "./useSocketRoom"
-
-function normalizeComment(comment: CommentWithAuthor): CommentWithAuthor {
-  return {
-    ...comment,
-    author: {
-      id: comment.author?.id ?? comment.authorId,
-      name: comment.author?.name ?? null,
-      image: comment.author?.image ?? null,
-    },
-    replies: Array.isArray(comment.replies) ? comment.replies.map(normalizeComment) : [],
-  }
-}
 
 async function fetchComments(prId: string): Promise<CommentWithAuthor[]> {
   const res = await fetch(`/api/pulls/${prId}/comments`)
@@ -70,7 +65,7 @@ export function useRealtimeComments(prId: string) {
     (comment: CommentWithAuthor) => {
       recordHandlerInvocation("comment:new")
       queryClient.setQueryData<CommentWithAuthor[]>(["comments", prId], (old) =>
-        old ? appendComment(old, comment) : [normalizeComment(comment)]
+        old ? appendCommentToThread(old, comment) : [normalizeComment(comment)]
       )
     },
     [queryClient, prId]
@@ -83,19 +78,7 @@ export function useRealtimeComments(prId: string) {
         const normalizedComment = normalizeComment(comment)
         if (!old) return [normalizedComment]
 
-        return old.map((item) => {
-          if (item.id === normalizedComment.id) return normalizedComment
-
-          const replies = Array.isArray(item.replies) ? item.replies : []
-          if (replies.length === 0) return item
-
-          return {
-            ...item,
-            replies: replies.map((reply) =>
-              reply.id === normalizedComment.id ? normalizedComment : reply
-            ),
-          }
-        })
+        return replaceCommentInThread(old, normalizedComment)
       })
     },
     [queryClient, prId]
@@ -105,14 +88,24 @@ export function useRealtimeComments(prId: string) {
     ({ commentId }: { commentId: string; prId: string }) => {
       recordHandlerInvocation("comment:deleted")
       queryClient.setQueryData<CommentWithAuthor[]>(["comments", prId], (old) =>
-        old
-          ? old
-              .filter((item) => item.id !== commentId)
-              .map((item) => ({
-                ...item,
-                replies: (item.replies ?? []).filter((reply) => reply.id !== commentId),
-              }))
-          : []
+        old ? removeCommentFromThread(old, commentId) : []
+      )
+    },
+    [queryClient, prId]
+  )
+
+  const handleReactionUpdated = useCallback(
+    ({
+      commentId,
+      reactions,
+    }: {
+      commentId: string
+      prId: string
+      reactions: CommentWithAuthor["reactions"]
+    }) => {
+      recordHandlerInvocation("comment:reaction-updated")
+      queryClient.setQueryData<CommentWithAuthor[]>(["comments", prId], (old) =>
+        old ? updateCommentReactionsInThread(old, commentId, reactions) : old
       )
     },
     [queryClient, prId]
@@ -124,19 +117,23 @@ export function useRealtimeComments(prId: string) {
     recordHandlerRegistered("comment:new")
     recordHandlerRegistered("comment:updated")
     recordHandlerRegistered("comment:deleted")
+    recordHandlerRegistered("comment:reaction-updated")
     socket.on("comment:new", handleNew)
     socket.on("comment:updated", handleUpdated)
     socket.on("comment:deleted", handleDeleted)
+    socket.on("comment:reaction-updated", handleReactionUpdated)
 
     return () => {
       socket.off("comment:new", handleNew)
       socket.off("comment:updated", handleUpdated)
       socket.off("comment:deleted", handleDeleted)
+      socket.off("comment:reaction-updated", handleReactionUpdated)
       recordHandlerRemoved("comment:new")
       recordHandlerRemoved("comment:updated")
       recordHandlerRemoved("comment:deleted")
+      recordHandlerRemoved("comment:reaction-updated")
     }
-  }, [socket, handleDeleted, handleNew, handleUpdated])
+  }, [socket, handleDeleted, handleNew, handleReactionUpdated, handleUpdated])
 
   useEffect(() => {
     if (previousFallbackRef.current && !fallbackActive) {

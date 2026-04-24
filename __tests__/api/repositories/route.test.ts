@@ -2,6 +2,7 @@ import { POST } from "@/app/api/repositories/route"
 import { auth } from "@/lib/auth"
 import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
+import { syncRepositoryPullRequests } from "@/lib/pull-request-sync"
 import {
   connectRepositoryToUser,
   isRepositoryMembershipMigrationError,
@@ -22,11 +23,11 @@ jest.mock("@/lib/prisma", () => ({
       create: jest.fn(),
       update: jest.fn(),
     },
-    pullRequest: {
-      count: jest.fn(),
-      createMany: jest.fn(),
-    },
   },
+}))
+
+jest.mock("@/lib/pull-request-sync", () => ({
+  syncRepositoryPullRequests: jest.fn(),
 }))
 
 jest.mock("@/lib/repository-access", () => ({
@@ -39,8 +40,7 @@ const mockedGetOctokit = getOctokit as jest.Mock
 const mockedFindUnique = prisma.repository.findUnique as jest.Mock
 const mockedCreate = prisma.repository.create as jest.Mock
 const mockedUpdate = prisma.repository.update as jest.Mock
-const mockedCount = prisma.pullRequest.count as jest.Mock
-const mockedCreateMany = prisma.pullRequest.createMany as jest.Mock
+const mockedSyncRepositoryPullRequests = syncRepositoryPullRequests as jest.Mock
 const mockedConnectRepositoryToUser = connectRepositoryToUser as jest.Mock
 const mockedIsRepositoryMembershipMigrationError =
   isRepositoryMembershipMigrationError as jest.Mock
@@ -62,15 +62,14 @@ describe("POST /api/repositories", () => {
   it("creates a repository connection", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
     mockedFindUnique.mockResolvedValue(null)
-    mockedCount.mockResolvedValue(0)
-    mockedCreateMany.mockResolvedValue({ count: 0 })
+    mockedSyncRepositoryPullRequests.mockResolvedValue({
+      syncedCount: 0,
+      detailHydratedCount: 0,
+    })
     mockedGetOctokit.mockResolvedValue({
       rest: {
         repos: {
           createWebhook: jest.fn().mockResolvedValue({ data: { id: 9999 } }),
-        },
-        pulls: {
-          list: jest.fn().mockResolvedValue({ data: [] }),
         },
       },
     })
@@ -127,6 +126,12 @@ describe("POST /api/repositories", () => {
       },
       select: expect.any(Object),
     })
+    expect(mockedSyncRepositoryPullRequests).toHaveBeenCalledWith({
+      octokit: expect.any(Object),
+      owner: "user",
+      repo: "my-repo",
+      repositoryId: "repo-1",
+    })
   })
 
   it("returns 401 for anonymous users", async () => {
@@ -171,6 +176,37 @@ describe("POST /api/repositories", () => {
 
     expect(response.status).toBe(409)
     expect(body.error).toContain("already connected")
+  })
+
+  it("syncs PRs when connecting an existing shared repository", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedFindUnique.mockResolvedValue({
+      id: "existing-repo",
+      githubId: BigInt(12345),
+      name: "repo",
+      fullName: "user/repo",
+      description: null,
+      language: null,
+      webhookId: 9999,
+    })
+    mockedConnectRepositoryToUser.mockResolvedValue("created")
+    mockedGetOctokit.mockResolvedValue({ rest: { repos: {} } })
+    mockedSyncRepositoryPullRequests.mockResolvedValue({
+      syncedCount: 12,
+      detailHydratedCount: 3,
+    })
+
+    const response = await POST(
+      createRequest({ githubId: 12345, name: "repo", fullName: "user/repo" })
+    )
+
+    expect(response.status).toBe(201)
+    expect(mockedSyncRepositoryPullRequests).toHaveBeenCalledWith({
+      octokit: expect.any(Object),
+      owner: "user",
+      repo: "repo",
+      repositoryId: "existing-repo",
+    })
   })
 
   it("returns 500 on unexpected errors", async () => {
