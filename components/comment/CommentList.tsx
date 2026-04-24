@@ -11,13 +11,21 @@ import {
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ko } from "date-fns/locale"
-import { useCreateComment, useDeleteComment } from "@/hooks/useComments"
+import {
+  useCreateComment,
+  useDeleteComment,
+  useToggleReaction,
+} from "@/hooks/useComments"
 import { usePRDetail } from "@/hooks/usePRDetail"
 import { useRealtimeComments } from "@/hooks/useRealtimeComments"
 import { useTypingIndicator } from "@/hooks/useTypingIndicator"
 import { recordRender } from "@/lib/measurements/renderCounter"
 import { cn } from "@/lib/utils"
-import type { CommentWithAuthor, MentionUser } from "@/types/comment"
+import type {
+  CommentWithAuthor,
+  MentionUser,
+  ReactionEmoji,
+} from "@/types/comment"
 import {
   SocketConnectionBadge,
   SocketConnectionNotice,
@@ -309,6 +317,13 @@ export default function CommentList({
       handleSend()
     }
   }
+
+  const handleReaction = useCallback(
+    (commentId: string, emoji: ReactionEmoji) => {
+      toggleReaction.mutate({ commentId, emoji })
+    },
+    [toggleReaction]
+  )
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
