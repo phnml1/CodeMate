@@ -3,6 +3,13 @@
 import { useEffect, useSyncExternalStore } from "react"
 import { io } from "socket.io-client"
 import type { TypedClientSocket } from "@/lib/socket/types"
+import {
+  recordSocketConnectCall,
+  recordSocketConnectError,
+  recordSocketConnected,
+  recordSocketCreate,
+  recordSocketDisconnected,
+} from "@/lib/measurements/socketMetrics"
 
 export type SocketConnectionStatus =
   | "idle"
@@ -12,11 +19,17 @@ export type SocketConnectionStatus =
   | "disconnected"
   | "error"
 
+export const SOCKET_FALLBACK_GRACE_MS = 8_000
+
+const realtimeEnabled = process.env.NEXT_PUBLIC_REALTIME_MODE === "socket"
+
 let socket: TypedClientSocket | null = null
 let connected = false
 let connecting = false
+let fallbackActive = !realtimeEnabled
 let status: SocketConnectionStatus = "idle"
 let lastError: string | null = null
+let fallbackTimer: number | null = null
 const listeners = new Set<() => void>()
 
 function notify() {
@@ -46,6 +59,14 @@ function getErrorSnapshot() {
   return lastError
 }
 
+function getFallbackSnapshot() {
+  return fallbackActive
+}
+
+function getRealtimeEnabledSnapshot() {
+  return realtimeEnabled
+}
+
 function getServerSocketSnapshot(): null {
   return null
 }
@@ -60,6 +81,51 @@ function getServerStatusSnapshot(): SocketConnectionStatus {
 
 function getServerErrorSnapshot(): null {
   return null
+}
+
+function getServerFallbackSnapshot() {
+  return !realtimeEnabled
+}
+
+function getServerRealtimeEnabledSnapshot() {
+  return realtimeEnabled
+}
+
+function clearFallbackTimer() {
+  if (fallbackTimer == null) return
+
+  window.clearTimeout(fallbackTimer)
+  fallbackTimer = null
+}
+
+function scheduleFallbackActivation() {
+  if (!realtimeEnabled || fallbackActive || fallbackTimer != null) return
+
+  fallbackTimer = window.setTimeout(() => {
+    fallbackTimer = null
+    fallbackActive = true
+    notify()
+  }, SOCKET_FALLBACK_GRACE_MS)
+}
+
+function syncFallbackState(nextStatus: SocketConnectionStatus) {
+  if (!realtimeEnabled) {
+    clearFallbackTimer()
+    fallbackActive = true
+    return
+  }
+
+  if (
+    nextStatus === "connected" ||
+    nextStatus === "connecting" ||
+    nextStatus === "idle"
+  ) {
+    clearFallbackTimer()
+    fallbackActive = false
+    return
+  }
+
+  scheduleFallbackActivation()
 }
 
 function setConnectionState(
@@ -84,11 +150,14 @@ function setConnectionState(
     lastError = options?.error ?? null
   }
 
+  syncFallbackState(nextStatus)
   notify()
 }
 
 async function connect() {
-  if (process.env.NEXT_PUBLIC_REALTIME_MODE !== "socket") {
+  recordSocketConnectCall()
+
+  if (!realtimeEnabled) {
     setConnectionState("idle", {
       connected: false,
       connecting: false,
@@ -123,13 +192,14 @@ async function connect() {
       setConnectionState("error", {
         connected: false,
         connecting: false,
-        error: "소켓 인증 토큰을 가져오지 못했습니다.",
+        error: "Failed to fetch a socket auth token.",
       })
       return
     }
 
     const { token } = await res.json()
 
+    recordSocketCreate()
     socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000", {
       path: "/socket.io",
       transports: ["websocket"],
@@ -141,6 +211,7 @@ async function connect() {
     })
 
     socket.on("connect", () => {
+      recordSocketConnected()
       setConnectionState("connected", {
         connected: true,
         connecting: false,
@@ -149,6 +220,7 @@ async function connect() {
     })
 
     socket.on("disconnect", (reason) => {
+      recordSocketDisconnected()
       const nextStatus =
         reason === "io client disconnect" ? "disconnected" : "reconnecting"
 
@@ -160,6 +232,7 @@ async function connect() {
     })
 
     socket.on("connect_error", (error) => {
+      recordSocketConnectError(error.message)
       const shouldRetry = socket?.active ?? false
 
       setConnectionState(shouldRetry ? "reconnecting" : "error", {
@@ -174,14 +247,14 @@ async function connect() {
     setConnectionState("error", {
       connected: false,
       connecting: false,
-      error: "소켓 연결 초기화 중 오류가 발생했습니다.",
+      error: "Failed to initialize the socket connection.",
     })
   }
 }
 
 export function useSocket() {
   useEffect(() => {
-    connect()
+    void connect()
   }, [])
 
   const currentSocket = useSyncExternalStore(
@@ -204,11 +277,24 @@ export function useSocket() {
     getErrorSnapshot,
     getServerErrorSnapshot
   )
+  const currentFallbackActive = useSyncExternalStore(
+    subscribe,
+    getFallbackSnapshot,
+    getServerFallbackSnapshot
+  )
+  const currentRealtimeEnabled = useSyncExternalStore(
+    subscribe,
+    getRealtimeEnabledSnapshot,
+    getServerRealtimeEnabledSnapshot
+  )
 
   return {
     socket: currentSocket,
     isConnected,
     connectionStatus,
     connectionError,
+    fallbackActive: currentFallbackActive,
+    realtimeEnabled: currentRealtimeEnabled,
+    degraded: currentRealtimeEnabled && currentFallbackActive,
   }
 }

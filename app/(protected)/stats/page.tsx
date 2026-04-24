@@ -1,21 +1,32 @@
 import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
-import { fetchStatsOverview } from "@/lib/stats"
-import { buildAccessibleRepositoryWhere } from "@/lib/repository-access"
 import StatsClient from "@/components/stats/StatsClient"
+import { prisma } from "@/lib/prisma"
+import { buildAccessibleRepositoryWhere } from "@/lib/repository-access"
+import { fetchStatsOverview, type StatsOverview } from "@/lib/stats"
 
 export const metadata: Metadata = {
-  title: "코드 통계",
-  description: "코드 품질 지표와 리뷰 통계를 분석합니다.",
+  title: "Code Stats",
+  description: "Analyze quality trends, review insights, and pull request activity.",
+}
+
+const EMPTY_OVERVIEW: StatsOverview = {
+  totalPRs: 0,
+  mergedPRs: 0,
+  mergeRate: 0,
+  avgQualityScore: 0,
+  totalIssues: 0,
+  resolvedComments: 0,
+  totalComments: 0,
 }
 
 export default async function StatsPage() {
   const session = await auth()
   if (!session?.user?.id) return null
+
   const repositoryWhere = await buildAccessibleRepositoryWhere(session.user.id)
 
-  const [overview, repos] = await Promise.all([
+  const [overviewResult, reposResult] = await Promise.allSettled([
     fetchStatsOverview(session.user.id, "30d"),
     prisma.repository.findMany({
       where: repositoryWhere,
@@ -24,5 +35,23 @@ export default async function StatsPage() {
     }),
   ])
 
-  return <StatsClient initialOverview={overview} repos={repos} />
+  const initialOverview =
+    overviewResult.status === "fulfilled"
+      ? overviewResult.value
+      : EMPTY_OVERVIEW
+
+  const initialOverviewError =
+    overviewResult.status === "rejected"
+      ? "Failed to load overview metrics on the first render."
+      : null
+
+  const repos = reposResult.status === "fulfilled" ? reposResult.value : []
+
+  return (
+    <StatsClient
+      initialOverview={initialOverview}
+      initialOverviewError={initialOverviewError}
+      repos={repos}
+    />
+  )
 }

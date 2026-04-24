@@ -2,46 +2,56 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 import { CircleDot } from "lucide-react"
-
-import { Skeleton } from "@/components/ui/skeleton"
 import { surfaceStyles, textStyles } from "@/lib/styles"
 import { cn } from "@/lib/utils"
 import type { IssueSeverityItem } from "@/lib/stats"
+import {
+  StatsChartEmpty,
+  StatsChartError,
+  StatsChartLoading,
+} from "./StatsChartState"
 
 interface IssueSeverityChartProps {
   data: IssueSeverityItem[]
   loading: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
 export default function IssueSeverityChart({
   data,
   loading,
+  error,
+  onRetry,
 }: IssueSeverityChartProps) {
-  const total = data.reduce((s, d) => s + d.value, 0)
+  const total = data.reduce((sum, item) => sum + item.value, 0)
 
   return (
-    <div className={cn("lg:col-span-2", surfaceStyles.panel, surfaceStyles.panelPadding)}>
+    <div
+      className={cn(
+        "lg:col-span-2",
+        surfaceStyles.panel,
+        surfaceStyles.panelPadding
+      )}
+    >
       <h3 className={`${textStyles.sectionTitle} mb-4 sm:mb-6`}>
-        이슈 심각도 분포
+        Issue Severity
       </h3>
       {loading ? (
-        <div className="flex flex-col items-center gap-6">
-          <Skeleton className="size-48 rounded-full" />
-          <div className="w-full space-y-3">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-4 w-full rounded" />
-            ))}
-          </div>
-        </div>
+        <StatsChartLoading variant="pie" />
+      ) : error ? (
+        <StatsChartError message={error} onRetry={onRetry} />
       ) : data.length === 0 ? (
-        <div className="flex h-70 flex-col items-center justify-center text-slate-400">
-          <CircleDot className="mb-3 size-10 text-slate-300" />
-          <p className="text-sm font-medium">데이터가 없습니다</p>
-        </div>
+        <StatsChartEmpty icon={CircleDot} message="No issue severity data yet." />
       ) : (
         <div className="flex flex-col items-center gap-6">
           <div className="relative h-55 w-55 sm:h-65 sm:w-65">
-            <ResponsiveContainer width="100%" height="100%" minHeight={200} minWidth={200}>
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minHeight={200}
+              minWidth={200}
+            >
               <PieChart>
                 <Pie
                   data={data}
@@ -75,7 +85,7 @@ export default function IssueSeverityChart({
                           </span>
                         </div>
                         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                          {value}건 ({Math.round((value / total) * 100)}%)
+                          {value} items ({Math.round((value / total) * 100)}%)
                         </p>
                       </div>
                     )
@@ -85,9 +95,9 @@ export default function IssueSeverityChart({
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-3xl font-bold text-slate-900 dark:text-slate-50 sm:text-4xl">
-                {total}건
+                {total}
               </span>
-              <span className="text-xs text-slate-400 sm:text-sm">전체 이슈</span>
+              <span className="text-xs text-slate-400 sm:text-sm">Total Issues</span>
             </div>
           </div>
           <div className="w-full space-y-3 sm:space-y-4">
@@ -103,7 +113,7 @@ export default function IssueSeverityChart({
                   </span>
                 </div>
                 <span className="text-xs font-bold text-slate-900 dark:text-slate-50 sm:text-sm">
-                  {item.value}건
+                  {item.value} items
                 </span>
               </div>
             ))}

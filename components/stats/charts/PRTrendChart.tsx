@@ -9,15 +9,20 @@ import {
   YAxis,
 } from "recharts"
 import { BarChart3 } from "lucide-react"
-
-import { Skeleton } from "@/components/ui/skeleton"
 import { surfaceStyles, textStyles } from "@/lib/styles"
 import { cn } from "@/lib/utils"
 import type { PRTrendItem } from "@/lib/stats"
+import {
+  StatsChartEmpty,
+  StatsChartError,
+  StatsChartLoading,
+} from "./StatsChartState"
 
 interface PRTrendChartProps {
   data: PRTrendItem[]
   loading: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
 function CustomTooltip({
@@ -46,7 +51,7 @@ function CustomTooltip({
             {entry.name}:
           </span>
           <span className="font-semibold text-slate-900 dark:text-slate-50">
-            {entry.value}건
+            {entry.value} items
           </span>
         </div>
       ))}
@@ -54,21 +59,27 @@ function CustomTooltip({
   )
 }
 
-export default function PRTrendChart({ data, loading }: PRTrendChartProps) {
+export default function PRTrendChart({
+  data,
+  loading,
+  error,
+  onRetry,
+}: PRTrendChartProps) {
   return (
-    <div className={cn("lg:col-span-3", surfaceStyles.panel, surfaceStyles.panelPadding)}>
-      <h3 className={`${textStyles.sectionTitle} mb-4 sm:mb-6`}>
-        PR 활동 추이
-      </h3>
+    <div
+      className={cn(
+        "lg:col-span-3",
+        surfaceStyles.panel,
+        surfaceStyles.panelPadding
+      )}
+    >
+      <h3 className={`${textStyles.sectionTitle} mb-4 sm:mb-6`}>PR Trend</h3>
       {loading ? (
-        <div className="h-70 w-full sm:h-85">
-          <Skeleton className="h-full w-full rounded-md" />
-        </div>
+        <StatsChartLoading />
+      ) : error ? (
+        <StatsChartError message={error} onRetry={onRetry} />
       ) : data.length === 0 ? (
-        <div className="flex h-70 w-full flex-col items-center justify-center text-slate-400 sm:h-85">
-          <BarChart3 className="mb-3 size-10 text-slate-300" />
-          <p className="text-sm font-medium">데이터가 없습니다</p>
-        </div>
+        <StatsChartEmpty icon={BarChart3} message="No PR activity yet." />
       ) : (
         <div className="h-70 w-full sm:h-85">
           <ResponsiveContainer width="100%" height="100%" minHeight={200}>
@@ -81,11 +92,23 @@ export default function PRTrendChart({ data, loading }: PRTrendChartProps) {
                   <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
                   <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05} />
                 </linearGradient>
-                <linearGradient id="mergedGradient" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient
+                  id="mergedGradient"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
                   <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
                   <stop offset="100%" stopColor="#22c55e" stopOpacity={0.05} />
                 </linearGradient>
-                <linearGradient id="closedGradient" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient
+                  id="closedGradient"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
                   <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.3} />
                   <stop offset="100%" stopColor="#94a3b8" stopOpacity={0.05} />
                 </linearGradient>

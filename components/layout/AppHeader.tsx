@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import NotificationBell from "@/components/notification/NotificationBell"
+import { SocketConnectionBadge } from "@/components/realtime/SocketConnectionStatus"
 import HeaderSearch from "./HeaderSearch"
 import HeaderProfile from "./HeaderProfile"
 
@@ -17,6 +18,7 @@ export default async function AppHeader() {
         </div>
       </div>
       <div className="flex items-center gap-2 md:gap-4">
+        <SocketConnectionBadge className="hidden lg:inline-flex" />
         <HeaderSearch />
         <NotificationBell />
         <HeaderProfile

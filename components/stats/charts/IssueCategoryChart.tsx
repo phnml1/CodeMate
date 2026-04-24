@@ -10,11 +10,14 @@ import {
   YAxis,
 } from "recharts"
 import { BarChart3 } from "lucide-react"
-
-import { Skeleton } from "@/components/ui/skeleton"
 import { surfaceStyles, textStyles } from "@/lib/styles"
 import { cn } from "@/lib/utils"
 import type { IssueCategoryItem } from "@/lib/stats"
+import {
+  StatsChartEmpty,
+  StatsChartError,
+  StatsChartLoading,
+} from "./StatsChartState"
 
 const CATEGORY_COLORS: Record<string, string> = {
   BUG: "#ef4444",
@@ -35,11 +38,15 @@ const CATEGORY_LABELS: Record<string, string> = {
 interface IssueCategoryChartProps {
   data: IssueCategoryItem[]
   loading: boolean
+  error?: string | null
+  onRetry?: () => void
 }
 
 export default function IssueCategoryChart({
   data,
   loading,
+  error,
+  onRetry,
 }: IssueCategoryChartProps) {
   const chartData = data.map((item) => ({
     ...item,
@@ -50,17 +57,14 @@ export default function IssueCategoryChart({
   return (
     <div className={cn(surfaceStyles.panel, surfaceStyles.panelPadding)}>
       <h3 className={`${textStyles.sectionTitle} mb-4 sm:mb-6`}>
-        이슈 카테고리 분포
+        Issue Categories
       </h3>
       {loading ? (
-        <div className="h-70 w-full sm:h-85">
-          <Skeleton className="h-full w-full rounded-md" />
-        </div>
+        <StatsChartLoading />
+      ) : error ? (
+        <StatsChartError message={error} onRetry={onRetry} />
       ) : chartData.length === 0 ? (
-        <div className="flex h-70 w-full flex-col items-center justify-center text-slate-400 sm:h-85">
-          <BarChart3 className="mb-3 size-10 text-slate-300" />
-          <p className="text-sm font-medium">데이터가 없습니다</p>
-        </div>
+        <StatsChartEmpty icon={BarChart3} message="No issue category data yet." />
       ) : (
         <div className="h-70 w-full sm:h-85">
           <ResponsiveContainer width="100%" height="100%" minHeight={200}>
@@ -101,7 +105,7 @@ export default function IssueCategoryChart({
                         </span>
                       </div>
                       <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                        {item.count}건
+                        {item.count} items
                       </p>
                     </div>
                   )

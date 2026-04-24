@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useCallback, useMemo } from "react"
+import { useEffect, useCallback, useMemo, useRef } from "react"
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useSocket } from "./useSocket"
@@ -17,8 +17,7 @@ import {
   recordHandlerRemoved,
 } from "@/lib/measurements/socketMetrics"
 
-const isSocketMode = process.env.NEXT_PUBLIC_REALTIME_MODE === "socket"
-const toastedNotificationKeys = new Set<string>()
+const toastedNotificationIds = new Set<string>()
 
 async function fetchNotifications(
   type?: NotificationFilterType,
@@ -53,19 +52,6 @@ function getToastMessage(notification: BaseNotification) {
       : null
 
   if (notification.type === "NEW_REVIEW") {
-    if (notification.reviewStatus === "PENDING") {
-      return null
-    }
-
-    if (notification.reviewStatus === "FAILED") {
-      return {
-        title: "AI review failed",
-        description:
-          notification.message ?? "The review process hit an error.",
-        kind: "error" as const,
-      }
-    }
-
     return {
       title: prTitle ? `AI review is ready for "${prTitle}"` : "AI review is ready",
       description: notification.message ?? "Open the PR to review the result.",
@@ -90,10 +76,6 @@ function getToastMessage(notification: BaseNotification) {
 
 function showNotificationToast(notification: BaseNotification) {
   const toastContent = getToastMessage(notification)
-  if (!toastContent) {
-    return
-  }
-
   const action =
     notification.prId &&
     (notification.type === "NEW_REVIEW" ||
@@ -135,13 +117,14 @@ export function useNotifications(
   typeFilter?: NotificationFilterType,
   readFilter?: NotificationFilterRead
 ) {
-  const { socket } = useSocket()
+  const { socket, fallbackActive, realtimeEnabled } = useSocket()
   const queryClient = useQueryClient()
+  const previousFallbackRef = useRef(fallbackActive)
 
   const { data, isLoading } = useQuery({
     queryKey: ["notifications", typeFilter, readFilter],
     queryFn: () => fetchNotifications(typeFilter, readFilter),
-    refetchInterval: isSocketMode ? false : 10_000,
+    refetchInterval: realtimeEnabled && !fallbackActive ? false : 10_000,
   })
 
   const notifications = useMemo(() => data?.notifications ?? [], [data])
@@ -151,58 +134,26 @@ export function useNotifications(
     (base: BaseNotification) => {
       recordHandlerInvocation("notification:new")
 
-      const toastKey = `${base.id}:${base.reviewStatus ?? "none"}`
-      if (!toastedNotificationKeys.has(toastKey)) {
-        toastedNotificationKeys.add(toastKey)
+      if (!toastedNotificationIds.has(base.id)) {
+        toastedNotificationIds.add(base.id)
         showNotificationToast(base)
       }
 
       const notification: Notification = {
         ...base,
-        prTitle: base.prTitle ?? null,
-        prNumber: base.prNumber ?? null,
-        repoFullName: base.repoFullName ?? null,
+        prTitle: null,
+        prNumber: null,
+        repoFullName: null,
       }
 
       queryClient.setQueryData<NotificationsResponse>(
         ["notifications", typeFilter, readFilter],
         (old) => {
-          if (!old) {
-            return {
-              notifications: [notification],
-              unreadCount: notification.isRead ? 0 : 1,
-              total: 1,
-            }
-          }
-
-          const existingIndex = old.notifications.findIndex((n) => n.id === notification.id)
-
-          if (existingIndex === -1) {
-            return {
-              notifications: [notification, ...old.notifications],
-              unreadCount: old.unreadCount + (notification.isRead ? 0 : 1),
-              total: old.total + 1,
-            }
-          }
-
-          const existing = old.notifications[existingIndex]
-          const nextNotifications = [...old.notifications]
-          nextNotifications[existingIndex] = notification
-
-          const unreadDelta =
-            existing.isRead === notification.isRead
-              ? 0
-              : notification.isRead
-                ? -1
-                : 1
-
+          if (!old) return { notifications: [notification], unreadCount: 1, total: 1 }
           return {
-            notifications: [
-              notification,
-              ...nextNotifications.filter((item) => item.id !== notification.id),
-            ],
-            unreadCount: old.unreadCount + unreadDelta,
-            total: old.total,
+            notifications: [notification, ...old.notifications],
+            unreadCount: old.unreadCount + 1,
+            total: old.total + 1,
           }
         }
       )
@@ -222,6 +173,14 @@ export function useNotifications(
       recordHandlerRemoved("notification:new")
     }
   }, [socket, handleNew])
+
+  useEffect(() => {
+    if (previousFallbackRef.current && !fallbackActive) {
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] })
+    }
+
+    previousFallbackRef.current = fallbackActive
+  }, [fallbackActive, queryClient])
 
   const { mutate: markAsRead } = useMutation({
     mutationFn: markAsReadApi,

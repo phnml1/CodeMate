@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   appendCommentToThread,
@@ -15,6 +15,7 @@ import {
   recordHandlerRegistered,
   recordHandlerRemoved,
 } from "@/lib/measurements/socketMetrics"
+import { useSocket } from "./useSocket"
 import { useSocketRoom } from "./useSocketRoom"
 
 async function fetchComments(prId: string): Promise<CommentWithAuthor[]> {
@@ -24,16 +25,40 @@ async function fetchComments(prId: string): Promise<CommentWithAuthor[]> {
   return (data.comments as CommentWithAuthor[]).map(normalizeComment)
 }
 
-const isSocketMode = process.env.NEXT_PUBLIC_REALTIME_MODE === "socket"
+function appendComment(
+  comments: CommentWithAuthor[],
+  comment: CommentWithAuthor
+): CommentWithAuthor[] {
+  const normalizedComment = normalizeComment(comment)
+
+  if (normalizedComment.parentId == null) {
+    if (comments.some((item) => item.id === normalizedComment.id)) return comments
+    return [...comments, normalizedComment]
+  }
+
+  return comments.map((item) => {
+    const replies = Array.isArray(item.replies) ? item.replies : []
+
+    if (item.id === normalizedComment.parentId) {
+      if (replies.some((reply) => reply.id === normalizedComment.id)) return item
+      return { ...item, replies: [...replies, normalizedComment] }
+    }
+
+    if (replies.length === 0) return item
+    return { ...item, replies: appendComment(replies, normalizedComment) }
+  })
+}
 
 export function useRealtimeComments(prId: string) {
   const socket = useSocketRoom(prId)
+  const { fallbackActive, realtimeEnabled } = useSocket()
   const queryClient = useQueryClient()
+  const previousFallbackRef = useRef(fallbackActive)
 
   const query = useQuery({
     queryKey: ["comments", prId],
     queryFn: () => fetchComments(prId),
-    refetchInterval: isSocketMode ? false : 10_000,
+    refetchInterval: realtimeEnabled && !fallbackActive ? false : 10_000,
   })
 
   const handleNew = useCallback(
@@ -109,6 +134,14 @@ export function useRealtimeComments(prId: string) {
       recordHandlerRemoved("comment:reaction-updated")
     }
   }, [socket, handleDeleted, handleNew, handleReactionUpdated, handleUpdated])
+
+  useEffect(() => {
+    if (previousFallbackRef.current && !fallbackActive) {
+      void query.refetch()
+    }
+
+    previousFallbackRef.current = fallbackActive
+  }, [fallbackActive, query])
 
   return query
 }
