@@ -14,6 +14,7 @@ import PRListFooter from "./PRListFooter";
 export default function PRList() {
   const searchParams = useSearchParams();
   const statusTab = (searchParams.get("status") as PRFilterTab) ?? "All";
+  const search = searchParams.get("search") ?? undefined;
   const apiStatus = FILTER_TAB_TO_STATUS[statusTab];
 
   const {
@@ -23,7 +24,7 @@ export default function PRList() {
     isFetchingNextPage,
     isLoading,
     isError,
-  } = usePullRequests(apiStatus);
+  } = usePullRequests({ status: apiStatus, search });
 
   if (isLoading) {
     return (
@@ -38,7 +39,7 @@ export default function PRList() {
   if (isError) {
     return (
       <div className={surfaceStyles.emptyState}>
-        PR 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
+        PR 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
       </div>
     );
   }
@@ -51,23 +52,23 @@ export default function PRList() {
 
   return (
     <div className={layoutStyles.listStack}>
-        {pullRequests.map((pr, index) => (
-          <PRCard key={pr.id} {...pr} animationDelay={index * 75} />
-        ))}
+      {pullRequests.map((pr, index) => (
+        <PRCard key={pr.id} {...pr} animationDelay={index * 75} />
+      ))}
 
-        <InfiniteScrollTrigger
-          onLoadMore={fetchNextPage}
-          hasNextPage={hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          loadingFallback={
-            <div className={layoutStyles.listStack}>
-              <PRCardSkeleton />
-              <PRCardSkeleton />
-            </div>
-          }
-        />
+      <InfiniteScrollTrigger
+        onLoadMore={fetchNextPage}
+        hasNextPage={hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        loadingFallback={
+          <div className={layoutStyles.listStack}>
+            <PRCardSkeleton />
+            <PRCardSkeleton />
+          </div>
+        }
+      />
 
-        {!hasNextPage && <PRListFooter />}
+      {!hasNextPage && <PRListFooter />}
     </div>
   );
 }

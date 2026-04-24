@@ -20,6 +20,7 @@ export async function GET(request: Request) {
 
     const repoId = searchParams.get("repoId") ?? undefined
     const statusParam = searchParams.get("status") ?? undefined
+    const search = searchParams.get("search")?.trim() ?? ""
     const pageParam = parseInt(searchParams.get("page") ?? "1", 10)
     const limitParam = parseInt(
       searchParams.get("limit") ?? String(DEFAULT_LIMIT),
@@ -44,8 +45,30 @@ export async function GET(request: Request) {
     )
 
     const where = {
-      ...accessiblePullRequestWhere,
-      ...(statusParam && { status: statusParam as PRStatus }),
+      AND: [
+        accessiblePullRequestWhere,
+        ...(statusParam ? [{ status: statusParam as PRStatus }] : []),
+        ...(search
+          ? [
+              {
+                OR: [
+                  {
+                    title: {
+                      contains: search,
+                      mode: "insensitive" as const,
+                    },
+                  },
+                  {
+                    description: {
+                      contains: search,
+                      mode: "insensitive" as const,
+                    },
+                  },
+                ],
+              },
+            ]
+          : []),
+      ],
     }
 
     const [total, pullRequests] = await Promise.all([
