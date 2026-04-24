@@ -17,3 +17,13 @@ export interface RepoListResponse {
   repos: GitHubRepo[];
   pagination: RepoPagination;
 }
+
+export interface ConnectedRepository {
+  id: string;
+  name: string;
+  fullName: string;
+}
+
+export interface ConnectedRepositoryListResponse {
+  repositories: ConnectedRepository[];
+}
