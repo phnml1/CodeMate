@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import { parsePatch } from "@/lib/diff";
 import type { PRFile } from "@/types/pulls";
 import type { ReviewIssue } from "@/types/review";
@@ -18,7 +19,7 @@ interface PRDiffViewerProps {
   inlineComments: CommentWithAuthor[];
 }
 
-export default function PRDiffViewer({
+function PRDiffViewer({
   file,
   isActive = false,
   issues = [],
@@ -29,7 +30,7 @@ export default function PRDiffViewer({
 }: PRDiffViewerProps) {
   const collapsed = usePRDetailStore((s) => s.collapsedDiffs[file.filename] ?? false);
   const toggleDiff = usePRDetailStore((s) => s.toggleDiff);
-  const lines = file.patch ? parsePatch(file.patch) : [];
+  const lines = useMemo(() => (file.patch ? parsePatch(file.patch) : []), [file.patch]);
 
   return (
     <div
@@ -69,3 +70,5 @@ export default function PRDiffViewer({
     </div>
   );
 }
+
+export default memo(PRDiffViewer);

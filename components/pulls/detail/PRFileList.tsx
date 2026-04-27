@@ -1,21 +1,29 @@
 "use client";
 
+import { memo } from "react";
 import { ChevronLeft, MessageSquare } from "lucide-react";
 import FileIcon from "./FileIcon";
 import { PR_FILE_STATUS_BADGE } from "@/constants/pulls";
-import type { PRFile } from "@/types/pulls";
+import { usePRCommentGroups } from "@/hooks/pr-detail/usePRCommentGroups";
+import { useCachedPRFiles } from "@/hooks/pr-detail/usePRDetailCachedQueries";
+import { usePRDetailFileNavigation } from "@/hooks/pr-detail/usePRDetailFileNavigation";
+import { usePRDetailStore } from "@/stores/prDetailStore";
 
 interface PRFileListProps {
-  files: PRFile[];
-  selectedFile?: string;
-  onSelectFile?: (filename: string) => void;
-  collapsed?: boolean;
-  onCollapse?: (collapsed: boolean) => void;
-  commentCountsByFile?: Record<string, number>;
+  prId: string;
 }
 
 
-export default function PRFileList({ files, selectedFile, onSelectFile, collapsed = false, onCollapse, commentCountsByFile = {} }: PRFileListProps) {
+function PRFileList({ prId }: PRFileListProps) {
+  const { data: files = [] } = useCachedPRFiles(prId);
+  const selectedFile = usePRDetailStore((state) => state.selectedFile);
+  const collapsed = usePRDetailStore((state) => state.sidebarCollapsed);
+  const setSidebarCollapsed = usePRDetailStore(
+    (state) => state.setSidebarCollapsed
+  );
+  const { selectAndScrollToFile } = usePRDetailFileNavigation();
+  const { commentCountsByFile } = usePRCommentGroups(prId);
+
   return (
     <nav
       aria-label="변경된 파일 목록"
@@ -34,7 +42,7 @@ export default function PRFileList({ files, selectedFile, onSelectFile, collapse
             </span>
           </div>
           <button
-            onClick={() => onCollapse?.(true)}
+            onClick={() => setSidebarCollapsed(true)}
             aria-label="파일 목록 닫기"
             className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-400 transition-colors"
           >
@@ -52,7 +60,7 @@ export default function PRFileList({ files, selectedFile, onSelectFile, collapse
           return (
             <button
               key={file.filename}
-              onClick={() => onSelectFile?.(file.filename)}
+              onClick={() => selectAndScrollToFile(file.filename)}
               aria-label={`${file.filename} 파일로 이동`}
               aria-current={isSelected ? "true" : undefined}
               className={`w-full flex items-center justify-between p-2.5 rounded-xl transition-all text-left group border-l-2 ${
@@ -95,3 +103,5 @@ export default function PRFileList({ files, selectedFile, onSelectFile, collapse
     </nav>
   );
 }
+
+export default memo(PRFileList);
