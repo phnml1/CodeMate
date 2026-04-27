@@ -4,12 +4,12 @@ import type { PRStatus, PullRequestListResponse } from "@/types/pulls";
 
 interface PullRequestFilter {
   status?: PRStatus;
-  repoId?: string;
+  search?: string;
 }
 
 async function fetchPullRequestsPage({
   status,
-  repoId,
+  search,
   page,
 }: PullRequestFilter & {
   page: number;
@@ -17,7 +17,7 @@ async function fetchPullRequestsPage({
   const params = new URLSearchParams();
 
   if (status) params.set("status", status);
-  if (repoId) params.set("repoId", repoId);
+  if (search) params.set("search", search);
   params.set("page", String(page));
 
   const res = await fetch(`/api/pulls?${params}`);
@@ -31,7 +31,7 @@ async function fetchPullRequestsPage({
 
 export function usePullRequests(filter: PullRequestFilter) {
   return useInfiniteQuery({
-    queryKey: ["pullRequests", filter.status, filter.repoId],
+    queryKey: ["pullRequests", filter.status, filter.search],
     queryFn: ({ pageParam }) =>
       fetchPullRequestsPage({ ...filter, page: pageParam }),
     initialPageParam: 1,

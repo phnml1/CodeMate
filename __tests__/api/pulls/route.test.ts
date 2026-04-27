@@ -89,7 +89,9 @@ describe("GET /api/pulls", () => {
     expect(body.pagination).toEqual({ total: 1, page: 1, limit: 20, totalPages: 1 })
     expect(mockedFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { repoId: { in: ["repo-1"] } },
+        where: {
+          AND: [{ repoId: { in: ["repo-1"] } }],
+        },
         skip: 0,
         take: 20,
       })
@@ -124,7 +126,9 @@ describe("GET /api/pulls", () => {
 
     expect(mockedFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { repoId: { in: ["repo-1"] }, status: "OPEN" },
+        where: {
+          AND: [{ repoId: { in: ["repo-1"] } }, { status: "OPEN" }],
+        },
       })
     )
   })
