@@ -1,6 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
+import type { UseQueryOptions } from "@tanstack/react-query";
 
 import type { PullRequest } from "@/types/pulls";
+
+export const prDetailQueryKey = (id: string) => ["pullRequest", id] as const;
+type PRDetailQueryKey = ReturnType<typeof prDetailQueryKey>;
+type PRDetailQueryOptions = Omit<
+  UseQueryOptions<PullRequest, Error, PullRequest, PRDetailQueryKey>,
+  "queryKey" | "queryFn"
+>;
 
 async function fetchPRDetail(id: string): Promise<PullRequest> {
   const res = await fetch(`/api/pulls/${id}`);
@@ -8,9 +16,10 @@ async function fetchPRDetail(id: string): Promise<PullRequest> {
   return res.json();
 }
 
-export function usePRDetail(id: string) {
+export function usePRDetail(id: string, options?: PRDetailQueryOptions) {
   return useQuery({
-    queryKey: ["pullRequest", id],
+    queryKey: prDetailQueryKey(id),
     queryFn: () => fetchPRDetail(id),
+    ...options,
   });
 }

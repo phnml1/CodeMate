@@ -1,11 +1,18 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import type { UseQueryOptions } from "@tanstack/react-query";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 import type { PRFile } from "@/types/pulls";
 
 const GITHUB_REAUTH_REQUIRED = "GITHUB_REAUTH_REQUIRED";
 let githubReauthHandled = false;
+export const prFilesQueryKey = (id: string) => ["pullRequestFiles", id] as const;
+type PRFilesQueryKey = ReturnType<typeof prFilesQueryKey>;
+type PRFilesQueryOptions = Omit<
+  UseQueryOptions<PRFile[], Error, PRFile[], PRFilesQueryKey>,
+  "queryKey" | "queryFn"
+>;
 
 class PRFilesError extends Error {
   code?: string;
@@ -35,9 +42,9 @@ async function fetchPRFiles(id: string): Promise<PRFile[]> {
   return data.files;
 }
 
-export function usePRFiles(id: string) {
+export function usePRFiles(id: string, options?: PRFilesQueryOptions) {
   const query = useQuery({
-    queryKey: ["pullRequestFiles", id],
+    queryKey: prFilesQueryKey(id),
     queryFn: () => fetchPRFiles(id),
     retry: (failureCount, error) => {
       if (error instanceof PRFilesError && error.code === GITHUB_REAUTH_REQUIRED) {
@@ -46,6 +53,7 @@ export function usePRFiles(id: string) {
 
       return failureCount < 3;
     },
+    ...options,
   });
 
   useEffect(() => {

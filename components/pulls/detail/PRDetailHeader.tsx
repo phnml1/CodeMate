@@ -5,16 +5,19 @@ import { ChevronLeft, FileText, Clock } from "lucide-react";
 import { timeAgo } from "@/lib/date";
 import { PR_STATUS_STYLE } from "@/constants/pulls";
 import { SocketConnectionBadge } from "@/components/realtime/SocketConnectionStatus";
+import { useCachedPRDetail } from "@/hooks/pr-detail/usePRDetailCachedQueries";
 import BranchChip from "./BranchChip";
-import type { PullRequest } from "@/types/pulls";
 
 interface PRDetailHeaderProps {
-  pr: PullRequest;
+  prId: string;
   scrolled?: boolean;
 }
 
-export default function PRDetailHeader({ pr, scrolled = false }: PRDetailHeaderProps) {
+export default function PRDetailHeader({ prId, scrolled = false }: PRDetailHeaderProps) {
   const router = useRouter();
+  const { data: pr } = useCachedPRDetail(prId);
+
+  if (!pr) return null;
 
   return (
     <div

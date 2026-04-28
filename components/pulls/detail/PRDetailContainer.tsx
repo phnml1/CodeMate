@@ -1,13 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import PRDetailLayout from "@/components/pulls/detail/PRDetailLayout";
 import { usePRDetail } from "@/hooks/usePRDetail";
 import { usePRFiles } from "@/hooks/usePRFiles";
-import { useReview } from "@/hooks/useReview";
 import { layoutStyles } from "@/lib/styles";
-import type { Review } from "@/types/review";
 
 interface PRDetailContainerProps {
   id: string;
@@ -22,50 +18,6 @@ export default function PRDetailContainer({
 }: PRDetailContainerProps) {
   const { data: pr, isPending: prPending, isError: prError } = usePRDetail(id);
   const { data: files, isPending: filesPending, isError: filesError } = usePRFiles(id);
-  const { data: review, isPending: reviewPending } = useReview(id);
-  const queryClient = useQueryClient();
-  const [isRequesting, setIsRequesting] = useState(false);
-
-  const handleRequestReview = async () => {
-    setIsRequesting(true);
-    try {
-      const res = await fetch("/api/review/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pullRequestId: id }),
-      });
-
-      if (res.ok) {
-        queryClient.setQueryData<Review | null>(["review", id], (current) =>
-          current
-            ? {
-                ...current,
-                status: "PENDING",
-                stage: "QUEUED",
-              }
-            : {
-                id: `pending-${id}`,
-                pullRequestId: id,
-                qualityScore: 0,
-                severity: "LOW",
-                issueCount: 0,
-                status: "PENDING",
-                stage: "QUEUED",
-                aiSuggestions: {
-                  issues: [],
-                  summary: "",
-                  overallAssessment: "COMMENT",
-                },
-                reviewedAt: new Date().toISOString(),
-              }
-        );
-
-        await queryClient.invalidateQueries({ queryKey: ["review", id] });
-      }
-    } finally {
-      setIsRequesting(false);
-    }
-  };
 
   if (prPending || filesPending) {
     return (
@@ -98,12 +50,7 @@ export default function PRDetailContainer({
 
   return (
     <PRDetailLayout
-      pr={pr}
-      files={files}
-      review={review}
-      isReviewPending={reviewPending}
-      onRequestReview={handleRequestReview}
-      isRequesting={isRequesting}
+      id={id}
       commentSlot={commentSlot}
       currentUserId={currentUserId}
     />

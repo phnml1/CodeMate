@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useState } from "react"
+import { Fragment, useMemo, useState } from "react"
 import { Plus } from "lucide-react"
 import { DIFF_ROW_CLASS, DIFF_CODE_CLASS, DIFF_SYMBOL } from "@/constants/diff"
 import { ISSUE_ROW_CLASS, ISSUE_INLINE_CLASS } from "@/constants/review"
@@ -11,6 +11,9 @@ import { ISSUE_ICON } from "@/lib/review-ui"
 import InlineCommentForm from "../../../comment/InlineCommentForm"
 import InlineCommentThread from "../../../comment/InlineCommentThread"
 import { useInlineTypingIndicator } from "@/hooks/useInlineTypingIndicator"
+import { groupCommentsByLine } from "@/lib/pr-detail/commentUtils"
+import { getLineCommentsKey } from "@/lib/pr-detail/diffUtils"
+import { groupIssuesByLine } from "@/lib/pr-detail/reviewUtils"
 
 interface DiffTableProps {
   lines: DiffLine[]
@@ -35,24 +38,11 @@ export default function DiffTable({
   const [openFormLine, setOpenFormLine] = useState<number | null>(null)
 
   const { typingByLine } = useInlineTypingIndicator(prId ?? "")
-
-  const issuesByLine = new Map<number, ReviewIssue[]>()
-  for (const issue of issues) {
-    if (issue.lineNumber != null) {
-      const list = issuesByLine.get(issue.lineNumber) ?? []
-      list.push(issue)
-      issuesByLine.set(issue.lineNumber, list)
-    }
-  }
-
-  const commentsByLine = new Map<number, CommentWithAuthor[]>()
-  for (const comment of inlineComments) {
-    if (comment.lineNumber != null) {
-      const list = commentsByLine.get(comment.lineNumber) ?? []
-      list.push(comment)
-      commentsByLine.set(comment.lineNumber, list)
-    }
-  }
+  const issuesByLine = useMemo(() => groupIssuesByLine(issues), [issues])
+  const commentsByLine = useMemo(
+    () => groupCommentsByLine(inlineComments),
+    [inlineComments]
+  )
 
   const canAddInlineComment = !!(prId && filePath)
 
@@ -143,7 +133,7 @@ export default function DiffTable({
 
               {(() => {
                 if (!filePath || line.newNum == null) return null
-                const lineKey = `${filePath}:${line.newNum}`
+                const lineKey = getLineCommentsKey(filePath, line.newNum)
                 const typingNames = typingByLine.get(lineKey)
                 if (!typingNames?.length) return null
                 const label = typingNames.length === 1
