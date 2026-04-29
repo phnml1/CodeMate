@@ -14,7 +14,7 @@ interface MobileFileDropdownProps {
 export default function MobileFileDropdown({
   prId,
 }: MobileFileDropdownProps) {
-  const { data: files = [] } = useCachedPRFiles(prId);
+  const { data: files = [], isPending, isError } = useCachedPRFiles(prId);
   const { selectAndScrollToFile } = usePRDetailFileNavigation();
   const { selectedFile, mobileFileOpen, setMobileFileOpen } = usePRDetailStore(
     useShallow((state) => ({
@@ -29,7 +29,7 @@ export default function MobileFileDropdown({
       <button
         onClick={() => setMobileFileOpen(!mobileFileOpen)}
         aria-expanded={mobileFileOpen}
-        aria-label="변경된 파일 목록 보기"
+        aria-label="변경 파일 목록 보기"
         className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
       >
         <div className="flex min-w-0 items-center gap-2">
@@ -40,6 +40,10 @@ export default function MobileFileDropdown({
                 {selectedFile}
               </span>
             </>
+          ) : isPending ? (
+            <span className="text-xs text-slate-400">파일 로딩 중...</span>
+          ) : isError ? (
+            <span className="text-xs text-rose-400">파일 로딩 실패</span>
           ) : (
             <span className="text-xs text-slate-400">파일 선택</span>
           )}
@@ -59,29 +63,44 @@ export default function MobileFileDropdown({
 
       {mobileFileOpen && (
         <div className="absolute left-0 right-0 top-full z-30 max-h-64 overflow-y-auto border-b border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900">
-          {files.map((file) => (
-            <button
-              key={file.filename}
-              onClick={() => selectAndScrollToFile(file.filename)}
-              aria-current={selectedFile === file.filename ? "true" : undefined}
-              className={`flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors ${
-                selectedFile === file.filename
-                  ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                  : "text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800"
-              }`}
-            >
-              <div className="flex min-w-0 items-center gap-2">
-                <FileIcon filename={file.filename} size={14} />
-                <span className="truncate text-xs font-bold">
-                  {file.filename}
-                </span>
-              </div>
-              <div className="ml-2 flex shrink-0 items-center gap-1.5 text-[10px] font-black">
-                <span className="text-emerald-600">+{file.additions}</span>
-                <span className="text-rose-500">-{file.deletions}</span>
-              </div>
-            </button>
-          ))}
+          {isPending ? (
+            <div className="space-y-2 p-3" aria-label="파일 목록 로딩 중">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="h-8 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800"
+                />
+              ))}
+            </div>
+          ) : isError ? (
+            <div className="px-4 py-4 text-center text-xs font-medium text-slate-400 dark:text-slate-500">
+              파일 목록을 불러오지 못했습니다.
+            </div>
+          ) : (
+            files.map((file) => (
+              <button
+                key={file.filename}
+                onClick={() => selectAndScrollToFile(file.filename)}
+                aria-current={selectedFile === file.filename ? "true" : undefined}
+                className={`flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors ${
+                  selectedFile === file.filename
+                    ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                    : "text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800"
+                }`}
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <FileIcon filename={file.filename} size={14} />
+                  <span className="truncate text-xs font-bold">
+                    {file.filename}
+                  </span>
+                </div>
+                <div className="ml-2 flex shrink-0 items-center gap-1.5 text-[10px] font-black">
+                  <span className="text-emerald-600">+{file.additions}</span>
+                  <span className="text-rose-500">-{file.deletions}</span>
+                </div>
+              </button>
+            ))
+          )}
         </div>
       )}
     </div>

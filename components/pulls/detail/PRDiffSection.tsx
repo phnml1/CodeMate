@@ -38,7 +38,7 @@ export default function PRDiffSection({
   prId,
   currentUserId,
 }: PRDiffSectionProps) {
-  const { data: files = [] } = useCachedPRFiles(prId);
+  const { data: files = [], isPending, isError } = useCachedPRFiles(prId);
   const { data: review } = useCachedReview(prId);
   const selectedFile = usePRDetailStore((state) => state.selectedFile);
   const { inlineCommentsByFile } = usePRCommentGroups(prId);
@@ -47,6 +47,23 @@ export default function PRDiffSection({
     () => groupIssuesByFile(getIndexedReviewIssues(review)),
     [review]
   );
+
+  if (isPending) {
+    return (
+      <div className="space-y-4" aria-label="diff 로딩 중">
+        <Skeleton className="h-40 w-full rounded-2xl" />
+        <Skeleton className="h-56 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm font-medium text-slate-400 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500">
+        변경 파일을 불러오지 못했습니다.
+      </div>
+    );
+  }
 
   return (
     <>
