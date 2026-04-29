@@ -248,3 +248,200 @@ ReviewSection
 - #156 적용으로 loading responsibility는 더 명확해졌다.
 - 하지만 Lighthouse after 결과상 다음 병목은 `files loading gate`가 아니라 client-side JS/hydration이다.
 - 다음 작업은 `refractor` lazy loading을 별도 이슈/브랜치로 분리하는 것이 가장 객관적이고 측정 가능한 순서다.
+
+## 11. Lighthouse After Refractor Lazy Loading
+
+Report: `PR Detail Page Performance Report - 157 Applied`
+
+- Measured at: `2026-04-29 18:42`
+- Environment: `localhost:3000`
+- Related PR: [#158 perf: PR Detail 리뷰 코드 하이라이터 lazy loading](https://github.com/phnml1/CodeMate/pull/158)
+- Base PR: [#157 perf: PR Detail 헤더 렌더링과 files 로딩 분리](https://github.com/phnml1/CodeMate/pull/157)
+
+### Applied Change
+
+- `components/review/SuggestionCard.tsx`에서 `react-syntax-highlighter`와 `oneDark` static import를 제거했다.
+- `components/review/SuggestionCodeBlock/` 폴더를 추가했다.
+- suggestion card가 열리고 example code block이 실제로 mount될 때만 `SyntaxHighlightedCode`를 dynamic import한다.
+- highlighter import 전 또는 import 실패 시 plain `<pre><code>` fallback을 유지한다.
+- `react-syntax-highlighter` import는 `components/review/SuggestionCodeBlock/SyntaxHighlightedCode.tsx` 한 파일에만 남겼다.
+
+### Metrics Compared With `156 Applied`
+
+| Metric | 156 Applied | 157 Applied | Change |
+|---|---:|---:|---:|
+| Performance | 51 | 53 | +2 |
+| First Contentful Paint | 0.3s | 0.3s | 0 |
+| Largest Contentful Paint | 2.8s | 2.7s | -0.1s |
+| Total Blocking Time | 1,780ms | 1,240ms | -540ms |
+| Cumulative Layout Shift | 0 | 0 | 0 |
+| Speed Index | 2.1s | 1.8s | -0.3s |
+| Server response time observed | 1,551ms | 1,328ms | -223ms |
+| Time to First Byte | 1,560ms | 1,330ms | -230ms |
+| Maximum critical path latency | 1,854ms | 1,600ms | -254ms |
+| Element render delay | 4,370ms | 3,270ms | -1,100ms |
+| Main-thread work | 4.0s | 3.6s | -0.4s |
+| JavaScript execution time | 2.9s | 2.6s | -0.3s |
+| Script Evaluation | 2,671ms | 2,490ms | -181ms |
+| Script Parsing & Compilation | 400ms | 309ms | -91ms |
+| Total network payload | 1,608KiB | 1,286KiB | -322KiB |
+| Long tasks | 13 | 11 | -2 |
+
+### Important Result
+
+`node_modules_refractor_lang_ce18cb0d._.js` no longer appears in the largest payload list or CPU table.
+
+This strongly suggests that the review code highlighter was removed or deferred from the initial PR Detail route. This is the clearest measurable win so far because it directly reduced initial payload, parsing/compilation work, TBT, and element render delay.
+
+### Remaining Bottlenecks After `157 Applied`
+
+| Area | Evidence | Notes |
+|---|---|---|
+| Shared app shell hydration | `ProtectedLayout: 927.49ms`, `AppHeader: 923.68ms`, `AppSidebar: 489.37ms` | Header/sidebar/session/socket/UI primitives are now more visible. |
+| PR detail render cost | `PRDetailPage: 888.60ms` | Detail layout still mounts review, diff, comments, socket room, deep link, modal hosts, and floating button path. |
+| Socket reconnect | `Reconnect: 134.10ms`, `Reconnect: 85.30ms` | Reconnect traces remain one of the biggest post-load costs. |
+| Modal/dynamic loading | `IssueDetailModal` appears twice, `Dialog`, `BailoutToCSR`, `Promise Resolved: 349.50ms` | Modal is currently rendered from both review and diff sections. |
+| New long-task target | `node_modules_1819799d._.js` long tasks up to `432ms` | Need bundle/import tracing to identify the package group. |
+| Session/auth duplication | Multiple `Object.session` measures | `AppHeader`, `AppSidebar`, PR page, APIs, and socket token path all need inspection. |
+
+### Updated Priority
+
+1. Confirm `refractor` stays out of the initial route in follow-up measurements.
+2. Remove duplicated `IssueDetailModal` mounting by introducing a single modal owner.
+3. Reduce socket reconnect work and avoid socket attempts when the configured mode is polling or the socket server is unavailable.
+4. Inspect `node_modules_1819799d._.js` with bundle analysis/import tracing.
+5. Reduce shared app shell hydration by addressing session duplication and tooltip/dropdown mounting.
+
+## 12. Next Candidate: Single Issue Modal Owner
+
+Current modal ownership:
+
+```txt
+ReviewSection
+  owns selectedIssue
+  renders IssueDetailModal
+
+PRDiffSection
+  owns selectedIssue
+  renders IssueDetailModal
+```
+
+This means the PR Detail page has two dynamic imports and two modal hosts for the same conceptual UI: "show selected review issue detail".
+
+Proposed modal ownership:
+
+```txt
+PRDetailLayout
+  owns selectedIssue once
+  renders IssueDetailModal once, only when selectedIssue exists
+
+ReviewSection
+  receives onIssueClick
+  calls onIssueClick(issue)
+
+PRDiffSection
+  receives onIssueClick
+  calls onIssueClick(issue)
+```
+
+Expected impact:
+
+- `IssueDetailModal` and `Dialog` should stop appearing twice.
+- Closed modal code should not mount during initial render.
+- `LoadableComponent`, `BailoutToCSR`, and related promise work should decrease.
+- Review and diff sections become simpler because they no longer own modal state.
+
+## 13. After Single Issue Modal Owner
+
+Related change: `IssueModalHost` owns the issue detail modal once under `PRDetailLayout`.
+
+### Applied Structure
+
+Before:
+
+```txt
+ReviewSection
+  owns selectedIssue
+  dynamic-imports IssueDetailModal
+  renders IssueDetailModal
+
+PRDiffSection
+  owns selectedIssue
+  dynamic-imports IssueDetailModal
+  renders IssueDetailModal
+```
+
+After:
+
+```txt
+PRDetailLayout
+  owns selectedIssue once
+  passes onIssueClick to ReviewSection and PRDiffSection
+  renders IssueModalHost once
+
+IssueModalHost
+  returns null when selectedIssue is null
+  lazy-loads IssueDetailModal only after an issue is selected
+```
+
+### Lighthouse Follow-up Interpretation
+
+The follow-up Lighthouse PDFs after the `158` work show that the modal optimization is working in the intended direction.
+
+Before this change, the `157 Applied` report showed `IssueDetailModal` twice during the initial page lifetime. Those entries were paired with `Dialog`, `BailoutToCSR`, and multiple `LoadableComponent` entries. The report also showed `Promise Resolved: 349.50ms`.
+
+After the single-owner modal structure, the follow-up `158 Applied` measurements no longer show `IssueDetailModal` in User Timing search results. This matches the implementation because `IssueModalHost` returns `null` while no issue is selected:
+
+```tsx
+if (!issue) return null;
+```
+
+### 158 Applied Three-run Average
+
+| Metric | Average |
+|---|---:|
+| Performance | 56 |
+| First Contentful Paint | 0.33s |
+| Largest Contentful Paint | 2.47s |
+| Total Blocking Time | 1,183ms |
+| Cumulative Layout Shift | 0 |
+| Speed Index | 1.5s |
+| Time to First Byte | 957ms |
+| Server response time observed | 949ms |
+| Element render delay | 3,403ms |
+| JavaScript execution time | 2.4s |
+| Main-thread work | about 3.2s |
+| Unused JS savings | 370KiB |
+| Minify JS savings | 267KiB |
+
+Component timing averages from the 2nd and 3rd measurements:
+
+| Component / Measure | Average |
+|---|---:|
+| `ProtectedLayout` | 533.26ms |
+| `AppHeader` | 530.33ms |
+| `PRDetailPage` | 545.05ms |
+| `AppSidebar` | 443.52ms |
+| `Cascading Update` | 108.80ms |
+| `TooltipProviderProvider` | 69.05ms |
+| Long tasks count | about 9.5 |
+
+### Result
+
+- `IssueDetailModal` no longer appears in the initial-load User Timing search results.
+- The previous duplicated `IssueDetailModal` / `Dialog` / `BailoutToCSR` pattern appears removed.
+- `Promise Resolved` improved from `349.50ms` to either `205.70ms` or `11.50ms` in the follow-up reports, though this value still fluctuates.
+- `LoadableComponent` entries still exist, which means other dynamic imports remain.
+- Reconnect work still appears, including values around `85ms` to `120ms`.
+
+### Updated Bottleneck Layer
+
+This change should be treated as a successful cleanup of duplicated modal ownership, not as the final PR Detail performance fix. The remaining bottleneck layer is now:
+
+1. `ProtectedLayout` / `AppHeader` hydration and shared AppShell work.
+2. `PRDetailPage` initial render cost.
+3. `node_modules_1819799d._.js` long tasks.
+4. WebSocket reconnect work during or shortly after initial load.
+5. Repeated Tooltip / Popper / Radix primitive mounting.
+
+Recommended next target: inspect WebSocket connect/reconnect behavior and make sure socket connection and `socket.io-client` loading do not happen on the critical path when the page is measured in polling mode or when realtime is not immediately needed.
