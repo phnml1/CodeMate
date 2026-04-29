@@ -17,9 +17,9 @@ export default function PRDetailContainer({
   currentUserId,
 }: PRDetailContainerProps) {
   const { data: pr, isPending: prPending, isError: prError } = usePRDetail(id);
-  const { data: files, isPending: filesPending, isError: filesError } = usePRFiles(id);
+  usePRFiles(id);
 
-  if (prPending || filesPending) {
+  if (prPending) {
     return (
       <div className={`${layoutStyles.detailFrame} animate-pulse`}>
         <div className="w-72 shrink-0 border-r border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900" />
@@ -33,7 +33,7 @@ export default function PRDetailContainer({
     );
   }
 
-  if (prError || filesError || !pr || !files) {
+  if (prError || !pr) {
     return (
       <div className={`${layoutStyles.detailFrame} items-center justify-center`}>
         <div className="space-y-2 text-center">

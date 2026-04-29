@@ -15,7 +15,7 @@ interface PRFileListProps {
 
 
 function PRFileList({ prId }: PRFileListProps) {
-  const { data: files = [] } = useCachedPRFiles(prId);
+  const { data: files = [], isPending, isError } = useCachedPRFiles(prId);
   const selectedFile = usePRDetailStore((state) => state.selectedFile);
   const collapsed = usePRDetailStore((state) => state.sidebarCollapsed);
   const setSidebarCollapsed = usePRDetailStore(
@@ -53,7 +53,21 @@ function PRFileList({ prId }: PRFileListProps) {
 
       {/* 파일 목록 */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-slate-50 dark:bg-slate-950">
-        {files.map((file) => {
+        {isPending ? (
+          <div className="space-y-2 p-2" aria-label="파일 목록 로딩 중">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-10 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800"
+              />
+            ))}
+          </div>
+        ) : isError ? (
+          <div className="px-3 py-6 text-center text-xs font-medium text-slate-400 dark:text-slate-500">
+            파일 목록을 불러오지 못했습니다.
+          </div>
+        ) : (
+          files.map((file) => {
           const badge = PR_FILE_STATUS_BADGE[file.status];
           const isSelected = file.filename === selectedFile;
           const commentCount = commentCountsByFile[file.filename] ?? 0;
@@ -98,7 +112,7 @@ function PRFileList({ prId }: PRFileListProps) {
               </div>
             </button>
           );
-        })}
+        }))}
       </div>
     </nav>
   );
