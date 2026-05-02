@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Bell } from "lucide-react"
-import { useNotifications } from "@/hooks/useNotifications"
+import { useNotificationSummary, useNotifications } from "@/hooks/useNotifications"
 import { getNotificationLink } from "@/lib/notification-link"
 import NotificationList from "./NotificationList"
 import type { Notification } from "@/types/notification"
@@ -12,7 +12,12 @@ export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const router = useRouter()
-  const { notifications, unreadCount, markAsRead, deleteNotification } = useNotifications()
+  const { unreadCount } = useNotificationSummary()
+  const { notifications, isLoading, markAsRead, deleteNotification } = useNotifications(
+    undefined,
+    undefined,
+    { enabled: isOpen }
+  )
 
   // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
@@ -63,12 +68,18 @@ export default function NotificationBell() {
 
       {isOpen && (
         <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-lg shadow-lg border border-slate-200 z-50">
-          <NotificationList
-            notifications={notifications}
-            onClickItem={handleClickItem}
-            onMarkAllRead={handleMarkAllRead}
-            onDelete={handleDelete}
-          />
+          {isLoading ? (
+            <div className="px-4 py-8 text-center text-sm text-slate-400">
+              Loading notifications...
+            </div>
+          ) : (
+            <NotificationList
+              notifications={notifications}
+              onClickItem={handleClickItem}
+              onMarkAllRead={handleMarkAllRead}
+              onDelete={handleDelete}
+            />
+          )}
           <div className="px-4 py-2 border-t border-slate-100">
             <button
               onClick={() => {
