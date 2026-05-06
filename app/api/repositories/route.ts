@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { githubId, name, fullName, description, language } = body
+    const { githubId, name, fullName, description, language, canAdminister } = body
 
     if (!githubId || !name || !fullName) {
       return NextResponse.json(
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
 
     const [owner, repo] = fullName.split("/")
 
-    if (!repository.webhookId) {
+    if (!repository.webhookId && canAdminister === true) {
       try {
         const octokit = await getOctokit(session.user.id)
         const { data: hook } = await octokit.rest.repos.createWebhook({

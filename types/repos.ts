@@ -3,6 +3,7 @@ export interface GitHubRepo {
   name: string;
   fullName: string;
   language: string | null;
+  canAdminister: boolean;
   isConnected: boolean;
   repositoryId?: string;
 }
