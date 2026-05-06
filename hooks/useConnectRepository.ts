@@ -5,6 +5,7 @@ interface ConnectRepositoryInput {
   name: string
   fullName: string
   language: string | null
+  canAdminister: boolean
 }
 
 async function connectRepository(input: ConnectRepositoryInput) {

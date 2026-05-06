@@ -98,6 +98,7 @@ describe("POST /api/repositories", () => {
         name: "my-repo",
         fullName: "user/my-repo",
         language: "TypeScript",
+        canAdminister: true,
       })
     )
     const body = await response.json()
@@ -126,6 +127,58 @@ describe("POST /api/repositories", () => {
       },
       select: expect.any(Object),
     })
+    expect(mockedSyncRepositoryPullRequests).toHaveBeenCalledWith({
+      octokit: expect.any(Object),
+      owner: "user",
+      repo: "my-repo",
+      repositoryId: "repo-1",
+    })
+    expect(mockedUpdate).toHaveBeenCalledWith({
+      where: { id: "repo-1" },
+      data: { webhookId: 9999 },
+      select: expect.any(Object),
+    })
+  })
+
+  it("skips webhook registration when the user cannot administer the repository", async () => {
+    const createWebhook = jest.fn()
+
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedFindUnique.mockResolvedValue(null)
+    mockedSyncRepositoryPullRequests.mockResolvedValue({
+      syncedCount: 0,
+      detailHydratedCount: 0,
+    })
+    mockedGetOctokit.mockResolvedValue({
+      rest: {
+        repos: {
+          createWebhook,
+        },
+      },
+    })
+    mockedCreate.mockResolvedValue({
+      id: "repo-1",
+      githubId: BigInt(12345),
+      name: "my-repo",
+      fullName: "user/my-repo",
+      description: null,
+      language: "TypeScript",
+      webhookId: null,
+    })
+
+    const response = await POST(
+      createRequest({
+        githubId: 12345,
+        name: "my-repo",
+        fullName: "user/my-repo",
+        language: "TypeScript",
+        canAdminister: false,
+      })
+    )
+
+    expect(response.status).toBe(201)
+    expect(createWebhook).not.toHaveBeenCalled()
+    expect(mockedUpdate).not.toHaveBeenCalled()
     expect(mockedSyncRepositoryPullRequests).toHaveBeenCalledWith({
       octokit: expect.any(Object),
       owner: "user",

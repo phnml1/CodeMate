@@ -54,8 +54,20 @@ describe("GET /api/github/repos", () => {
         repos: {
           listForAuthenticatedUser: jest.fn().mockResolvedValue({
             data: [
-              { id: 1, name: "repo-a", full_name: "user/repo-a", language: "TypeScript" },
-              { id: 2, name: "repo-b", full_name: "user/repo-b", language: "Python" },
+              {
+                id: 1,
+                name: "repo-a",
+                full_name: "user/repo-a",
+                language: "TypeScript",
+                permissions: { admin: true },
+              },
+              {
+                id: 2,
+                name: "repo-b",
+                full_name: "user/repo-b",
+                language: "Python",
+                permissions: { admin: false },
+              },
             ],
             headers: {},
           }),
@@ -74,6 +86,7 @@ describe("GET /api/github/repos", () => {
         name: "repo-a",
         fullName: "user/repo-a",
         language: "TypeScript",
+        canAdminister: true,
         isConnected: true,
         repositoryId: "db-repo-1",
       },
@@ -82,8 +95,8 @@ describe("GET /api/github/repos", () => {
         name: "repo-b",
         fullName: "user/repo-b",
         language: "Python",
+        canAdminister: false,
         isConnected: false,
-        repositoryId: undefined,
       },
     ])
     expect(body.pagination).toEqual({ page: 1, perPage: 20, hasNextPage: false })

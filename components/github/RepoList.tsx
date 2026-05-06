@@ -95,6 +95,7 @@ export default function RepoList({
                 name: repo.name,
                 fullName: repo.fullName,
                 language: repo.language,
+                canAdminister: repo.canAdminister,
               })
             }
             onDisconnect={() => repo.repositoryId && disconnect(repo.repositoryId)}

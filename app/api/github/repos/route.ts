@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
       name: repo.name,
       fullName: repo.full_name,
       language: repo.language,
+      canAdminister: repo.permissions?.admin ?? false,
       isConnected: connectedMap.has(BigInt(repo.id)),
       repositoryId: connectedMap.get(BigInt(repo.id)),
     }))
