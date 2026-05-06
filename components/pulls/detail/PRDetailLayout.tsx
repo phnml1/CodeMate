@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import FloatingCommentsButton from "./FloatingCommentsButton";
+import IssueModalHost from "./IssueModalHost";
 import PRDetailStickyHeader from "./PRDetailStickyHeader";
 import PRDiffSection from "./PRDiffSection";
 import PRFileList from "./PRFileList";
@@ -13,6 +14,7 @@ import { usePRDetailReset } from "@/hooks/pr-detail/usePRDetailReset";
 import { useSocketRoom } from "@/hooks/useSocketRoom";
 import { layoutStyles } from "@/lib/styles";
 import { usePRDetailStore } from "@/stores/prDetailStore";
+import type { ReviewIssue } from "@/types/review";
 
 interface PRDetailLayoutProps {
   id: string;
@@ -34,6 +36,7 @@ export default function PRDetailLayout({
     );
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<ReviewIssue | null>(null);
 
   useSocketRoom(id);
   usePRDetailReset(id);
@@ -51,6 +54,14 @@ export default function PRDetailLayout({
     if (!el || !target) return;
     target.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  const handleIssueClick = useCallback((issue: ReviewIssue) => {
+    setSelectedIssue(issue);
+  }, []);
+
+  const handleIssueClose = useCallback(() => {
+    setSelectedIssue(null);
+  }, []);
 
   return (
     <div className={`${layoutStyles.detailFrame} relative`}>
@@ -76,11 +87,15 @@ export default function PRDetailLayout({
         />
 
         <div className="space-y-4 p-4">
-          <ReviewSection prId={id} />
+          <ReviewSection
+            prId={id}
+            onIssueClick={handleIssueClick}
+          />
 
           <PRDiffSection
             prId={id}
             currentUserId={currentUserId}
+            onIssueClick={handleIssueClick}
           />
 
           <div id="general-comments" className="scroll-mt-36">
@@ -92,6 +107,11 @@ export default function PRDetailLayout({
           prId={id}
           visible={scrolled}
           onClick={handleScrollToComments}
+        />
+
+        <IssueModalHost
+          issue={selectedIssue}
+          onClose={handleIssueClose}
         />
       </div>
     </div>

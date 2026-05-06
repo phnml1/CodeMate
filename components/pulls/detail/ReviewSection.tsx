@@ -3,27 +3,24 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BotMessageSquare, ChevronDown } from "lucide-react";
-import dynamic from "next/dynamic";
 import ReviewPanel from "@/components/review/ReviewPanel";
 import { useReview } from "@/hooks/useReview";
 import type { ReviewIssue } from "@/types/review";
 
-const IssueDetailModal = dynamic(
-  () => import("@/components/review/IssueDetailModal"),
-  { ssr: false }
-);
-
 interface ReviewSectionProps {
   prId: string;
+  onIssueClick: (issue: ReviewIssue) => void;
 }
 
-export default function ReviewSection({ prId }: ReviewSectionProps) {
+export default function ReviewSection({
+  prId,
+  onIssueClick,
+}: ReviewSectionProps) {
   const { data: review } = useReview(prId);
   const searchParams = useSearchParams();
   const [reviewOpen, setReviewOpen] = useState(
     () => searchParams.get("review") === "open"
   );
-  const [selectedIssue, setSelectedIssue] = useState<ReviewIssue | null>(null);
 
   useEffect(() => {
     if (searchParams.get("review") !== "open") return;
@@ -68,16 +65,11 @@ export default function ReviewSection({ prId }: ReviewSectionProps) {
           <div className="p-4">
             <ReviewPanel
               prId={prId}
-              onIssueClick={setSelectedIssue}
+              onIssueClick={onIssueClick}
             />
           </div>
         )}
       </div>
-
-      <IssueDetailModal
-        issue={selectedIssue}
-        onClose={() => setSelectedIssue(null)}
-      />
     </>
   );
 }

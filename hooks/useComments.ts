@@ -1,10 +1,12 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  appendCommentToThread,
   findCommentInThread,
   normalizeComment,
   toggleReactionForUser,
   updateCommentReactionsInThread,
 } from "@/lib/comments/cache"
+import { useSocketState } from "./useSocket"
 import type {
   CommentWithAuthor,
   CommentsListResponse,
@@ -63,6 +65,8 @@ export function useComments(prId: string) {
 
 export function useCreateComment(prId: string) {
   const queryClient = useQueryClient()
+  const { fallbackActive, realtimeEnabled } = useSocketState()
+  const shouldPatchCommentCache = !realtimeEnabled || fallbackActive
 
   return useMutation({
     mutationFn: async (input: CreateCommentInput) => {
@@ -74,6 +78,13 @@ export function useCreateComment(prId: string) {
       if (!res.ok) throw new Error("Failed to create comment.")
       const data = await res.json()
       return normalizeComment(data.comment as CommentWithAuthor)
+    },
+    onSuccess: (comment) => {
+      if (!shouldPatchCommentCache) return
+
+      queryClient.setQueryData<CommentWithAuthor[]>(["comments", prId], (old) =>
+        old ? appendCommentToThread(old, comment) : [comment]
+      )
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["comments", prId] })

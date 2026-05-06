@@ -31,6 +31,10 @@ export interface NotificationsResponse {
   total: number
 }
 
+export interface NotificationSummaryResponse {
+  unreadCount: number
+}
+
 export interface NotificationSetting {
   mentionEnabled: boolean
   newReviewEnabled: boolean

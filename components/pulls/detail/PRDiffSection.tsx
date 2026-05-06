@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -21,28 +21,24 @@ const PRDiffViewer = dynamic(() => import("./PRDiffViewer"), {
   loading: () => <Skeleton className="h-96 w-full rounded-lg" />,
 });
 
-const IssueDetailModal = dynamic(
-  () => import("@/components/review/IssueDetailModal"),
-  { ssr: false }
-);
-
 const EMPTY_ISSUES: ReviewIssue[] = [];
 const EMPTY_COMMENTS: CommentWithAuthor[] = [];
 
 interface PRDiffSectionProps {
   prId: string;
   currentUserId: string;
+  onIssueClick: (issue: ReviewIssue) => void;
 }
 
 export default function PRDiffSection({
   prId,
   currentUserId,
+  onIssueClick,
 }: PRDiffSectionProps) {
   const { data: files = [], isPending, isError } = useCachedPRFiles(prId);
   const { data: review } = useCachedReview(prId);
   const selectedFile = usePRDetailStore((state) => state.selectedFile);
   const { inlineCommentsByFile } = usePRCommentGroups(prId);
-  const [selectedIssue, setSelectedIssue] = useState<ReviewIssue | null>(null);
   const issuesByFile = useMemo(
     () => groupIssuesByFile(getIndexedReviewIssues(review)),
     [review]
@@ -73,17 +69,12 @@ export default function PRDiffSection({
           file={file}
           isActive={selectedFile === file.filename}
           issues={issuesByFile.get(file.filename) ?? EMPTY_ISSUES}
-          onIssueClick={setSelectedIssue}
+          onIssueClick={onIssueClick}
           prId={prId}
           currentUserId={currentUserId}
           inlineComments={inlineCommentsByFile[file.filename] ?? EMPTY_COMMENTS}
         />
       ))}
-
-      <IssueDetailModal
-        issue={selectedIssue}
-        onClose={() => setSelectedIssue(null)}
-      />
     </>
   );
 }

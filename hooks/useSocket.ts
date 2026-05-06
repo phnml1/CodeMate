@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useSyncExternalStore } from "react"
-import { io } from "socket.io-client"
 import type { TypedClientSocket } from "@/lib/socket/types"
 import {
   recordSocketConnectCall,
@@ -30,6 +29,7 @@ let fallbackActive = !realtimeEnabled
 let status: SocketConnectionStatus = "idle"
 let lastError: string | null = null
 let fallbackTimer: number | null = null
+let socketAttemptBlocked = false
 const listeners = new Set<() => void>()
 
 function notify() {
@@ -98,13 +98,31 @@ function clearFallbackTimer() {
   fallbackTimer = null
 }
 
+function stopSocketConnection() {
+  if (!socket) return
+
+  const currentSocket = socket
+  socket = null
+  currentSocket.removeAllListeners()
+  currentSocket.disconnect()
+}
+
+function activatePollingFallback() {
+  clearFallbackTimer()
+  socketAttemptBlocked = true
+  fallbackActive = true
+  connected = false
+  connecting = false
+  stopSocketConnection()
+  notify()
+}
+
 function scheduleFallbackActivation() {
   if (!realtimeEnabled || fallbackActive || fallbackTimer != null) return
 
   fallbackTimer = window.setTimeout(() => {
     fallbackTimer = null
-    fallbackActive = true
-    notify()
+    activatePollingFallback()
   }, SOCKET_FALLBACK_GRACE_MS)
 }
 
@@ -166,6 +184,14 @@ async function connect() {
     return
   }
 
+  if (socketAttemptBlocked) {
+    fallbackActive = true
+    connected = false
+    connecting = false
+    notify()
+    return
+  }
+
   if (socket) {
     if (!socket.connected && !connecting) {
       setConnectionState("reconnecting", {
@@ -198,6 +224,7 @@ async function connect() {
     }
 
     const { token } = await res.json()
+    const { io } = await import("socket.io-client")
 
     recordSocketCreate()
     socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000", {
@@ -252,11 +279,7 @@ async function connect() {
   }
 }
 
-export function useSocket() {
-  useEffect(() => {
-    void connect()
-  }, [])
-
+export function useSocketState() {
   const currentSocket = useSyncExternalStore(
     subscribe,
     getSocketSnapshot,
@@ -297,4 +320,17 @@ export function useSocket() {
     realtimeEnabled: currentRealtimeEnabled,
     degraded: currentRealtimeEnabled && currentFallbackActive,
   }
+}
+
+export function useEnsureSocketConnection() {
+  useEffect(() => {
+    if (!realtimeEnabled) return
+
+    void connect()
+  }, [])
+}
+
+export function useSocket() {
+  useEnsureSocketConnection()
+  return useSocketState()
 }
