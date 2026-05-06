@@ -20,7 +20,7 @@ export default async function AppHeader() {
       <div className="flex items-center gap-2 md:gap-4">
         <SocketConnectionBadge className="hidden lg:inline-flex" />
         <HeaderSearch />
-        <NotificationBell />
+        {user?.id ? <NotificationBell /> : null}
         <HeaderProfile
           user={user ? { name: user.name, email: user.email, image: user.image } : undefined}
         />
