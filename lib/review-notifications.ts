@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import {
+  notificationCompatSelect,
+  toBaseNotification,
+} from "@/lib/notifications/compat";
 import { emitNotification } from "@/lib/socket/emitter";
 import type { NotificationReviewStatus } from "@/types/notification";
 
@@ -58,25 +62,24 @@ export async function upsertReviewNotifications(params: {
               title: content.title,
               message: content.message,
               isRead: false,
-              reviewStatus: params.status,
               createdAt: new Date(),
             },
+            select: notificationCompatSelect,
           })
         : await prisma.notification.create({
             data: {
               type: "NEW_REVIEW",
-              reviewStatus: params.status,
               title: content.title,
               message: content.message,
               isRead: false,
               userId,
               prId: params.prId,
             },
+            select: notificationCompatSelect,
           });
 
       emitNotification(userId, {
-        ...notification,
-        createdAt: notification.createdAt.toISOString(),
+        ...toBaseNotification(notification, params.status),
         prTitle: params.prTitle,
         prNumber: params.prNumber,
       });

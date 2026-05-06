@@ -22,7 +22,10 @@ export async function DELETE(
     return Response.json({ error: "Notification not found" }, { status: 404 })
   }
 
-  await prisma.notification.delete({ where: { id } })
+  await prisma.notification.delete({
+    where: { id },
+    select: { id: true },
+  })
 
   return Response.json({ success: true })
 }

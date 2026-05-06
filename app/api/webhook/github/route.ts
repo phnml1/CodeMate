@@ -2,6 +2,10 @@ import { revalidateTag } from "next/cache"
 import { NextResponse, after } from "next/server"
 import { analyzeReview } from "@/lib/ai/analyze"
 import { getEnabledUserIds } from "@/lib/notification-settings"
+import {
+  notificationCompatSelect,
+  toBaseNotification,
+} from "@/lib/notifications/compat"
 import { prisma } from "@/lib/prisma"
 import { getRepositoryMemberIds } from "@/lib/repository-access"
 import { upsertReviewNotifications } from "@/lib/review-notifications"
@@ -55,11 +59,11 @@ async function notifyUsers(params: {
           userId,
           prId: params.prId,
         },
+        select: notificationCompatSelect,
       })
 
       emitNotification(userId, {
-        ...notification,
-        createdAt: notification.createdAt.toISOString(),
+        ...toBaseNotification(notification),
         prTitle: params.prTitle,
         prNumber: params.prNumber,
       })
