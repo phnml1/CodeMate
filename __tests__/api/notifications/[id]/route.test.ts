@@ -64,7 +64,10 @@ describe("DELETE /api/notifications/[id]", () => {
 
     expect(res.status).toBe(200)
     expect(body.success).toBe(true)
-    expect(mockedDelete).toHaveBeenCalledWith({ where: { id: "notif-1" } })
+    expect(mockedDelete).toHaveBeenCalledWith({
+      where: { id: "notif-1" },
+      select: { id: true },
+    })
   })
 
   it("다른 사용자의 알림은 삭제할 수 없다", async () => {

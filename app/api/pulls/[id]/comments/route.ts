@@ -1,5 +1,9 @@
 import { auth } from "@/lib/auth"
 import { getEnabledUserIds } from "@/lib/notification-settings"
+import {
+  notificationCompatSelect,
+  toBaseNotification,
+} from "@/lib/notifications/compat"
 import { prisma } from "@/lib/prisma"
 import {
   buildAccessiblePullRequestWhere,
@@ -27,12 +31,10 @@ async function createNotificationsForUsers(params: {
           prId: params.prId,
           commentId: params.commentId,
         },
+        select: notificationCompatSelect,
       })
 
-      emitNotification(userId, {
-        ...notification,
-        createdAt: notification.createdAt.toISOString(),
-      })
+      emitNotification(userId, toBaseNotification(notification))
     })
   )
 }

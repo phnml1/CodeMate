@@ -1,4 +1,8 @@
 import { auth } from "@/lib/auth"
+import {
+  notificationCompatSelect,
+  toBaseNotification,
+} from "@/lib/notifications/compat"
 import { prisma } from "@/lib/prisma"
 import type { NotificationType } from "@/types/notification"
 
@@ -28,6 +32,7 @@ export async function GET(request: Request) {
   const [notifications, total, unreadCount] = await Promise.all([
     prisma.notification.findMany({
       where,
+      select: notificationCompatSelect,
       orderBy: [{ isRead: "asc" }, { createdAt: "desc" }],
       take: 50,
     }),
@@ -65,8 +70,7 @@ export async function GET(request: Request) {
     notifications: notifications.map((n) => {
       const pr = n.prId ? prMap.get(n.prId) : null
       return {
-        ...n,
-        createdAt: n.createdAt.toISOString(),
+        ...toBaseNotification(n),
         prTitle: pr?.title ?? null,
         prNumber: pr?.number ?? null,
         repoFullName: pr?.repoFullName ?? null,
