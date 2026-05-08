@@ -19,6 +19,9 @@ export interface SyncRepositoryPullRequestsResult {
   detailHydratedCount: number
 }
 
+const PR_WRITE_BATCH_SIZE = 25
+const PR_DETAIL_FETCH_BATCH_SIZE = 5
+
 export function getPullRequestStatus(pr: {
   state: string
   draft?: boolean | null
@@ -32,6 +35,21 @@ export function getPullRequestStatus(pr: {
   }
 
   return "OPEN"
+}
+
+async function mapInBatches<T, Result>(
+  items: T[],
+  batchSize: number,
+  handler: (item: T) => Promise<Result>
+): Promise<Result[]> {
+  const results: Result[] = []
+
+  for (let index = 0; index < items.length; index += batchSize) {
+    const batch = items.slice(index, index + batchSize)
+    results.push(...(await Promise.all(batch.map(handler))))
+  }
+
+  return results
 }
 
 function getNeedsDetailHydration(
@@ -146,8 +164,10 @@ export async function syncRepositoryPullRequests({
     getNeedsDetailHydration(existingByNumber.get(pullRequest.number), pullRequest)
   )
 
-  const syncedPullRequests = await prisma.$transaction(
-    remotePullRequests.map((pullRequest) =>
+  const syncedPullRequests = await mapInBatches(
+    remotePullRequests,
+    PR_WRITE_BATCH_SIZE,
+    (pullRequest) =>
       prisma.pullRequest.upsert({
         where: { githubId: BigInt(pullRequest.id) },
         update: {
@@ -167,48 +187,49 @@ export async function syncRepositoryPullRequests({
         },
         create: toUpsertPayload(pullRequest, repositoryId),
       })
-    )
   )
 
   const syncedByNumber = new Map(
     syncedPullRequests.map((pullRequest) => [pullRequest.number, pullRequest.id])
   )
 
-  const hydratedResults: {
-    id: string
-    additions: number
-    deletions: number
-    changedFiles: number
-  }[] = []
+  const hydratedResults = await mapInBatches(
+    pullRequestsToHydrate,
+    PR_DETAIL_FETCH_BATCH_SIZE,
+    async (pullRequest) => {
+      try {
+        const { data } = await octokit.rest.pulls.get({
+          owner,
+          repo,
+          pull_number: pullRequest.number,
+        })
 
-  for (const pullRequest of pullRequestsToHydrate) {
-    try {
-      const { data } = await octokit.rest.pulls.get({
-        owner,
-        repo,
-        pull_number: pullRequest.number,
-      })
+        const localId = syncedByNumber.get(pullRequest.number)
 
-      const localId = syncedByNumber.get(pullRequest.number)
+        if (!localId) {
+          return null
+        }
 
-      if (!localId) {
-        continue
+        return {
+          id: localId,
+          additions: data.additions ?? 0,
+          deletions: data.deletions ?? 0,
+          changedFiles: data.changed_files ?? 0,
+        }
+      } catch {
+        // Continue syncing other PRs when one detail request fails.
+        return null
       }
-
-      hydratedResults.push({
-        id: localId,
-        additions: data.additions ?? 0,
-        deletions: data.deletions ?? 0,
-        changedFiles: data.changed_files ?? 0,
-      })
-    } catch {
-      // Continue syncing other PRs when one detail request fails.
     }
-  }
+  )
 
-  if (hydratedResults.length > 0) {
-    await prisma.$transaction(
-      hydratedResults.map((result) =>
+  const validHydratedResults = hydratedResults.filter((result) => result !== null)
+
+  if (validHydratedResults.length > 0) {
+    await mapInBatches(
+      validHydratedResults,
+      PR_WRITE_BATCH_SIZE,
+      (result) =>
         prisma.pullRequest.update({
           where: { id: result.id },
           data: {
@@ -217,12 +238,11 @@ export async function syncRepositoryPullRequests({
             changedFiles: result.changedFiles,
           },
         })
-      )
     )
   }
 
   return {
     syncedCount: remotePullRequests.length,
-    detailHydratedCount: hydratedResults.length,
+    detailHydratedCount: validHydratedResults.length,
   }
 }
