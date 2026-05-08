@@ -25,6 +25,7 @@ const realtimeEnabled = process.env.NEXT_PUBLIC_REALTIME_MODE === "socket"
 let socket: TypedClientSocket | null = null
 let connected = false
 let connecting = false
+let everConnected = false
 let fallbackActive = !realtimeEnabled
 let status: SocketConnectionStatus = "idle"
 let lastError: string | null = null
@@ -107,12 +108,14 @@ function stopSocketConnection() {
   currentSocket.disconnect()
 }
 
-function activatePollingFallback() {
+function activatePollingFallback(error?: string | null) {
   clearFallbackTimer()
   socketAttemptBlocked = true
   fallbackActive = true
   connected = false
   connecting = false
+  status = error ? "error" : "disconnected"
+  lastError = error ?? null
   stopSocketConnection()
   notify()
 }
@@ -122,7 +125,7 @@ function scheduleFallbackActivation() {
 
   fallbackTimer = window.setTimeout(() => {
     fallbackTimer = null
-    activatePollingFallback()
+    activatePollingFallback(lastError)
   }, SOCKET_FALLBACK_GRACE_MS)
 }
 
@@ -215,11 +218,11 @@ async function connect() {
   try {
     const res = await fetch("/api/socket/token")
     if (!res.ok) {
-      setConnectionState("error", {
-        connected: false,
-        connecting: false,
-        error: "Failed to fetch a socket auth token.",
-      })
+      const error =
+        res.status === 401 || res.status === 403
+          ? "Socket auth is unavailable, so realtime is disabled and polling fallback is active."
+          : "Failed to fetch a socket auth token, so polling fallback is active."
+      activatePollingFallback(error)
       return
     }
 
@@ -239,6 +242,7 @@ async function connect() {
 
     socket.on("connect", () => {
       recordSocketConnected()
+      everConnected = true
       setConnectionState("connected", {
         connected: true,
         connecting: false,
@@ -260,6 +264,12 @@ async function connect() {
 
     socket.on("connect_error", (error) => {
       recordSocketConnectError(error.message)
+
+      if (!everConnected) {
+        activatePollingFallback(error.message)
+        return
+      }
+
       const shouldRetry = socket?.active ?? false
 
       setConnectionState(shouldRetry ? "reconnecting" : "error", {
@@ -270,12 +280,12 @@ async function connect() {
     })
 
     notify()
-  } catch {
-    setConnectionState("error", {
-      connected: false,
-      connecting: false,
-      error: "Failed to initialize the socket connection.",
-    })
+  } catch (error) {
+    activatePollingFallback(
+      error instanceof Error
+        ? error.message
+        : "Failed to initialize the socket connection."
+    )
   }
 }
 
