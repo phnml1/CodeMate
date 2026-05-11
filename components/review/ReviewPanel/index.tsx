@@ -1,7 +1,10 @@
 "use client";
 
 import { usePRReviewActions } from "@/hooks/pr-detail/usePRReviewActions";
-import { useReviewQuery } from "@/hooks/useReview";
+import {
+  useReviewQuery,
+  useReviewRealtimeInvalidation,
+} from "@/hooks/useReview";
 import type { ReviewIssue } from "@/types/review";
 import ReviewCompletedState from "./ReviewCompletedState";
 import ReviewEmptyState from "./ReviewEmptyState";
@@ -16,7 +19,9 @@ interface ReviewPanelProps {
 
 export default function ReviewPanel({ prId, onIssueClick }: ReviewPanelProps) {
   const { data: review, isPending } = useReviewQuery(prId);
-  const { requestReview, isRequesting } = usePRReviewActions(prId);
+  useReviewRealtimeInvalidation(prId);
+  const { requestReview, isRequesting, requestError } =
+    usePRReviewActions(prId);
 
   if (isPending) {
     return <ReviewLoadingState />;
@@ -26,6 +31,7 @@ export default function ReviewPanel({ prId, onIssueClick }: ReviewPanelProps) {
     return (
       <ReviewEmptyState
         isRequesting={isRequesting}
+        requestError={requestError}
         onRequestReview={requestReview}
       />
     );
@@ -36,6 +42,7 @@ export default function ReviewPanel({ prId, onIssueClick }: ReviewPanelProps) {
       <ReviewFailedState
         review={review}
         isRequesting={isRequesting}
+        requestError={requestError}
         onRequestReview={requestReview}
       />
     );
@@ -49,6 +56,7 @@ export default function ReviewPanel({ prId, onIssueClick }: ReviewPanelProps) {
     <ReviewCompletedState
       review={review}
       isRequesting={isRequesting}
+      requestError={requestError}
       onIssueClick={onIssueClick}
       onRequestReview={requestReview}
     />

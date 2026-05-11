@@ -4,6 +4,34 @@ import { getEnabledUserIds } from "@/lib/notification-settings";
 import { prisma } from "@/lib/prisma";
 import { getRepositoryMemberIds } from "@/lib/repository-access";
 import { upsertReviewNotifications } from "@/lib/review-notifications";
+import type { NotificationReviewStatus } from "@/types/notification";
+
+async function notifyReviewStatus(params: {
+  repositoryId: string;
+  prId: string;
+  prTitle: string;
+  prNumber: number;
+  status: NotificationReviewStatus;
+}) {
+  try {
+    const repositoryUserIds = [
+      ...new Set(await getRepositoryMemberIds(params.repositoryId)),
+    ];
+    const notificationType =
+      params.status === "FAILED" ? "REVIEW_FAILED" : "NEW_REVIEW";
+    const userIds = await getEnabledUserIds(repositoryUserIds, notificationType);
+
+    await upsertReviewNotifications({
+      userIds,
+      prId: params.prId,
+      prTitle: params.prTitle,
+      prNumber: params.prNumber,
+      status: params.status,
+    });
+  } catch (error) {
+    console.error("[review notification] failed:", error);
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -34,14 +62,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const repositoryUserIds = [...new Set(await getRepositoryMemberIds(pr.repoId))];
-    const pendingRecipientIds = await getEnabledUserIds(
-      repositoryUserIds,
-      "NEW_REVIEW"
-    );
-
-    await upsertReviewNotifications({
-      userIds: pendingRecipientIds,
+    void notifyReviewStatus({
+      repositoryId: pr.repoId,
       prId: pullRequestId,
       prTitle: pr.title,
       prNumber: pr.number,
@@ -54,13 +76,8 @@ export async function POST(request: Request) {
           return;
         }
 
-        const targetRecipients =
-          result.status === "FAILED"
-            ? await getEnabledUserIds(repositoryUserIds, "REVIEW_FAILED")
-            : pendingRecipientIds;
-
-        await upsertReviewNotifications({
-          userIds: targetRecipients,
+        await notifyReviewStatus({
+          repositoryId: pr.repoId,
           prId: pullRequestId,
           prTitle: pr.title,
           prNumber: pr.number,

@@ -14,6 +14,7 @@ import ReviewSummaryBox from "./ReviewSummaryBox";
 interface ReviewCompletedStateProps {
   review: Review;
   isRequesting: boolean;
+  requestError?: string | null;
   onRequestReview: () => void;
   onIssueClick?: (issue: ReviewIssue) => void;
 }
@@ -21,6 +22,7 @@ interface ReviewCompletedStateProps {
 export default function ReviewCompletedState({
   review,
   isRequesting,
+  requestError,
   onRequestReview,
   onIssueClick,
 }: ReviewCompletedStateProps) {
@@ -33,6 +35,7 @@ export default function ReviewCompletedState({
       <ReviewCompletedHeader
         assessment={view.assessment}
         isRequesting={isRequesting}
+        requestError={requestError}
         score={review.qualityScore}
         onRequestReview={onRequestReview}
       />
