@@ -2,11 +2,13 @@ import { BotMessageSquare, Loader2 } from "lucide-react";
 
 interface ReviewEmptyStateProps {
   isRequesting: boolean;
+  requestError?: string | null;
   onRequestReview: () => void;
 }
 
 export default function ReviewEmptyState({
   isRequesting,
+  requestError,
   onRequestReview,
 }: ReviewEmptyStateProps) {
   return (
@@ -23,6 +25,11 @@ export default function ReviewEmptyState({
           요청하면 AI가 이 PR을 분석해서 리뷰를 생성합니다.
         </p>
       </div>
+      {requestError && (
+        <p className="max-w-md rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-medium text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
+          {requestError}
+        </p>
+      )}
       <button
         type="button"
         onClick={onRequestReview}

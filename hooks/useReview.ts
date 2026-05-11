@@ -19,9 +19,30 @@ type ReviewQueryOptions = Omit<
   "queryKey" | "queryFn"
 >
 
+class ReviewError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = "ReviewError"
+    this.status = status
+  }
+}
+
 async function fetchReview(prId: string): Promise<Review | null> {
   const res = await fetch(`/api/pulls/${prId}/review`)
-  if (!res.ok) throw new Error("리뷰 데이터를 불러오는 데 실패했습니다.")
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as
+      | { error?: string }
+      | null
+
+    throw new ReviewError(
+      body?.error ?? "리뷰 데이터를 불러오지 못했습니다.",
+      res.status
+    )
+  }
+
   return res.json()
 }
 
@@ -34,15 +55,17 @@ export function useReviewQuery(prId: string, options?: ReviewQueryOptions) {
       if (status === "PENDING" || status === "IN_PROGRESS") return 3000
       return false
     },
+    retry: false,
+    staleTime: 30_000,
     ...options,
   })
 }
 
-export function useReview(prId: string) {
+export function useReviewRealtimeInvalidation(prId: string) {
   const { socket } = useSocket()
   const queryClient = useQueryClient()
 
-  // Socket: NEW_REVIEW 알림 수신 시 즉시 refetch
+  // Socket: refetch review data when a review notification arrives.
   useEffect(() => {
     if (!socket) return
 
@@ -64,6 +87,8 @@ export function useReview(prId: string) {
       recordHandlerRemoved("notification:new")
     }
   }, [socket, prId, queryClient])
+}
 
+export function useReview(prId: string) {
   return useReviewQuery(prId)
 }

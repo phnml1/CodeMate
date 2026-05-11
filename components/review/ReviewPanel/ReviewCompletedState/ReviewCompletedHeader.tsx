@@ -6,6 +6,7 @@ import type { Review } from "@/types/review";
 interface ReviewCompletedHeaderProps {
   assessment: Review["aiSuggestions"]["overallAssessment"] | undefined;
   isRequesting: boolean;
+  requestError?: string | null;
   score: number;
   onRequestReview: () => void;
 }
@@ -13,6 +14,7 @@ interface ReviewCompletedHeaderProps {
 export default function ReviewCompletedHeader({
   assessment,
   isRequesting,
+  requestError,
   score,
   onRequestReview,
 }: ReviewCompletedHeaderProps) {
@@ -48,6 +50,11 @@ export default function ReviewCompletedHeader({
             </>
           )}
         </button>
+        {requestError && (
+          <p className="basis-full rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
+            {requestError}
+          </p>
+        )}
       </div>
     </div>
   );
