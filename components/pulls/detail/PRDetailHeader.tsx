@@ -6,18 +6,25 @@ import { timeAgo } from "@/lib/date";
 import { PR_STATUS_STYLE } from "@/constants/pulls";
 import { SocketConnectionBadge } from "@/components/realtime/SocketConnectionStatus";
 import { useCachedPRDetail } from "@/hooks/pr-detail/usePRDetailCachedQueries";
+import type { PullRequest } from "@/types/pulls";
 import BranchChip from "./BranchChip";
 
 interface PRDetailHeaderProps {
   prId: string;
   scrolled?: boolean;
+  initialPullRequest?: PullRequest;
 }
 
-export default function PRDetailHeader({ prId, scrolled = false }: PRDetailHeaderProps) {
+export default function PRDetailHeader({
+  prId,
+  scrolled = false,
+  initialPullRequest,
+}: PRDetailHeaderProps) {
   const router = useRouter();
   const { data: pr } = useCachedPRDetail(prId);
+  const displayPr = pr ?? initialPullRequest;
 
-  if (!pr) return null;
+  if (!displayPr) return null;
 
   return (
     <div
@@ -36,26 +43,26 @@ export default function PRDetailHeader({ prId, scrolled = false }: PRDetailHeade
             <ChevronLeft size={16} />
           </button>
 
-          <span className={`px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider shrink-0 ${PR_STATUS_STYLE[pr.status]}`}>
-            {pr.status}
+          <span className={`px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider shrink-0 ${PR_STATUS_STYLE[displayPr.status]}`}>
+            {displayPr.status}
           </span>
 
           <SocketConnectionBadge className="hidden md:inline-flex" />
 
           <h1 className="text-xs md:text-sm font-bold text-slate-900 dark:text-white truncate flex-1 min-w-0">
-            {pr.title}
+            {displayPr.title}
           </h1>
 
           <span className="text-[10px] text-slate-400 font-mono shrink-0 hidden sm:block">
-            #{pr.number}
+            #{displayPr.number}
           </span>
 
           <div className="hidden md:flex items-center gap-1 text-[10px] font-bold shrink-0">
             <span className="px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 rounded-full border border-emerald-100 dark:border-emerald-500/20">
-              +{pr.additions}
+              +{displayPr.additions}
             </span>
             <span className="px-1.5 py-0.5 bg-rose-50 dark:bg-rose-500/10 text-rose-500 rounded-full border border-rose-100 dark:border-rose-500/20">
-              -{pr.deletions}
+              -{displayPr.deletions}
             </span>
           </div>
         </div>
@@ -75,24 +82,24 @@ export default function PRDetailHeader({ prId, scrolled = false }: PRDetailHeade
               </button>
               <div className="flex flex-wrap items-baseline gap-2">
                 <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight break-all">
-                  {pr.title}
+                  {displayPr.title}
                 </h1>
                 <span className="text-lg md:text-2xl font-light text-slate-400">
-                  #{pr.number}
+                  #{displayPr.number}
                 </span>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 md:gap-3 text-sm">
-              <span className={`px-2.5 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${PR_STATUS_STYLE[pr.status]}`}>
-                {pr.status}
+              <span className={`px-2.5 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-wider ${PR_STATUS_STYLE[displayPr.status]}`}>
+                {displayPr.status}
               </span>
               <div className="flex flex-wrap items-center gap-1.5 text-slate-500 dark:text-slate-400 font-medium">
-                <span className="font-bold text-slate-900 dark:text-slate-200">{pr.repo.name}</span>
+                <span className="font-bold text-slate-900 dark:text-slate-200">{displayPr.repo.name}</span>
                 <span className="hidden sm:inline">wants to merge into</span>
-                <BranchChip name={pr.baseBranch} />
+                <BranchChip name={displayPr.baseBranch} />
                 <span className="hidden sm:inline">from</span>
-                <BranchChip name={pr.headBranch} />
+                <BranchChip name={displayPr.headBranch} />
               </div>
             </div>
           </div>
@@ -102,19 +109,19 @@ export default function PRDetailHeader({ prId, scrolled = false }: PRDetailHeade
             <div className="flex items-center gap-2 text-[10px] md:text-xs font-bold">
               <SocketConnectionBadge className="hidden md:inline-flex" />
               <span className="px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 rounded-full border border-emerald-100 dark:border-emerald-500/20">
-                +{pr.additions}
+                +{displayPr.additions}
               </span>
               <span className="px-2 py-1 bg-rose-50 dark:bg-rose-500/10 text-rose-500 rounded-full border border-rose-100 dark:border-rose-500/20">
-                -{pr.deletions}
+                -{displayPr.deletions}
               </span>
               <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full border border-slate-100 dark:border-slate-700">
                 <FileText size={14} />
-                {pr.changedFiles} files
+                {displayPr.changedFiles} files
               </div>
             </div>
             <div className="flex items-center gap-1.5 text-[10px] md:text-xs text-slate-400 font-medium">
               <Clock size={12} />
-              {timeAgo(pr.createdAt)}
+              {timeAgo(displayPr.createdAt)}
             </div>
           </div>
 

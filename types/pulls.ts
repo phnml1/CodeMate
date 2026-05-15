@@ -7,6 +7,15 @@ export interface PullRequestRepo {
   owner: { id: string; name: string | null; image: string | null } | null;
 }
 
+export interface PullRequestReviewSummary {
+  id: string;
+  status: string;
+  qualityScore: number | null;
+  issueCount: number;
+  severity: string | null;
+  reviewedAt: string | null;
+}
+
 export interface PullRequest {
   id: string;
   githubId: number;
@@ -27,6 +36,7 @@ export interface PullRequest {
   githubUpdatedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  reviews?: PullRequestReviewSummary[];
 }
 
 export interface PullRequestPagination {
