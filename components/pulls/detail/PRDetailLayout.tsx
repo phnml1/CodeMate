@@ -14,18 +14,21 @@ import { usePRDetailReset } from "@/hooks/pr-detail/usePRDetailReset";
 import { useSocketRoom } from "@/hooks/useSocketRoom";
 import { layoutStyles } from "@/lib/styles";
 import { usePRDetailStore } from "@/stores/prDetailStore";
+import type { PullRequest } from "@/types/pulls";
 import type { ReviewIssue } from "@/types/review";
 
 interface PRDetailLayoutProps {
   id: string;
   commentSlot: React.ReactNode;
   currentUserId: string;
+  initialPullRequest: PullRequest;
 }
 
 export default function PRDetailLayout({
   id,
   commentSlot,
   currentUserId,
+  initialPullRequest,
 }: PRDetailLayoutProps) {
   const { sidebarCollapsed, setSidebarCollapsed } =
     usePRDetailStore(
@@ -84,6 +87,7 @@ export default function PRDetailLayout({
         <PRDetailStickyHeader
           prId={id}
           scrolled={scrolled}
+          initialPullRequest={initialPullRequest}
         />
 
         <div className="space-y-4 p-4">
