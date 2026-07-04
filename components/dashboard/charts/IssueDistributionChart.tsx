@@ -12,7 +12,7 @@ export default function IssueDistributionChart({
 
   return (
     <div className="flex flex-col items-center gap-6">
-      <div className="relative w-55 h-55 sm:w-65 sm:h-65">
+      <div className="relative h-[220px] w-[220px] sm:h-[260px] sm:w-[260px]">
         <ResponsiveContainer width="100%" height="100%" minHeight={200} minWidth={200}>
           <PieChart>
             <Pie

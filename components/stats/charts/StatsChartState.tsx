@@ -35,7 +35,7 @@ export function StatsChartLoading({
   }
 
   return (
-    <div className="h-70 w-full sm:h-85">
+    <div className="h-[280px] w-full sm:h-[340px]">
       <Skeleton className="h-full w-full rounded-md" />
     </div>
   )
@@ -48,7 +48,7 @@ export function StatsChartEmpty({
 }: StatsChartEmptyProps) {
   return (
     <div
-      className={`flex h-70 w-full flex-col items-center justify-center text-slate-400 sm:h-85 ${className ?? ""}`}
+      className={`flex h-[280px] w-full flex-col items-center justify-center text-slate-400 sm:h-[340px] ${className ?? ""}`}
     >
       <Icon className="mb-3 size-10 text-slate-300" />
       <p className="text-sm font-medium">{message}</p>
@@ -63,7 +63,7 @@ export function StatsChartError({
 }: StatsChartErrorProps) {
   return (
     <div
-      className={`flex h-70 w-full flex-col items-center justify-center gap-3 text-center sm:h-85 ${className ?? ""}`}
+      className={`flex h-[280px] w-full flex-col items-center justify-center gap-3 text-center sm:h-[340px] ${className ?? ""}`}
     >
       <div className="flex size-12 items-center justify-center rounded-full bg-rose-50 text-rose-500 dark:bg-rose-950/40 dark:text-rose-300">
         <AlertCircle size={20} />

@@ -1,7 +1,26 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:www.prisma.io)"
+      "WebFetch(domain:www.prisma.io)",
+      "Read(//c/project/CodeMate/**)",
+      "Bash(npm i:*)",
+      "Bash(ANALYZE=true npm run build)",
+      "Bash(ANALYZE=true npx next build --webpack)",
+      "Bash(gh label:*)",
+      "Bash(powershell -Command \"Select-String -Path 'c:\\\\project\\\\CodeMate\\\\docs\\\\architecture-review\\\\*.md' -Pattern '개선점'\")",
+      "Bash(powershell -Command \"Get-Content 'c:\\\\project\\\\CodeMate\\\\docs\\\\architecture-review\\\\04-bundle-optimization.md' | Select-String '개선'\")",
+      "Bash(powershell -Command \"\\(Get-Content -Encoding UTF8 'c:\\\\project\\\\CodeMate\\\\docs\\\\architecture-review\\\\04-bundle-optimization.md'\\) -match '개선'\")",
+      "Bash(powershell -Command '\\(Get-Content -Raw -Encoding UTF8 '\\\\''c:\\\\project\\\\CodeMate\\\\docs\\\\architecture-review\\\\04-bundle-optimization.md'\\\\''\\) | Select-String -Pattern '\\\\''정량'\\\\'' -AllMatches | ForEach-Object { $_.Matches } | Select-Object -ExpandProperty Value')",
+      "Bash(git stash:*)",
+      "Bash(npx next:*)",
+      "Bash(TURBOPACK=0 npm run build)",
+      "Bash(sort -k5 -rn)",
+      "Bash(awk '{sum+=$5; count++} END {print \"Total JS files:\", count, \"Total size:\", sum/1024, \"KB\"}')",
+      "Bash(xargs -I{} sh -c 'echo \"{}: $\\(wc -c < \"{}\" | tr -d \" \"\\) bytes\"')",
+      "Bash(sort -k1)",
+      "Read(//c/Users/juyun/**)",
+      "Read(//temp/readonly/**)",
+      "Read(//c/temp/readonly/**)"
     ]
   }
 }

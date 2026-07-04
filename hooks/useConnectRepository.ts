@@ -1,5 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 
+import {
+  createClientApiError,
+  handleUnauthorizedAutoLogout,
+} from "@/lib/client-auth"
+
 interface ConnectRepositoryInput {
   githubId: number
   name: string
@@ -14,10 +19,20 @@ async function connectRepository(input: ConnectRepositoryInput) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   })
+
   if (!res.ok) {
-    const data = await res.json()
-    throw new Error(data.error ?? "저장소 연동에 실패했습니다.")
+    const error = await createClientApiError(
+      res,
+      "저장소 연결에 실패했습니다."
+    )
+
+    if (error.status === 401) {
+      handleUnauthorizedAutoLogout(error.message)
+    }
+
+    throw error
   }
+
   return res.json()
 }
 

@@ -45,7 +45,7 @@ export default function IssueSeverityChart({
         <StatsChartEmpty icon={CircleDot} message="No issue severity data yet." />
       ) : (
         <div className="flex flex-col items-center gap-6">
-          <div className="relative h-55 w-55 sm:h-65 sm:w-65">
+          <div className="relative h-[220px] w-[220px] sm:h-[260px] sm:w-[260px]">
             <ResponsiveContainer
               width="100%"
               height="100%"

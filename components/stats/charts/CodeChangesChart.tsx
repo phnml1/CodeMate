@@ -90,7 +90,7 @@ export default function CodeChangesChart({
       ) : data.length === 0 ? (
         <StatsChartEmpty icon={BarChart3} message="No code change data yet." />
       ) : (
-        <div className="h-70 w-full sm:h-85">
+        <div className="h-[280px] w-full sm:h-[340px]">
           <ResponsiveContainer width="100%" height="100%" minHeight={200}>
             <BarChart
               data={data}

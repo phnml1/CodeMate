@@ -12,7 +12,11 @@ This file is the Codex-facing companion to `CLAUDE.md`.
 
 - When creating issues, follow `.github/ISSUE_TEMPLATE/*`.
 - For hotfix issues, use the title format `hotfix: 한글제목`.
-- When creating pull requests, follow `.github/pull_request_template.md`.
+- When creating pull requests, always read `.github/pull_request_template.md` first and use that template for the PR body.
+- Fill the template sections with concrete content instead of replacing the body with a custom summary-only format.
+- If a template section is not applicable, explicitly mark it as not applicable rather than omitting the section.
+- Before opening a pull request, run lint, type checking, and tests when the project supports them.
+- Reflect the real results of lint, type checking, and tests in the PR body instead of assuming success.
 - Prefer small, focused PRs with the correct base branch for the actual diff scope.
 
 ## Branch and Commit Naming

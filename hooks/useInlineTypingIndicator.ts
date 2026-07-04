@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useCallback, useState, useMemo } from "react"
 import { useSocket } from "./useSocket"
+import {
+  recordHandlerInvocation,
+  recordHandlerRegistered,
+  recordHandlerRemoved,
+} from "@/lib/measurements/socketMetrics"
 
 const TYPING_TIMEOUT = 1000;
 
@@ -23,7 +28,17 @@ export function useInlineTypingIndicator(prId: string) {
     if (!socket || !prId) return
 
     const handleStart = (data: InlineTypingUser) => {
+      recordHandlerInvocation("inline:typing:start")
       setTypingUsers((prev) => {
+        const existing = prev.get(data.userId)
+        if (
+          existing &&
+          existing.userName === data.userName &&
+          existing.filePath === data.filePath &&
+          existing.lineNumber === data.lineNumber
+        ) {
+          return prev
+        }
         const next = new Map(prev)
         next.set(data.userId, data)
         return next
@@ -31,6 +46,7 @@ export function useInlineTypingIndicator(prId: string) {
     }
 
     const handleStop = ({ userId }: { userId: string }) => {
+      recordHandlerInvocation("inline:typing:stop")
       setTypingUsers((prev) => {
         if (!prev.has(userId)) return prev
         const next = new Map(prev)
@@ -39,13 +55,16 @@ export function useInlineTypingIndicator(prId: string) {
       })
     }
 
+    recordHandlerRegistered("inline:typing:start")
+    recordHandlerRegistered("inline:typing:stop")
     socket.on("inline:typing:start", handleStart)
     socket.on("inline:typing:stop", handleStop)
 
     return () => {
       socket.off("inline:typing:start", handleStart)
       socket.off("inline:typing:stop", handleStop)
-      setTypingUsers(new Map())
+      recordHandlerRemoved("inline:typing:start")
+      recordHandlerRemoved("inline:typing:stop")
     }
   }, [socket, prId])
 

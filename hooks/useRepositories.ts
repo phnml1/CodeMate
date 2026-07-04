@@ -1,5 +1,9 @@
 import { useInfiniteQuery } from "@tanstack/react-query"
 
+import {
+  createClientApiError,
+  handleUnauthorizedAutoLogout,
+} from "@/lib/client-auth"
 import type { RepoListResponse } from "@/types/repos"
 
 async function fetchRepositoriesPage(page: number): Promise<RepoListResponse> {
@@ -9,13 +13,16 @@ async function fetchRepositoriesPage(page: number): Promise<RepoListResponse> {
   const res = await fetch(`/api/github/repos?${params}`)
 
   if (!res.ok) {
-    const body = await res.json().catch(() => null)
-
-    throw new Error(
-      typeof body?.error === "string"
-        ? body.error
-        : "저장소 목록을 불러오지 못했습니다."
+    const error = await createClientApiError(
+      res,
+      "저장소 목록을 불러오지 못했습니다."
     )
+
+    if (error.status === 401) {
+      handleUnauthorizedAutoLogout(error.message)
+    }
+
+    throw error
   }
 
   return res.json()

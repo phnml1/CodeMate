@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { useSocket } from "./useSocket"
+import {
+  recordHandlerInvocation,
+  recordHandlerRegistered,
+  recordHandlerRemoved,
+} from "@/lib/measurements/socketMetrics"
 
 const TYPING_TIMEOUT = 2_000
 
@@ -19,6 +24,7 @@ export function useTypingIndicator(prId: string) {
     if (!socket || !prId) return
 
     const handleStart = (data: { userId: string; userName: string }) => {
+      recordHandlerInvocation("typing:start")
       setTypingUsers((prev) => {
         if (prev.get(data.userId) === data.userName) return prev
         const next = new Map(prev)
@@ -28,6 +34,7 @@ export function useTypingIndicator(prId: string) {
     }
 
     const handleStop = (data: { userId: string }) => {
+      recordHandlerInvocation("typing:stop")
       setTypingUsers((prev) => {
         if (!prev.has(data.userId)) return prev
         const next = new Map(prev)
@@ -36,13 +43,16 @@ export function useTypingIndicator(prId: string) {
       })
     }
 
+    recordHandlerRegistered("typing:start")
+    recordHandlerRegistered("typing:stop")
     socket.on("typing:start", handleStart)
     socket.on("typing:stop", handleStop)
 
     return () => {
       socket.off("typing:start", handleStart)
       socket.off("typing:stop", handleStop)
-      setTypingUsers(new Map())
+      recordHandlerRemoved("typing:start")
+      recordHandlerRemoved("typing:stop")
     }
   }, [socket, prId])
 
