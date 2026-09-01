@@ -10,9 +10,30 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: codemate_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d codemate_e2e"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
     # CI 환경 변수 설정 (많은 툴들이 CI 환경에서 다르게 동작)
     env:
       CI: true
+      E2E_TEST_MODE: 1
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/codemate_e2e
+      DIRECT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/codemate_e2e
+      AUTH_URL: http://localhost:3000
+      NEXTAUTH_URL: http://localhost:3000
+      GITHUB_ID: e2e-client-id
+      NEXT_PUBLIC_REALTIME_MODE: polling
 
     steps:
     # 0) 코드 체크아웃 (캐시 설정을 위해 가장 먼저 실행)
@@ -72,6 +93,12 @@ jobs:
             npm install
           fi
         fi
+
+    - name: Prepare ephemeral auth secrets
+      run: |
+        echo "AUTH_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+        echo "NEXTAUTH_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+        echo "GITHUB_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
     # 5) 린트 검사 — package.json에 lint 스크립트가 정의되어 있을 때만 실행
     - name: Lint check
@@ -167,3 +194,20 @@ jobs:
         else
           echo "build 스크립트 미정의 — 빌드 스킵"
         fi
+
+    - name: Install Playwright Chromium
+      run: npx playwright install --with-deps chromium
+
+    - name: Run Playwright E2E
+      run: npm run test:e2e
+
+    - name: Upload Playwright report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report
+        path: |
+          playwright-report/
+          test-results/
+        if-no-files-found: ignore
+        retention-days: 7
