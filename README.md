@@ -432,6 +432,36 @@ npm run dev
 
 브라우저에서 `http://localhost:3000` 접속
 
+### 6. Playwright E2E 실행
+
+E2E는 production 데이터와 분리된 `codemate_e2e` PostgreSQL만 사용합니다.
+아래 예시는 PowerShell 기준입니다.
+
+```powershell
+docker compose -f docker-compose.e2e.yml up -d --wait
+npx playwright install chromium
+
+$env:E2E_TEST_MODE = "1"
+$env:DATABASE_URL = "postgresql://postgres:postgres@localhost:5433/codemate_e2e"
+$env:DIRECT_DATABASE_URL = $env:DATABASE_URL
+$env:AUTH_URL = "http://localhost:3000"
+$env:NEXTAUTH_URL = $env:AUTH_URL
+$env:AUTH_SECRET = [guid]::NewGuid().ToString()
+$env:NEXTAUTH_SECRET = [guid]::NewGuid().ToString()
+$env:GITHUB_ID = "e2e-client-id"
+$env:GITHUB_SECRET = [guid]::NewGuid().ToString()
+$env:NEXT_PUBLIC_REALTIME_MODE = "polling"
+
+npm run test:e2e
+```
+
+`test:e2e`는 실행 전에 대상 DB가 localhost의 `codemate_e2e`인지 검사한 뒤
+해당 전용 DB만 초기화합니다. 테스트 종료 후 컨테이너는 다음 명령으로 정리합니다.
+
+```powershell
+docker compose -f docker-compose.e2e.yml down
+```
+
 ---
 
 ## 📅 개발 로드맵
