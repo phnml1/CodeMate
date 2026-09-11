@@ -7,14 +7,14 @@ const globalForPrisma = globalThis as unknown as {
 
 function createPrismaClient() {
   const connectionString =
-    process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL
+    process.env.DATABASE_URL ?? process.env.DIRECT_DATABASE_URL
 
   if (!connectionString) {
     throw new Error('DATABASE_URL or DIRECT_DATABASE_URL must be set')
   }
 
-  // Supabase pooler URLs can terminate long-lived auth/session queries unexpectedly.
-  // Prefer a direct connection when available and only fall back to DATABASE_URL.
+  // Runtime queries should use the Supabase pooler when it is configured.
+  // DIRECT_DATABASE_URL is kept as a fallback for environments without a pooler URL.
   const adapter = new PrismaPg({ connectionString, max: 5 })
 
   return new PrismaClient({ adapter })
