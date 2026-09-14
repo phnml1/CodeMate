@@ -46,11 +46,15 @@ export default function PRSearchInput() {
 
   return (
     <div className="relative flex-1 md:max-w-xs lg:max-w-md">
+      <label htmlFor="pull-request-search" className="sr-only">
+        Pull Request 검색
+      </label>
       <Search
         className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
         aria-hidden
       />
       <Input
+        id="pull-request-search"
         type="text"
         placeholder="PR 제목, 설명 검색..."
         value={search}

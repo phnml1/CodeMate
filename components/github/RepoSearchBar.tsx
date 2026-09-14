@@ -14,11 +14,15 @@ export default function RepoSearchBar({ value, onChange }: RepoSearchBarProps) {
     <div className="max-w-2xl">
       <div className={surfaceStyles.toolbar}>
         <div className="relative flex-1">
+          <label htmlFor="repository-search" className="sr-only">
+            저장소 검색
+          </label>
           <Search
             className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none"
             aria-hidden
           />
           <Input
+            id="repository-search"
             type="text"
             placeholder="레포지토리 이름으로 검색..."
             value={value}

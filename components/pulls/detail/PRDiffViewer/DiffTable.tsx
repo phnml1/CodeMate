@@ -84,6 +84,7 @@ export default function DiffTable({
                   {topIssue ? (
                     <button
                       type="button"
+                      aria-label={`${topIssue.title} 이슈 자세히 보기`}
                       title={`${topIssue.title} — 자세히 보기`}
                       onClick={() => onIssueClick?.(topIssue)}
                       className="cursor-pointer hover:scale-125 transition-transform"
@@ -93,6 +94,8 @@ export default function DiffTable({
                   ) : canAddInlineComment && (isHovered || isFormOpen) ? (
                     <button
                       type="button"
+                      aria-label={`${line.newNum}번 줄에 인라인 댓글 추가`}
+                      aria-expanded={isFormOpen}
                       title="댓글 추가"
                       onClick={() => setOpenFormLine(isFormOpen ? null : line.newNum!)}
                       className="cursor-pointer opacity-70 hover:opacity-100 transition-opacity"

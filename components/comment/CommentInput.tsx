@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useId } from "react"
 import { Button } from "@/components/ui/button"
 import type { MentionUser } from "@/types/comment"
 
@@ -43,6 +43,7 @@ export default function CommentInput({
   const [showMentionPop, setShowMentionPop] = useState(false)
   const [mentionQuery, setMentionQuery] = useState("")
   const [mentionCursorPos, setMentionCursorPos] = useState(0)
+  const textareaId = useId()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
 
@@ -120,8 +121,13 @@ export default function CommentInput({
         dangerouslySetInnerHTML={{ __html: getHighlightedHtml(content) }}
       />
 
+      <label htmlFor={textareaId} className="sr-only">
+        {submitLabel} 내용
+      </label>
+
       {/* textarea - 텍스트 투명, 커서만 표시 */}
       <textarea
+        id={textareaId}
         ref={textareaRef}
         value={content}
         onChange={handleChange}
@@ -140,6 +146,8 @@ export default function CommentInput({
           {filteredUsers.slice(0, 6).map((user) => (
             <button
               key={user.id}
+              type="button"
+              aria-label={`${user.name ?? user.id} 멘션 추가`}
               onMouseDown={(e) => {
                 e.preventDefault()
                 handleMentionSelect(user)

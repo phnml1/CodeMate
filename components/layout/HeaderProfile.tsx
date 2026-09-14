@@ -28,7 +28,11 @@ export default function HeaderProfile({ user }: HeaderProfileProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="rounded-full focus:outline-none hover:ring-2 hover:ring-blue-500 transition-all">
+        <button
+          type="button"
+          aria-label="사용자 메뉴 열기"
+          className="rounded-full focus:outline-none hover:ring-2 hover:ring-blue-500 transition-all"
+        >
           <Avatar className="w-8 h-8">
             <AvatarImage src={user?.image ?? ""} alt={user?.name ?? "user"} />
             <AvatarFallback className="bg-linear-to-br from-purple-500 to-pink-500 text-white text-sm font-bold">

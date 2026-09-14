@@ -35,6 +35,8 @@ export default function ReactionBar({
             type="button"
             onClick={() => onToggle(emoji)}
             disabled={disabled}
+            aria-pressed={active}
+            aria-label={`${emoji} 반응 ${active ? "취소" : "추가"}${count > 0 ? `, 현재 ${count}개` : ""}`}
             className={cn(
               "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors",
               active
@@ -53,6 +55,7 @@ export default function ReactionBar({
         <button
           type="button"
           disabled={disabled}
+          aria-label="반응 추가 메뉴"
           className="inline-flex items-center gap-1 rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-xs text-slate-400 transition-colors hover:border-slate-400 hover:text-slate-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-500 dark:hover:border-slate-500"
         >
           <span>+</span>
@@ -65,6 +68,7 @@ export default function ReactionBar({
               type="button"
               onClick={() => onToggle(emoji)}
               disabled={disabled}
+              aria-label={`${emoji} 반응 추가`}
               className="rounded p-0.5 text-lg transition-transform hover:scale-125 disabled:cursor-not-allowed"
               title={emoji}
             >
