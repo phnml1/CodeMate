@@ -163,6 +163,7 @@ function ChatBubble({
               className="mb-1 shrink-0 text-slate-300 opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
               onClick={() => deleteComment.mutate(comment.id)}
               disabled={deleteComment.isPending}
+              aria-label="댓글 삭제"
               title="Delete comment"
             >
               <Trash2 size={12} />
@@ -254,6 +255,8 @@ export default function CommentList({
   const { data: pr } = usePRDetail(prId)
   const [open, setOpen] = useState(true)
   const [input, setInput] = useState("")
+  const commentsPanelId = `comments-panel-${prId}`
+  const commentsInputId = `comment-input-${prId}`
   const chatEndRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
   const isInitialMountRef = useRef(true)
@@ -330,6 +333,8 @@ export default function CommentList({
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-controls={commentsPanelId}
         className="flex w-full items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/80 dark:hover:bg-slate-700/80"
       >
         <div className="flex items-center gap-2">
@@ -354,7 +359,7 @@ export default function CommentList({
       </button>
 
       {open && (
-        <>
+        <div id={commentsPanelId}>
           <SocketConnectionNotice />
 
           <div
@@ -411,7 +416,11 @@ export default function CommentList({
 
           <div className="border-t border-slate-200 bg-white px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
             <div className="flex items-end gap-2">
+              <label htmlFor={commentsInputId} className="sr-only">
+                일반 댓글 입력
+              </label>
               <textarea
+                id={commentsInputId}
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value)
@@ -430,6 +439,7 @@ export default function CommentList({
                 type="button"
                 onClick={handleSend}
                 disabled={!input.trim() || createComment.isPending}
+                aria-label="댓글 전송"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white shadow-sm transition-colors hover:bg-blue-600 active:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                 title="Send comment"
               >
@@ -448,7 +458,7 @@ export default function CommentList({
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
 
       <CommentRenderMetricsPanel prId={prId} />

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCreateComment } from "@/hooks/useComments"
@@ -20,6 +20,7 @@ export default function InlineCommentForm({
   onClose,
 }: InlineCommentFormProps) {
   const [content, setContent] = useState("")
+  const textareaId = useId()
   const createComment = useCreateComment(prId)
   const { onInlineTyping, onInlineTypingStop } = useInlineTypingIndicator(prId)
 
@@ -45,7 +46,11 @@ export default function InlineCommentForm({
 
   return (
     <div className="border-y border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900 dark:bg-blue-950/20">
+      <label htmlFor={textareaId} className="sr-only">
+        {filePath} {lineNumber}번 줄 인라인 댓글 입력
+      </label>
       <textarea
+        id={textareaId}
         autoFocus
         value={content}
         onChange={(e) => {
