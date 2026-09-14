@@ -129,8 +129,11 @@ export default function HeaderSearch() {
         title="전체 검색"
         description="페이지, 저장소, Pull Request를 검색합니다."
       >
+        <label htmlFor="global-search-command-input" className="sr-only">
+          전체 검색어
+        </label>
         <CommandInput
-          aria-label="전체 검색어"
+          id="global-search-command-input"
           placeholder="검색..."
           value={query}
           onValueChange={setQuery}
