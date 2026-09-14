@@ -13,9 +13,8 @@ test("global search and page filters expose accessible names", async ({ page }) 
   await globalSearchButton.click()
   await expect(page.getByRole("dialog", { name: "전체 검색" })).toBeVisible()
   await expect(
-    page.locator('label[for="global-search-command-input"]')
-  ).toHaveText("전체 검색어")
-  await expect(page.locator("#global-search-command-input")).toBeFocused()
+    page.getByRole("combobox", { name: "전체 검색어" })
+  ).toBeFocused()
 
   await page.keyboard.press("Escape")
   await expect(
