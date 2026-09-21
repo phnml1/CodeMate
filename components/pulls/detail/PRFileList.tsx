@@ -29,7 +29,7 @@ function PRFileList({ prId }: PRFileListProps) {
       aria-label="변경된 파일 목록"
       className={`
         shrink-0  flex-col transition-all duration-300 ease-in-out border-r border-slate-200 dark:border-slate-800 overflow-hidden
-        hidden md:flex self-stretch relative
+        hidden lg:flex self-stretch relative
  ${collapsed ? "w-0" : "w-72"}`}
     >
       {/* 헤더 */}

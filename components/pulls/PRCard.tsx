@@ -36,14 +36,12 @@ export default function PRCard({
   return (
     <Card
       className={cn(
-        "group relative cursor-pointer",
+        "group relative",
         surfaceStyles.interactiveCard,
         "animate-in fade-in slide-in-from-bottom-4 fill-mode-both"
       )}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
-      <Link href={`/pulls/${id}`} className="absolute inset-0 z-0 rounded-md" aria-label={title} />
-
       <div className="flex flex-col gap-3 h-full">
         {/* Header: Status badge + PR number */}
         <div className="flex items-center gap-2 sm:gap-3">
@@ -54,8 +52,13 @@ export default function PRCard({
         </div>
 
         {/* Title */}
-        <h3 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-blue-700 transition-colors tracking-tight leading-snug">
-          {title}
+        <h3 className="text-base sm:text-lg font-bold tracking-tight leading-snug">
+          <Link
+            href={`/pulls/${id}`}
+            className="relative z-10 text-slate-900 transition-colors hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group-hover:text-blue-700"
+          >
+            {title}
+          </Link>
         </h3>
 
         {/* Meta info (without time) */}
