@@ -16,7 +16,7 @@ function PRStatusFilterFallback() {
 
 export default function PRFilterBar() {
   return (
-    <div className={`${surfaceStyles.toolbar} flex flex-col items-stretch justify-between gap-4 md:flex-row md:items-center`}>
+    <div className={`${surfaceStyles.toolbar} flex flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center`}>
       <Suspense fallback={<PRStatusFilterFallback />}>
         <PRStatusFilter />
       </Suspense>

@@ -78,7 +78,7 @@ export default function PRDetailLayout({
           <button
             onClick={() => setSidebarCollapsed(false)}
             aria-label="파일 목록 열기"
-            className="absolute left-0 top-6 z-30 hidden rounded-r-lg border border-slate-200 bg-white p-2 shadow-md transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 md:block"
+            className="absolute left-0 top-6 z-30 hidden rounded-r-lg border border-slate-200 bg-white p-2 shadow-md transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 lg:block"
           >
             <ChevronRight size={16} />
           </button>

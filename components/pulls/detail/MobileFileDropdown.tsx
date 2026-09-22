@@ -16,6 +16,7 @@ export default function MobileFileDropdown({
 }: MobileFileDropdownProps) {
   const { data: files = [], isPending, isError } = useCachedPRFiles(prId);
   const { selectAndScrollToFile } = usePRDetailFileNavigation();
+  const mobileFileListId = `mobile-file-list-${prId}`;
   const { selectedFile, mobileFileOpen, setMobileFileOpen } = usePRDetailStore(
     useShallow((state) => ({
       selectedFile: state.selectedFile,
@@ -25,10 +26,12 @@ export default function MobileFileDropdown({
   );
 
   return (
-    <div className="relative border-b border-slate-200 bg-white px-4 py-2 dark:border-slate-800 dark:bg-slate-900 md:hidden">
+    <div className="relative border-b border-slate-200 bg-white px-4 py-2 dark:border-slate-800 dark:bg-slate-900 lg:hidden">
       <button
+        type="button"
         onClick={() => setMobileFileOpen(!mobileFileOpen)}
         aria-expanded={mobileFileOpen}
+        aria-controls={mobileFileListId}
         aria-label="변경 파일 목록 보기"
         className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
       >
@@ -62,7 +65,10 @@ export default function MobileFileDropdown({
       </button>
 
       {mobileFileOpen && (
-        <div className="absolute left-0 right-0 top-full z-30 max-h-64 overflow-y-auto border-b border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900">
+        <div
+          id={mobileFileListId}
+          className="absolute left-0 right-0 top-full z-30 max-h-64 overflow-y-auto border-b border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900"
+        >
           {isPending ? (
             <div className="space-y-2 p-3" aria-label="파일 목록 로딩 중">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -80,7 +86,9 @@ export default function MobileFileDropdown({
             files.map((file) => (
               <button
                 key={file.filename}
+                type="button"
                 onClick={() => selectAndScrollToFile(file.filename)}
+                aria-label={`${file.filename} 파일로 이동`}
                 aria-current={selectedFile === file.filename ? "true" : undefined}
                 className={`flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors ${
                   selectedFile === file.filename
