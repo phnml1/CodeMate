@@ -1,10 +1,17 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { analyzeReview } from "@/lib/ai/analyze";
+import { auth } from "@/lib/auth";
+import { invalidateDashboardForUsers } from "@/lib/dashboard-cache";
 import { getEnabledUserIds } from "@/lib/notification-settings";
 import { prisma } from "@/lib/prisma";
-import { getRepositoryMemberIds } from "@/lib/repository-access";
+import {
+  buildAccessiblePullRequestWhere,
+  getRepositoryMemberIds,
+} from "@/lib/repository-access";
 import { upsertReviewNotifications } from "@/lib/review-notifications";
 import type { NotificationReviewStatus } from "@/types/notification";
+
+export const maxDuration = 300;
 
 async function notifyReviewStatus(params: {
   repositoryId: string;
@@ -35,18 +42,26 @@ async function notifyReviewStatus(params: {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { pullRequestId } = body as { pullRequestId?: string };
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    if (!pullRequestId) {
+    const body = (await request.json().catch(() => null)) as
+      | { pullRequestId?: unknown }
+      | null;
+    const pullRequestId = body?.pullRequestId;
+
+    if (typeof pullRequestId !== "string" || !pullRequestId.trim()) {
       return NextResponse.json(
         { error: "pullRequestId is required" },
         { status: 400 }
       );
     }
 
-    const pr = await prisma.pullRequest.findUnique({
-      where: { id: pullRequestId },
+    const accessibleWhere = await buildAccessiblePullRequestWhere(session.user.id);
+    const pr = await prisma.pullRequest.findFirst({
+      where: { id: pullRequestId, ...accessibleWhere },
       select: {
         id: true,
         title: true,
@@ -62,29 +77,34 @@ export async function POST(request: Request) {
       );
     }
 
-    void notifyReviewStatus({
-      repositoryId: pr.repoId,
-      prId: pullRequestId,
-      prTitle: pr.title,
-      prNumber: pr.number,
-      status: "PENDING",
-    });
+    after(async () => {
+      try {
+        await notifyReviewStatus({
+          repositoryId: pr.repoId,
+          prId: pr.id,
+          prTitle: pr.title,
+          prNumber: pr.number,
+          status: "PENDING",
+        });
 
-    analyzeReview(pullRequestId)
-      .then(async (result) => {
+        const result = await analyzeReview(pr.id);
         if (result.status === "SKIPPED_ACTIVE") {
           return;
         }
 
+        invalidateDashboardForUsers(await getRepositoryMemberIds(pr.repoId));
+
         await notifyReviewStatus({
           repositoryId: pr.repoId,
-          prId: pullRequestId,
+          prId: pr.id,
           prTitle: pr.title,
           prNumber: pr.number,
           status: result.status,
         });
-      })
-      .catch((error) => console.error("[analyze] analyzeReview failed:", error));
+      } catch (error) {
+        console.error("[analyze] analyzeReview failed:", error);
+      }
+    });
 
     return NextResponse.json({ status: "PENDING" });
   } catch {

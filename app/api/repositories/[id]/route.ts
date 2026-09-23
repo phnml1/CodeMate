@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth"
 import { getOctokit } from "@/lib/github"
+import { invalidateDashboardForUsers } from "@/lib/dashboard-cache"
 import { prisma } from "@/lib/prisma"
 import {
   detachRepositoryFromUser,
@@ -45,6 +46,7 @@ export async function DELETE(
 
     if (memberCount > 1) {
       await detachRepositoryFromUser(session.user.id, id)
+      invalidateDashboardForUsers([session.user.id])
 
       return NextResponse.json({
         message: "Repository connection removed.",
@@ -66,6 +68,7 @@ export async function DELETE(
     }
 
     await prisma.repository.delete({ where: { id } })
+    invalidateDashboardForUsers([session.user.id])
 
     return NextResponse.json({
       message: "Repository removed.",

@@ -1,13 +1,24 @@
 import { GET } from "@/app/api/review/[reviewId]/route"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
+
+jest.mock("@/lib/auth", () => ({ auth: jest.fn() }))
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
-    review: { findUnique: jest.fn() },
+    review: { findFirst: jest.fn() },
   },
 }))
 
-const mockedFindUnique = prisma.review.findUnique as jest.Mock
+jest.mock("@/lib/repository-access", () => ({
+  buildAccessiblePullRequestWhere: jest.fn(),
+}))
+
+const mockedAuth = auth as jest.Mock
+const mockedFindFirst = prisma.review.findFirst as jest.Mock
+const mockedBuildAccessiblePullRequestWhere =
+  buildAccessiblePullRequestWhere as jest.Mock
 
 const mockReview = {
   id: "review-1",
@@ -30,10 +41,17 @@ function makeRequest(reviewId: string) {
 }
 
 describe("GET /api/review/[reviewId]", () => {
+  beforeEach(() => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
+      repoId: { in: ["repo-1"] },
+    })
+  })
+
   afterEach(() => jest.clearAllMocks())
 
   it("returns the requested review with stage information", async () => {
-    mockedFindUnique.mockResolvedValue(mockReview)
+    mockedFindFirst.mockResolvedValue(mockReview)
 
     const { request, params } = makeRequest("review-1")
     const res = await GET(request, { params })
@@ -45,10 +63,31 @@ describe("GET /api/review/[reviewId]", () => {
     expect(body.stage).toBe("COMPLETED")
     expect(body.qualityScore).toBe(100)
     expect(body.pullRequest.number).toBe(1)
+    expect(mockedFindFirst).toHaveBeenCalledWith({
+      where: {
+        id: "review-1",
+        pullRequest: { is: { repoId: { in: ["repo-1"] } } },
+      },
+      include: {
+        pullRequest: {
+          select: { id: true, number: true, title: true, repoId: true },
+        },
+      },
+    })
+  })
+
+  it("returns 401 to anonymous users", async () => {
+    mockedAuth.mockResolvedValue(null)
+
+    const { request, params } = makeRequest("review-1")
+    const res = await GET(request, { params })
+
+    expect(res.status).toBe(401)
+    expect(mockedFindFirst).not.toHaveBeenCalled()
   })
 
   it("returns stage information for pending reviews", async () => {
-    mockedFindUnique.mockResolvedValue({
+    mockedFindFirst.mockResolvedValue({
       ...mockReview,
       status: "PENDING",
       stage: "FETCHING_FILES",
@@ -64,7 +103,7 @@ describe("GET /api/review/[reviewId]", () => {
   })
 
   it("returns 404 for missing reviews", async () => {
-    mockedFindUnique.mockResolvedValue(null)
+    mockedFindFirst.mockResolvedValue(null)
 
     const { request, params } = makeRequest("not-exist")
     const res = await GET(request, { params })
@@ -74,8 +113,25 @@ describe("GET /api/review/[reviewId]", () => {
     expect(body.error).toBe("Review not found")
   })
 
+  it("does not expose a review outside the user's repositories", async () => {
+    mockedFindFirst.mockResolvedValue(null)
+
+    const { request, params } = makeRequest("other-user-review")
+    const res = await GET(request, { params })
+
+    expect(res.status).toBe(404)
+    expect(mockedFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "other-user-review",
+          pullRequest: { is: { repoId: { in: ["repo-1"] } } },
+        },
+      })
+    )
+  })
+
   it("returns 500 on unexpected errors", async () => {
-    mockedFindUnique.mockRejectedValue(new Error("DB error"))
+    mockedFindFirst.mockRejectedValue(new Error("DB error"))
 
     const { request, params } = makeRequest("review-1")
     const res = await GET(request, { params })

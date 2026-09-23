@@ -1,8 +1,12 @@
 import { auth } from "@/lib/auth"
 import { getOctokit } from "@/lib/github"
+import { invalidateDashboardForUsers } from "@/lib/dashboard-cache"
 import { prisma } from "@/lib/prisma"
 import { syncRepositoryPullRequests } from "@/lib/pull-request-sync"
-import { buildAccessibleRepositoryWhere } from "@/lib/repository-access"
+import {
+  buildAccessibleRepositoryWhere,
+  getRepositoryMemberIds,
+} from "@/lib/repository-access"
 import { NextResponse } from "next/server"
 
 function getSyncErrorResponse(error: unknown) {
@@ -85,6 +89,8 @@ export async function POST(
       repo,
       repositoryId: repository.id,
     })
+
+    invalidateDashboardForUsers(await getRepositoryMemberIds(repository.id))
 
     return NextResponse.json({
       updated: result.syncedCount,

@@ -1,8 +1,11 @@
 import type { Metadata } from "next"
-import { auth } from "@/lib/auth"
+import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query"
+import { notFound } from "next/navigation"
+import { requireCurrentUser } from "@/lib/dal/session"
 import PRDetailContainer from "@/components/pulls/detail/PRDetailContainer"
 import CommentSection from "@/components/comment/CommentSection"
 import { getPullRequestDetailForUser } from "@/lib/pr-detail/pullRequestDetail"
+import { prDetailQueryKey } from "@/lib/query-keys"
 
 interface PRDetailPageProps {
   params: Promise<{ id: string }>
@@ -20,18 +23,20 @@ export async function generateMetadata({
 
 export default async function PRDetailPage({ params }: PRDetailPageProps) {
   const { id } = await params;
-  const session = await auth();
-  const currentUserId = session?.user?.id ?? "";
-  const initialPullRequest = session?.user?.id
-    ? await getPullRequestDetailForUser(id, session.user.id)
-    : null;
+  const user = await requireCurrentUser();
+  const initialPullRequest = await getPullRequestDetailForUser(id, user.id);
+  if (!initialPullRequest) notFound();
+
+  const queryClient = new QueryClient();
+  queryClient.setQueryData(prDetailQueryKey(id), initialPullRequest);
 
   return (
-    <PRDetailContainer
-      id={id}
-      commentSlot={<CommentSection prId={id} />}
-      currentUserId={currentUserId}
-      initialPullRequest={initialPullRequest}
-    />
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <PRDetailContainer
+        id={id}
+        commentSlot={<CommentSection prId={id} />}
+        currentUserId={user.id}
+      />
+    </HydrationBoundary>
   );
 }

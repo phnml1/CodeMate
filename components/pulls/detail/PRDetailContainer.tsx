@@ -4,24 +4,20 @@ import PRDetailLayout from "@/components/pulls/detail/PRDetailLayout";
 import { usePRDetail } from "@/hooks/usePRDetail";
 import { usePRFiles } from "@/hooks/usePRFiles";
 import { layoutStyles } from "@/lib/styles";
-import type { PullRequest } from "@/types/pulls";
 
 interface PRDetailContainerProps {
   id: string;
   commentSlot: React.ReactNode;
   currentUserId: string;
-  initialPullRequest?: PullRequest | null;
 }
 
 export default function PRDetailContainer({
   id,
   commentSlot,
   currentUserId,
-  initialPullRequest,
 }: PRDetailContainerProps) {
   const { data: pr, isPending: prPending, isError: prError } = usePRDetail(id, {
-    initialData: initialPullRequest ?? undefined,
-    staleTime: initialPullRequest ? 30_000 : undefined,
+    staleTime: 30_000,
   });
   usePRFiles(id);
 

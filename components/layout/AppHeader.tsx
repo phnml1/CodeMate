@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth"
+import { getCurrentUser } from "@/lib/dal/session"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import NotificationBell from "@/components/notification/NotificationBell"
 import { SocketConnectionBadge } from "@/components/realtime/SocketConnectionStatus"
@@ -6,8 +6,7 @@ import HeaderSearch from "./HeaderSearch"
 import HeaderProfile from "./HeaderProfile"
 
 export default async function AppHeader() {
-  const session = await auth()
-  const user = session?.user
+  const user = await getCurrentUser()
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between sticky top-0 z-40">

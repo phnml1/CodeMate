@@ -1,12 +1,20 @@
 import { POST } from "@/app/api/repositories/[id]/sync/route"
 import { auth } from "@/lib/auth"
+import { invalidateDashboardForUsers } from "@/lib/dashboard-cache"
 import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
 import { syncRepositoryPullRequests } from "@/lib/pull-request-sync"
-import { buildAccessibleRepositoryWhere } from "@/lib/repository-access"
+import {
+  buildAccessibleRepositoryWhere,
+  getRepositoryMemberIds,
+} from "@/lib/repository-access"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
+}))
+
+jest.mock("@/lib/dashboard-cache", () => ({
+  invalidateDashboardForUsers: jest.fn(),
 }))
 
 jest.mock("@/lib/github", () => ({
@@ -27,6 +35,7 @@ jest.mock("@/lib/pull-request-sync", () => ({
 
 jest.mock("@/lib/repository-access", () => ({
   buildAccessibleRepositoryWhere: jest.fn(),
+  getRepositoryMemberIds: jest.fn().mockResolvedValue(["user-1"]),
 }))
 
 const mockedAuth = auth as jest.Mock
@@ -35,10 +44,12 @@ const mockedFindFirst = prisma.repository.findFirst as jest.Mock
 const mockedSyncRepositoryPullRequests = syncRepositoryPullRequests as jest.Mock
 const mockedBuildAccessibleRepositoryWhere =
   buildAccessibleRepositoryWhere as jest.Mock
+const mockedGetRepositoryMemberIds = getRepositoryMemberIds as jest.Mock
 
 describe("POST /api/repositories/[id]/sync", () => {
   afterEach(() => {
     jest.clearAllMocks()
+    mockedGetRepositoryMemberIds.mockResolvedValue(["user-1"])
   })
 
   it("returns 401 for anonymous users", async () => {
@@ -51,6 +62,7 @@ describe("POST /api/repositories/[id]/sync", () => {
 
     expect(response.status).toBe(401)
     expect(body.error).toBe("Unauthorized")
+    expect(invalidateDashboardForUsers).not.toHaveBeenCalled()
   })
 
   it("syncs the latest PR list for the repository", async () => {
@@ -65,6 +77,7 @@ describe("POST /api/repositories/[id]/sync", () => {
       syncedCount: 18,
       detailHydratedCount: 4,
     })
+    mockedGetRepositoryMemberIds.mockResolvedValue(["user-1", "user-2"])
 
     const response = await POST(new Request("http://localhost"), {
       params: Promise.resolve({ id: "repo-1" }),
@@ -77,6 +90,10 @@ describe("POST /api/repositories/[id]/sync", () => {
       total: 18,
       detailHydrated: 4,
     })
+    expect(invalidateDashboardForUsers).toHaveBeenCalledWith([
+      "user-1",
+      "user-2",
+    ])
     expect(mockedBuildAccessibleRepositoryWhere).toHaveBeenCalledWith(
       "user-1",
       "repo-1"

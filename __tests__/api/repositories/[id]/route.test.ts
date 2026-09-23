@@ -1,5 +1,6 @@
 import { DELETE } from "@/app/api/repositories/[id]/route"
 import { auth } from "@/lib/auth"
+import { invalidateDashboardForUsers } from "@/lib/dashboard-cache"
 import { prisma } from "@/lib/prisma"
 import {
   detachRepositoryFromUser,
@@ -10,6 +11,10 @@ import {
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
+}))
+
+jest.mock("@/lib/dashboard-cache", () => ({
+  invalidateDashboardForUsers: jest.fn(),
 }))
 
 jest.mock("@/lib/github", () => ({
@@ -75,6 +80,7 @@ describe("DELETE /api/repositories/[id]", () => {
     expect(response.status).toBe(200)
     expect(body.message).toContain("removed")
     expect(mockedDelete).toHaveBeenCalledWith({ where: { id: "repo-1" } })
+    expect(invalidateDashboardForUsers).toHaveBeenCalledWith(["user-1"])
   })
 
   it("returns 401 for anonymous users", async () => {
@@ -86,6 +92,7 @@ describe("DELETE /api/repositories/[id]", () => {
 
     expect(response.status).toBe(401)
     expect(body.error).toBe("Unauthorized")
+    expect(invalidateDashboardForUsers).not.toHaveBeenCalled()
   })
 
   it("returns 404 when the repository does not exist", async () => {
@@ -139,6 +146,7 @@ describe("DELETE /api/repositories/[id]", () => {
       "repo-1"
     )
     expect(mockedDelete).not.toHaveBeenCalled()
+    expect(invalidateDashboardForUsers).toHaveBeenCalledWith(["user-1"])
   })
 
   it("returns 500 on unexpected errors", async () => {

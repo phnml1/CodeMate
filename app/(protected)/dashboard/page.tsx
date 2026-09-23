@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
-import { auth } from "@/lib/auth"
+import { Suspense } from "react"
+import { requireCurrentUser } from "@/lib/dal/session"
 import {
   getCachedDashboardStats,
   getCachedDashboardQualityTrend,
@@ -10,28 +11,49 @@ import StatCards from "@/components/dashboard/stat-cards/StatCards"
 import ChartsSection from "@/components/dashboard/charts/ChartsSection"
 import RecentPRSection from "@/components/dashboard/recent-prs/RecentPRSection"
 import { PageContainer } from "@/components/layout/PageContainer"
+import {
+  ChartSkeleton,
+  RecentPRSkeleton,
+  StatCardsSkeleton,
+} from "@/components/dashboard/DashboardSectionSkeletons"
 
 export const metadata: Metadata = {
   title: "대시보드",
   description: "코드 품질 통계 및 최근 Pull Request 현황을 한눈에 확인하세요",
 }
 
-export default async function Page() {
-  const session = await auth()
-  if (!session?.user?.id) return null
+async function Stats({ userId }: { userId: string }) {
+  const stats = await getCachedDashboardStats(userId)
+  return <StatCards stats={stats} />
+}
 
-  const [stats, qualityTrend, issueSeverity, recentPRs] = await Promise.all([
-    getCachedDashboardStats(session.user.id),
-    getCachedDashboardQualityTrend(session.user.id),
-    getCachedDashboardIssueSeverity(session.user.id),
-    getCachedDashboardRecentPRs(session.user.id),
+async function Charts({ userId }: { userId: string }) {
+  const [qualityTrend, issueSeverity] = await Promise.all([
+    getCachedDashboardQualityTrend(userId),
+    getCachedDashboardIssueSeverity(userId),
   ])
+  return <ChartsSection qualityTrend={qualityTrend} issueSeverity={issueSeverity} />
+}
+
+async function RecentPRs({ userId }: { userId: string }) {
+  const prs = await getCachedDashboardRecentPRs(userId)
+  return <RecentPRSection prs={prs} />
+}
+
+export default async function Page() {
+  const user = await requireCurrentUser()
 
   return (
     <PageContainer size="wide">
-      <StatCards stats={stats} />
-      <ChartsSection qualityTrend={qualityTrend} issueSeverity={issueSeverity} />
-      <RecentPRSection prs={recentPRs} />
+      <Suspense fallback={<StatCardsSkeleton />}>
+        <Stats userId={user.id} />
+      </Suspense>
+      <Suspense fallback={<ChartSkeleton />}>
+        <Charts userId={user.id} />
+      </Suspense>
+      <Suspense fallback={<RecentPRSkeleton />}>
+        <RecentPRs userId={user.id} />
+      </Suspense>
     </PageContainer>
   )
 }

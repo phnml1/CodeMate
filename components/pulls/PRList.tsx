@@ -15,6 +15,7 @@ export default function PRList() {
   const searchParams = useSearchParams();
   const statusTab = (searchParams.get("status") as PRFilterTab) ?? "All";
   const search = searchParams.get("search") ?? undefined;
+  const repoId = searchParams.get("repoId") ?? undefined;
   const apiStatus = FILTER_TAB_TO_STATUS[statusTab];
 
   const {
@@ -24,7 +25,7 @@ export default function PRList() {
     isFetchingNextPage,
     isLoading,
     isError,
-  } = usePullRequests({ status: apiStatus, search });
+  } = usePullRequests({ status: apiStatus, search, repoId });
 
   if (isLoading) {
     return (

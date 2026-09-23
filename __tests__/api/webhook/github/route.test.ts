@@ -2,6 +2,7 @@ import { POST } from "@/app/api/webhook/github/route"
 import { prisma } from "@/lib/prisma"
 import * as webhookValidator from "@/lib/webhook-validator"
 import * as analyzeModule from "@/lib/ai/analyze"
+import { invalidateDashboardForUsers } from "@/lib/dashboard-cache"
 import { getRepositoryMemberIds } from "@/lib/repository-access"
 import * as reviewNotificationsModule from "@/lib/review-notifications"
 import crypto from "crypto"
@@ -40,6 +41,10 @@ jest.mock("@/lib/ai/analyze", () => ({
     status: "COMPLETED",
     reviewId: "review-1",
   }),
+}))
+
+jest.mock("@/lib/dashboard-cache", () => ({
+  invalidateDashboardForUsers: jest.fn(),
 }))
 
 jest.mock("@/lib/socket/emitter", () => ({
@@ -138,6 +143,7 @@ describe("POST /api/webhook/github", () => {
 
     expect(response.status).toBe(200)
     expect(body.message).toBe("PR processed")
+    expect(invalidateDashboardForUsers).toHaveBeenCalledWith(["user-1"])
   })
 
   it("calls analyzeReview inside after()", async () => {
@@ -145,6 +151,7 @@ describe("POST /api/webhook/github", () => {
     await flushAfter()
 
     expect(mockedAnalyzeReview).toHaveBeenCalledWith("pr-1")
+    expect(invalidateDashboardForUsers).toHaveBeenCalledTimes(2)
     expect(mockedUpsertReviewNotifications).toHaveBeenCalledWith({
       userIds: ["user-1"],
       prId: "pr-1",
@@ -191,6 +198,7 @@ describe("POST /api/webhook/github", () => {
 
     expect(response.status).toBe(401)
     expect(body.error).toBe("Invalid webhook signature")
+    expect(invalidateDashboardForUsers).not.toHaveBeenCalled()
   })
 
   it("ignores non pull_request events", async () => {
@@ -223,6 +231,7 @@ describe("POST /api/webhook/github", () => {
 
     expect(response.status).toBe(200)
     expect(body.message).toBe("PR status processed")
+    expect(invalidateDashboardForUsers).toHaveBeenCalledWith(["user-1"])
     expect(prisma.notification.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ type: "PR_MERGED", userId: "user-1" }),
