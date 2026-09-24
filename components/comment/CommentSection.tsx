@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth"
+import { requireCurrentUser } from "@/lib/dal/session"
 import CommentList from "./CommentList"
 
 interface CommentSectionProps {
@@ -6,8 +6,7 @@ interface CommentSectionProps {
 }
 
 export default async function CommentSection({ prId }: CommentSectionProps) {
-  const session = await auth()
-  const currentUserId = session?.user?.id ?? ""
+  const user = await requireCurrentUser()
 
-  return <CommentList prId={prId} currentUserId={currentUserId} />
+  return <CommentList prId={prId} currentUserId={user.id} />
 }

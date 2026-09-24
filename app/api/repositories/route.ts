@@ -2,9 +2,11 @@ import { auth } from "@/lib/auth"
 import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
 import { syncRepositoryPullRequests } from "@/lib/pull-request-sync"
+import { getConnectedRepositoriesForUser } from "@/lib/dal/repositories"
+import { invalidateDashboardForUsers } from "@/lib/dashboard-cache"
 import {
-  buildAccessibleRepositoryWhere,
   connectRepositoryToUser,
+  getRepositoryMemberIds,
   isRepositoryMembershipMigrationError,
 } from "@/lib/repository-access"
 import { NextResponse } from "next/server"
@@ -16,13 +18,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const repositoryWhere = await buildAccessibleRepositoryWhere(session.user.id)
-
-    const repositories = await prisma.repository.findMany({
-      where: repositoryWhere,
-      select: { id: true, name: true, fullName: true },
-      orderBy: { name: "asc" },
-    })
+    const repositories = await getConnectedRepositoriesForUser(session.user.id)
 
     return NextResponse.json({ repositories })
   } catch (error) {
@@ -162,6 +158,8 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error("[Repository PR sync] failed:", error)
     }
+
+    invalidateDashboardForUsers(await getRepositoryMemberIds(repository.id))
 
     return NextResponse.json(
       { repository: { ...repository, githubId: Number(repository.githubId) } },

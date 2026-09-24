@@ -1,8 +1,7 @@
 import type { Metadata } from "next"
-import { auth } from "@/lib/auth"
 import StatsClient from "@/components/stats/StatsClient"
-import { prisma } from "@/lib/prisma"
-import { buildAccessibleRepositoryWhere } from "@/lib/repository-access"
+import { getConnectedRepositoriesForUser } from "@/lib/dal/repositories"
+import { requireCurrentUser } from "@/lib/dal/session"
 import { fetchStatsOverview, type StatsOverview } from "@/lib/stats"
 
 export const metadata: Metadata = {
@@ -21,18 +20,11 @@ const EMPTY_OVERVIEW: StatsOverview = {
 }
 
 export default async function StatsPage() {
-  const session = await auth()
-  if (!session?.user?.id) return null
-
-  const repositoryWhere = await buildAccessibleRepositoryWhere(session.user.id)
+  const user = await requireCurrentUser()
 
   const [overviewResult, reposResult] = await Promise.allSettled([
-    fetchStatsOverview(session.user.id, "30d"),
-    prisma.repository.findMany({
-      where: repositoryWhere,
-      select: { id: true, name: true, fullName: true },
-      orderBy: { name: "asc" },
-    }),
+    fetchStatsOverview(user.id, "30d"),
+    getConnectedRepositoriesForUser(user.id),
   ])
 
   const initialOverview =

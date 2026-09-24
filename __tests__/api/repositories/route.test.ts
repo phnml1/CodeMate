@@ -1,15 +1,26 @@
-import { POST } from "@/app/api/repositories/route"
+import { GET, POST } from "@/app/api/repositories/route"
 import { auth } from "@/lib/auth"
+import { getConnectedRepositoriesForUser } from "@/lib/dal/repositories"
+import { invalidateDashboardForUsers } from "@/lib/dashboard-cache"
 import { getOctokit } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
 import { syncRepositoryPullRequests } from "@/lib/pull-request-sync"
 import {
   connectRepositoryToUser,
+  getRepositoryMemberIds,
   isRepositoryMembershipMigrationError,
 } from "@/lib/repository-access"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
+}))
+
+jest.mock("@/lib/dal/repositories", () => ({
+  getConnectedRepositoriesForUser: jest.fn(),
+}))
+
+jest.mock("@/lib/dashboard-cache", () => ({
+  invalidateDashboardForUsers: jest.fn(),
 }))
 
 jest.mock("@/lib/github", () => ({
@@ -32,16 +43,20 @@ jest.mock("@/lib/pull-request-sync", () => ({
 
 jest.mock("@/lib/repository-access", () => ({
   connectRepositoryToUser: jest.fn(),
+  getRepositoryMemberIds: jest.fn().mockResolvedValue(["user-1"]),
   isRepositoryMembershipMigrationError: jest.fn(() => false),
 }))
 
 const mockedAuth = auth as jest.Mock
+const mockedGetConnectedRepositoriesForUser =
+  getConnectedRepositoriesForUser as jest.Mock
 const mockedGetOctokit = getOctokit as jest.Mock
 const mockedFindUnique = prisma.repository.findUnique as jest.Mock
 const mockedCreate = prisma.repository.create as jest.Mock
 const mockedUpdate = prisma.repository.update as jest.Mock
 const mockedSyncRepositoryPullRequests = syncRepositoryPullRequests as jest.Mock
 const mockedConnectRepositoryToUser = connectRepositoryToUser as jest.Mock
+const mockedGetRepositoryMemberIds = getRepositoryMemberIds as jest.Mock
 const mockedIsRepositoryMembershipMigrationError =
   isRepositoryMembershipMigrationError as jest.Mock
 
@@ -53,9 +68,54 @@ function createRequest(body: object) {
   })
 }
 
+describe("GET /api/repositories", () => {
+  afterEach(() => {
+    jest.clearAllMocks()
+    mockedGetRepositoryMemberIds.mockResolvedValue(["user-1"])
+    mockedIsRepositoryMembershipMigrationError.mockReturnValue(false)
+  })
+
+  it("returns 401 for anonymous users", async () => {
+    mockedAuth.mockResolvedValue(null)
+
+    const response = await GET()
+
+    expect(response.status).toBe(401)
+    expect(mockedGetConnectedRepositoriesForUser).not.toHaveBeenCalled()
+  })
+
+  it("uses the shared accessible repository lookup", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedGetConnectedRepositoriesForUser.mockResolvedValue([
+      { id: "repo-1", name: "repo", fullName: "owner/repo" },
+    ])
+
+    const response = await GET()
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      repositories: [{ id: "repo-1", name: "repo", fullName: "owner/repo" }],
+    })
+    expect(mockedGetConnectedRepositoriesForUser).toHaveBeenCalledWith("user-1")
+  })
+
+  it("preserves the migration error response", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedGetConnectedRepositoriesForUser.mockRejectedValue(
+      new Error("membership table missing")
+    )
+    mockedIsRepositoryMembershipMigrationError.mockReturnValue(true)
+
+    const response = await GET()
+
+    expect(response.status).toBe(503)
+  })
+})
+
 describe("POST /api/repositories", () => {
   afterEach(() => {
     jest.clearAllMocks()
+    mockedGetRepositoryMemberIds.mockResolvedValue(["user-1"])
     mockedIsRepositoryMembershipMigrationError.mockReturnValue(false)
   })
 
@@ -104,6 +164,7 @@ describe("POST /api/repositories", () => {
     const body = await response.json()
 
     expect(response.status).toBe(201)
+    expect(invalidateDashboardForUsers).toHaveBeenCalledWith(["user-1"])
     expect(body.repository).toEqual(
       expect.objectContaining({
         id: "repo-1",
@@ -197,6 +258,7 @@ describe("POST /api/repositories", () => {
 
     expect(response.status).toBe(401)
     expect(body.error).toBe("Unauthorized")
+    expect(invalidateDashboardForUsers).not.toHaveBeenCalled()
   })
 
   it("returns 400 when required fields are missing", async () => {
@@ -243,6 +305,7 @@ describe("POST /api/repositories", () => {
       webhookId: 9999,
     })
     mockedConnectRepositoryToUser.mockResolvedValue("created")
+    mockedGetRepositoryMemberIds.mockResolvedValue(["user-1", "user-2"])
     mockedGetOctokit.mockResolvedValue({ rest: { repos: {} } })
     mockedSyncRepositoryPullRequests.mockResolvedValue({
       syncedCount: 12,
@@ -260,6 +323,10 @@ describe("POST /api/repositories", () => {
       repo: "repo",
       repositoryId: "existing-repo",
     })
+    expect(invalidateDashboardForUsers).toHaveBeenCalledWith([
+      "user-1",
+      "user-2",
+    ])
   })
 
   it("returns 500 on unexpected errors", async () => {

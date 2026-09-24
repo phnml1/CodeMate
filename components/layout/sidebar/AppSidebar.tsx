@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth"
+import { getCurrentUser } from "@/lib/dal/session"
 import {
   Sidebar,
   SidebarContent,
@@ -12,8 +12,7 @@ import { SidebarNav } from "./SidebarNav"
 import { SidebarUser } from "./SidebarUser"
 
 export async function AppSidebar() {
-  const session = await auth()
-  const user = session?.user
+  const user = await getCurrentUser()
 
   return (
     <Sidebar collapsible="icon">

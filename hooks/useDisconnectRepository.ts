@@ -18,6 +18,8 @@ export function useDisconnectRepository() {
     mutationFn: disconnectRepository,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["repositories"] })
+      queryClient.invalidateQueries({ queryKey: ["connectedRepositories"] })
+      queryClient.invalidateQueries({ queryKey: ["pullRequests"] })
     },
   })
 }

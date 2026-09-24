@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
 import type { AIReviewResponse } from "@/lib/ai/parsers"
 
 export async function GET(
@@ -7,10 +9,19 @@ export async function GET(
   { params }: { params: Promise<{ reviewId: string }> }
 ) {
   try {
-    const { reviewId } = await params
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
-    const review = await prisma.review.findUnique({
-      where: { id: reviewId },
+    const { reviewId } = await params
+    const accessibleWhere = await buildAccessiblePullRequestWhere(session.user.id)
+
+    const review = await prisma.review.findFirst({
+      where: {
+        id: reviewId,
+        pullRequest: { is: accessibleWhere },
+      },
       include: {
         pullRequest: {
           select: { id: true, number: true, title: true, repoId: true },

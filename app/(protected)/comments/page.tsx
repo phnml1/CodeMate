@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
-import { auth } from "@/lib/auth"
 import CommentsClient from "@/components/comment/CommentsClient"
-import { fetchConnectedRepos } from "@/lib/comments"
+import { getConnectedRepositoriesForUser } from "@/lib/dal/repositories"
+import { requireCurrentUser } from "@/lib/dal/session"
 
 export const metadata: Metadata = {
   title: "코드 리뷰 댓글",
@@ -9,8 +9,8 @@ export const metadata: Metadata = {
 }
 
 export default async function CommentsPage() {
-  const session = await auth()
-  const repos = await fetchConnectedRepos()
+  const user = await requireCurrentUser()
+  const repos = await getConnectedRepositoriesForUser(user.id)
 
-  return <CommentsClient repos={repos} userId={session?.user?.id} />
+  return <CommentsClient repos={repos} userId={user.id} />
 }

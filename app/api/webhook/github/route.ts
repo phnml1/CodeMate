@@ -1,4 +1,3 @@
-import { revalidateTag } from "next/cache"
 import { NextResponse, after } from "next/server"
 import { analyzeReview } from "@/lib/ai/analyze"
 import { getEnabledUserIds } from "@/lib/notification-settings"
@@ -7,26 +6,13 @@ import {
   toBaseNotification,
 } from "@/lib/notifications/compat"
 import { prisma } from "@/lib/prisma"
+import { invalidateDashboardForUsers } from "@/lib/dashboard-cache"
 import { getRepositoryMemberIds } from "@/lib/repository-access"
 import { upsertReviewNotifications } from "@/lib/review-notifications"
 import { emitNotification } from "@/lib/socket/emitter"
 import { verifyWebhookSignature } from "@/lib/webhook-validator"
 
 export const maxDuration = 300
-
-function safeRevalidateDashboard(userId: string) {
-  try {
-    revalidateTag(`dashboard-${userId}`, "max")
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-
-    if (message.includes("static generation store missing")) {
-      return
-    }
-
-    throw error
-  }
-}
 
 function getPRStatus(pr: {
   state: string
@@ -152,6 +138,8 @@ export async function POST(request: Request) {
       },
     })
 
+    invalidateDashboardForUsers(recipientIds)
+
     if (isStatusChange) {
       const isMerged =
         getPRStatus({
@@ -172,7 +160,6 @@ export async function POST(request: Request) {
         })
       }
 
-      recipientIds.forEach((userId) => safeRevalidateDashboard(userId))
       return NextResponse.json({ message: "PR status processed" })
     }
 
@@ -192,7 +179,7 @@ export async function POST(request: Request) {
         })
 
         const result = await analyzeReview(pullRequest.id)
-        recipientIds.forEach((userId) => safeRevalidateDashboard(userId))
+        invalidateDashboardForUsers(recipientIds)
 
         if (result.status === "SKIPPED_ACTIVE") return
 

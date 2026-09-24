@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { auth } from "@/lib/auth"
+import { requireCurrentUser } from "@/lib/dal/session"
 import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import SettingsClient from "@/components/settings/SettingsClient"
@@ -10,21 +10,20 @@ export const metadata: Metadata = {
 }
 
 export default async function SettingsPage() {
-  const session = await auth()
-  if (!session?.user?.id) redirect("/login")
+  const currentUser = await requireCurrentUser()
 
   const [user, account] = await Promise.all([
     prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: currentUser.id },
       select: { name: true, email: true, image: true, githubId: true },
     }),
     prisma.account.findFirst({
-      where: { userId: session.user.id, provider: "github" },
+      where: { userId: currentUser.id, provider: "github" },
       select: { scope: true, providerAccountId: true },
     }),
   ])
 
-  if (!user) redirect("/login")
+  if (!user) redirect("/auth/login")
 
   return (
     <SettingsClient

@@ -24,6 +24,7 @@ export function useSyncRepository() {
     mutationFn: syncRepository,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pullRequests"] })
+      queryClient.invalidateQueries({ queryKey: ["pullRequest"] })
     },
   })
 }

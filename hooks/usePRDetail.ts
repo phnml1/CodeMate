@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import type { UseQueryOptions } from "@tanstack/react-query";
 
 import type { PullRequest } from "@/types/pulls";
+import { prDetailQueryKey } from "@/lib/query-keys";
 
-export const prDetailQueryKey = (id: string) => ["pullRequest", id] as const;
+export { prDetailQueryKey };
 type PRDetailQueryKey = ReturnType<typeof prDetailQueryKey>;
 type PRDetailQueryOptions = Omit<
   UseQueryOptions<PullRequest, Error, PullRequest, PRDetailQueryKey>,

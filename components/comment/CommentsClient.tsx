@@ -8,10 +8,10 @@ import CommentFilter from "@/components/comment/CommentFilter"
 import CommentsHeader from "@/components/comment/CommentsHeader"
 import { PageContainer } from "@/components/layout/PageContainer"
 import type { CommentWithPR } from "@/types/comment"
-import type { ConnectedRepo } from "@/lib/comments"
+import type { ConnectedRepository } from "@/types/repos"
 
 interface CommentsClientProps {
-  repos: ConnectedRepo[]
+  repos: ConnectedRepository[]
   userId?: string
 }
 
