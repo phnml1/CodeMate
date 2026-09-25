@@ -52,4 +52,5 @@ docs
 lighthouses
 
 /socket-server/node_modules
+/socket-server/dist
 /socket-server/package-lock.json

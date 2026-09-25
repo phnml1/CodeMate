@@ -1,11 +1,19 @@
 import type { CommentWithAuthor, Reactions } from "@/types/comment"
 import type { BaseNotification } from "@/types/notification"
+import type {
+  ServerToClientEventName,
+  ServerToClientPayload,
+} from "@/lib/socket/types"
 
 function serialize<T>(data: unknown): T {
   return JSON.parse(JSON.stringify(data))
 }
 
-async function emitToSocket(room: string, event: string, data: unknown): Promise<void> {
+async function emitToSocket<Event extends ServerToClientEventName>(
+  room: string,
+  event: Event,
+  data: ServerToClientPayload<Event>
+): Promise<void> {
   const socketUrl = process.env.SOCKET_SERVER_URL
   if (!socketUrl) {
     console.warn("[Socket Emitter] SOCKET_SERVER_URL not set, skipping emit")

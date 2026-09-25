@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:socket": "cd socket-server && npm install && tsx --env-file=../.env index.ts",
+    "dev:socket": "tsx --env-file=.env socket-server/index.ts",
+    "build:socket": "tsc -p socket-server/tsconfig.json",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",

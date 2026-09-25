@@ -1,5 +1,15 @@
-import { createHmac } from "crypto"
-import type { TypedServerSocket, SocketData } from "./types"
+import { createHmac, timingSafeEqual } from "crypto"
+import type { TypedServerSocket, SocketData } from "../lib/socket/types"
+
+function safeEqualHex(actual: string, expected: string) {
+  const actualBuffer = Buffer.from(actual, "hex")
+  const expectedBuffer = Buffer.from(expected, "hex")
+
+  return (
+    actualBuffer.length === expectedBuffer.length &&
+    timingSafeEqual(actualBuffer, expectedBuffer)
+  )
+}
 
 export function authenticateSocket(
   socket: TypedServerSocket
@@ -23,7 +33,7 @@ export function authenticateSocket(
   }
 
   const expected = createHmac("sha256", secret).update(payload).digest("hex")
-  if (expected !== signature) {
+  if (!safeEqualHex(signature, expected)) {
     console.error("[Socket Auth] Invalid signature")
     return null
   }

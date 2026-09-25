@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
     ".next-*/**",
     "out/**",
     "build/**",
+    "socket-server/dist/**",
     "next-env.d.ts",
     // Next.js auto-generated type files
     "types/routes.d.ts",
