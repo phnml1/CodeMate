@@ -1,4 +1,4 @@
-import type { TypedServer, TypedServerSocket } from "./types"
+import type { TypedServer, TypedServerSocket } from "../lib/socket/types"
 import { authenticateSocket } from "./auth"
 
 function registerRoomHandlers(socket: TypedServerSocket) {

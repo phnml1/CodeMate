@@ -1,7 +1,7 @@
 import type { Server, Socket } from "socket.io"
 import type { Socket as ClientSocket } from "socket.io-client"
-import type { CommentWithAuthor, Reactions } from "@/types/comment"
-import type { BaseNotification } from "@/types/notification"
+import type { CommentWithAuthor, Reactions } from "../../types/comment"
+import type { BaseNotification } from "../../types/notification"
 
 export interface ServerToClientEvents {
   "comment:new": (comment: CommentWithAuthor) => void
@@ -53,3 +53,16 @@ export type TypedClientSocket = ClientSocket<
   ServerToClientEvents,
   ClientToServerEvents
 >
+
+export type ServerToClientEventName = keyof ServerToClientEvents
+
+export type ServerToClientPayload<Event extends ServerToClientEventName> =
+  Parameters<ServerToClientEvents[Event]>[0]
+
+export type InternalSocketEmitPayload = {
+  [Event in ServerToClientEventName]: {
+    room: string
+    event: Event
+    data: ServerToClientPayload<Event>
+  }
+}[ServerToClientEventName]

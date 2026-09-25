@@ -658,9 +658,13 @@ const REVIEW_PROMPT = `
 ```
 lib/
 ├── socket/
-│   ├── server.ts
-│   ├── handlers.ts
-│   └── types.ts
+│   ├── emitter.ts
+│   └── types.ts        # client/server shared Socket.IO protocol
+
+socket-server/
+├── index.ts            # standalone Socket.IO runtime
+├── handlers.ts
+└── auth.ts
 
 hooks/
 ├── useSocket.ts
@@ -672,39 +676,33 @@ components/
 ├── CommentInput.tsx
 ├── CommentThread.tsx
 └── TypingIndicator.tsx
-
-server.js (Custom server for Socket.io)
 ```
 
 #### Socket.io 서버 구현:
 ```typescript
-// lib/socket/server.ts
-import { Server } from 'socket.io';
+// socket-server/index.ts
+import { createServer } from "http"
+import { Server } from "socket.io"
+import { setupSocketHandlers } from "./handlers"
+import type { TypedServer } from "../lib/socket/types"
 
-export function initSocket(server: any) {
-  const io = new Server(server);
+const httpServer = createServer()
+const io: TypedServer = new Server(httpServer, {
+  cors: {
+    origin: process.env.NEXTJS_URL || "http://localhost:3000",
+    credentials: true,
+  },
+})
 
-  io.on('connection', (socket) => {
-    // PR 룸 참여
-    socket.on('join-pr', (prId) => {
-      socket.join(`pr:${prId}`);
-    });
+setupSocketHandlers(io)
 
-    // 새 댓글
-    socket.on('new-comment', async (data) => {
-      const comment = await createComment(data);
-      io.to(`pr:${data.prId}`).emit('comment-added', comment);
-    });
-
-    // 타이핑 중
-    socket.on('typing', (data) => {
-      socket.to(`pr:${data.prId}`).emit('user-typing', data);
-    });
-  });
-
-  return io;
-}
+httpServer.listen(process.env.PORT || 4000)
 ```
+
+Next.js 앱은 `next dev` / `next start`로 HTTP와 DB API를 담당하고,
+Socket.IO는 별도 프로세스인 `npm run dev:socket`으로 실행한다.
+서버 간 이벤트 발행은 Next API가 `SOCKET_SERVER_URL/internal/emit`으로 요청하며,
+브라우저와 standalone 서버는 `lib/socket/types.ts`의 같은 이벤트 계약을 사용한다.
 
 #### 테스트:
 - [ ] WebSocket 연결 성공
