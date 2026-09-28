@@ -1,15 +1,11 @@
 import { auth } from "@/lib/auth"
 import { getEnabledUserIds } from "@/lib/notification-settings"
-import {
-  notificationCompatSelect,
-  toBaseNotification,
-} from "@/lib/notifications/compat"
+import { notificationCompatSelect } from "@/lib/notifications/compat"
 import { prisma } from "@/lib/prisma"
 import {
   buildAccessiblePullRequestWhere,
   getRepositoryMemberIds,
 } from "@/lib/repository-access"
-import { emitCommentNew, emitNotification } from "@/lib/socket/emitter"
 import { NextResponse } from "next/server"
 
 async function createNotificationsForUsers(params: {
@@ -22,7 +18,7 @@ async function createNotificationsForUsers(params: {
 }) {
   await Promise.all(
     params.userIds.map(async (userId) => {
-      const notification = await prisma.notification.create({
+      await prisma.notification.create({
         data: {
           type: params.type,
           title: params.title,
@@ -33,8 +29,6 @@ async function createNotificationsForUsers(params: {
         },
         select: notificationCompatSelect,
       })
-
-      emitNotification(userId, toBaseNotification(notification))
     })
   )
 }
@@ -145,8 +139,6 @@ export async function POST(
         replies: false,
       },
     })
-
-    emitCommentNew(id, { ...comment, replies: [] })
 
     if (mentions && mentions.length > 0) {
       const uniqueMentions = [...new Set(mentions)].filter(

@@ -56,7 +56,7 @@ CodeMate는 **AI를 활용한 자동 코드 리뷰**와 **실시간 협업 기�
 - **코드 품질 점수** 산정 (0-100점)
 
 ### 3️⃣ 실시간 협업
-- 코드 라인별 댓글 (WebSocket)
+- 코드 라인별 댓글
 - 팀원 멘션 (@username)
 - 댓글 스레드 (답글 기능)
 - 실시간 타이핑 인디케이터
@@ -81,7 +81,6 @@ TypeScript        - 타입 안정성
 Tailwind CSS      - 스타일링
 shadcn/ui         - UI 컴포넌트
 Recharts          - 데이터 시각화
-Socket.io-client  - 실시간 통신
 Zod               - 스키마 검증
 ```
 
@@ -344,7 +343,7 @@ cd codemate
 npm install @prisma/client prisma
 npm install next-auth @auth/prisma-adapter
 npm install @anthropic-ai/sdk
-npm install socket.io socket.io-client
+npm install socket.io
 npm install @octokit/rest
 npm install zod
 npm install recharts lucide-react
@@ -450,7 +449,6 @@ $env:AUTH_SECRET = [guid]::NewGuid().ToString()
 $env:NEXTAUTH_SECRET = [guid]::NewGuid().ToString()
 $env:GITHUB_ID = "e2e-client-id"
 $env:GITHUB_SECRET = [guid]::NewGuid().ToString()
-$env:NEXT_PUBLIC_REALTIME_MODE = "polling"
 
 npm run test:e2e
 ```
@@ -667,15 +665,12 @@ socket-server/
 └── auth.ts
 
 hooks/
-├── useSocket.ts
-├── useRealtimeComments.ts
-└── useTypingIndicator.ts
+└── useRealtimeComments.ts
 
 components/
 ├── CommentSection.tsx
 ├── CommentInput.tsx
-├── CommentThread.tsx
-└── TypingIndicator.tsx
+└── CommentThread.tsx
 ```
 
 #### Socket.io 서버 구현:
@@ -701,14 +696,15 @@ httpServer.listen(process.env.PORT || 4000)
 
 Next.js 앱은 `next dev` / `next start`로 HTTP와 DB API를 담당하고,
 Socket.IO는 별도 프로세스인 `npm run dev:socket`으로 실행한다.
-서버 간 이벤트 발행은 Next API가 `SOCKET_SERVER_URL/internal/emit`으로 요청하며,
-브라우저와 standalone 서버는 `lib/socket/types.ts`의 같은 이벤트 계약을 사용한다.
+일반 PR 댓글과 알림은 REST API와 React Query polling으로 동작하며,
+브라우저는 일반 화면에서 Socket.IO client를 로드하지 않는다.
+standalone Socket.IO 서버는 이후 협업방 전용 realtime runtime으로 사용한다.
 
 #### 테스트:
-- [ ] WebSocket 연결 성공
-- [ ] 댓글 실시간 전송/수신
+- [ ] 협업방 WebSocket 연결 성공
+- [ ] 협업방 메시지 실시간 전송/수신
 - [ ] 여러 클라이언트 동시 접속
-- [ ] 타이핑 인디케이터 작동
+- [ ] 협업방 presence 작동
 - [ ] 멘션 알림
 - [ ] 연결 끊김 후 재연결
 

@@ -10,9 +10,7 @@ import type { CommentWithAuthor } from "@/types/comment"
 import { ISSUE_ICON } from "@/lib/review-ui"
 import InlineCommentForm from "../../../comment/InlineCommentForm"
 import InlineCommentThread from "../../../comment/InlineCommentThread"
-import { useInlineTypingIndicator } from "@/hooks/useInlineTypingIndicator"
 import { groupCommentsByLine } from "@/lib/pr-detail/commentUtils"
-import { getLineCommentsKey } from "@/lib/pr-detail/diffUtils"
 import { groupIssuesByLine } from "@/lib/pr-detail/reviewUtils"
 
 interface DiffTableProps {
@@ -37,7 +35,6 @@ export default function DiffTable({
   const [hoveredLine, setHoveredLine] = useState<number | null>(null)
   const [openFormLine, setOpenFormLine] = useState<number | null>(null)
 
-  const { typingByLine } = useInlineTypingIndicator(prId ?? "")
   const issuesByLine = useMemo(() => groupIssuesByLine(issues), [issues])
   const commentsByLine = useMemo(
     () => groupCommentsByLine(inlineComments),
@@ -133,30 +130,6 @@ export default function DiffTable({
                   </td>
                 </tr>
               )}
-
-              {(() => {
-                if (!filePath || line.newNum == null) return null
-                const lineKey = getLineCommentsKey(filePath, line.newNum)
-                const typingNames = typingByLine.get(lineKey)
-                if (!typingNames?.length) return null
-                const label = typingNames.length === 1
-                  ? `${typingNames[0]}님이 입력 중`
-                  : `${typingNames[0]} 외 ${typingNames.length - 1}명이 입력 중`
-                return (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-1 bg-blue-50 dark:bg-blue-950/20">
-                      <span className="flex items-center gap-1.5 text-[10px] text-blue-500 dark:text-blue-400">
-                        {label}
-                        <span className="flex items-end gap-0.5">
-                          <span className="w-1 h-1 bg-blue-400 rounded-full animate-bounce [animation-delay:0ms]" />
-                          <span className="w-1 h-1 bg-blue-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                          <span className="w-1 h-1 bg-blue-400 rounded-full animate-bounce [animation-delay:300ms]" />
-                        </span>
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })()}
 
               {lineIssues.map((issue, j) => (
                 <tr key={`issue-${i}-${j}`}>

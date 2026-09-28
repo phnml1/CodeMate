@@ -1,9 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import {
-  notificationCompatSelect,
-  toBaseNotification,
-} from "@/lib/notifications/compat";
-import { emitNotification } from "@/lib/socket/emitter";
+import { notificationCompatSelect } from "@/lib/notifications/compat";
 import type { NotificationReviewStatus } from "@/types/notification";
 
 function getReviewNotificationContent(
@@ -55,33 +51,30 @@ export async function upsertReviewNotifications(params: {
         select: { id: true },
       });
 
-      const notification = existing
-        ? await prisma.notification.update({
-            where: { id: existing.id },
-            data: {
-              title: content.title,
-              message: content.message,
-              isRead: false,
-              createdAt: new Date(),
-            },
-            select: notificationCompatSelect,
-          })
-        : await prisma.notification.create({
-            data: {
-              type: "NEW_REVIEW",
-              title: content.title,
-              message: content.message,
-              isRead: false,
-              userId,
-              prId: params.prId,
-            },
-            select: notificationCompatSelect,
-          });
+      if (existing) {
+        await prisma.notification.update({
+          where: { id: existing.id },
+          data: {
+            title: content.title,
+            message: content.message,
+            isRead: false,
+            createdAt: new Date(),
+          },
+          select: notificationCompatSelect,
+        });
+        return;
+      }
 
-      emitNotification(userId, {
-        ...toBaseNotification(notification, params.status),
-        prTitle: params.prTitle,
-        prNumber: params.prNumber,
+      await prisma.notification.create({
+        data: {
+          type: "NEW_REVIEW",
+          title: content.title,
+          message: content.message,
+          isRead: false,
+          userId,
+          prId: params.prId,
+        },
+        select: notificationCompatSelect,
       });
     })
   );

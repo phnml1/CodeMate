@@ -11,7 +11,6 @@ import PRFileList from "./PRFileList";
 import ReviewSection from "./ReviewSection";
 import { usePRDetailDeepLink } from "@/hooks/pr-detail/usePRDetailDeepLink";
 import { usePRDetailReset } from "@/hooks/pr-detail/usePRDetailReset";
-import { useSocketRoom } from "@/hooks/useSocketRoom";
 import { layoutStyles } from "@/lib/styles";
 import { usePRDetailStore } from "@/stores/prDetailStore";
 import type { PullRequest } from "@/types/pulls";
@@ -41,7 +40,6 @@ export default function PRDetailLayout({
   const [scrolled, setScrolled] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<ReviewIssue | null>(null);
 
-  useSocketRoom(id);
   usePRDetailReset(id);
   usePRDetailDeepLink(id);
 

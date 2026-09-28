@@ -1,7 +1,6 @@
 import { POST } from "@/app/api/comments/[id]/reactions/route"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { emitCommentReactionUpdated } from "@/lib/socket/emitter"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
@@ -16,14 +15,9 @@ jest.mock("@/lib/prisma", () => ({
   },
 }))
 
-jest.mock("@/lib/socket/emitter", () => ({
-  emitCommentReactionUpdated: jest.fn(),
-}))
-
 const mockedAuth = auth as jest.Mock
 const mockedFindUnique = prisma.comment.findUnique as jest.Mock
 const mockedUpdate = prisma.comment.update as jest.Mock
-const mockedEmitCommentReactionUpdated = emitCommentReactionUpdated as jest.Mock
 
 function createRequest(body: object) {
   return new Request("http://localhost/api/comments/comment-1/reactions", {
@@ -83,10 +77,9 @@ describe("POST /api/comments/[id]/reactions", () => {
     expect(response.status).toBe(400)
     expect(body.error).toBeDefined()
     expect(mockedUpdate).not.toHaveBeenCalled()
-    expect(mockedEmitCommentReactionUpdated).not.toHaveBeenCalled()
   })
 
-  it("adds a reaction and emits a realtime update", async () => {
+  it("adds a reaction and returns the updated comment", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
     mockedFindUnique.mockResolvedValue({
       id: "comment-1",
@@ -113,15 +106,10 @@ describe("POST /api/comments/[id]/reactions", () => {
         author: { select: { id: true, name: true, image: true } },
       },
     })
-    expect(mockedEmitCommentReactionUpdated).toHaveBeenCalledWith(
-      "pr-1",
-      "comment-1",
-      { "👍": ["user-2", "user-1"] }
-    )
     expect(body.comment.reactions["👍"]).toEqual(["user-2", "user-1"])
   })
 
-  it("removes the user's existing reaction and emits the trimmed payload", async () => {
+  it("removes the user's existing reaction and returns the updated comment", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
     mockedFindUnique.mockResolvedValue({
       id: "comment-1",
@@ -148,11 +136,6 @@ describe("POST /api/comments/[id]/reactions", () => {
         author: { select: { id: true, name: true, image: true } },
       },
     })
-    expect(mockedEmitCommentReactionUpdated).toHaveBeenCalledWith(
-      "pr-1",
-      "comment-1",
-      { "👍": ["user-2"] }
-    )
     expect(body.comment.reactions["👍"]).toEqual(["user-2"])
   })
 })

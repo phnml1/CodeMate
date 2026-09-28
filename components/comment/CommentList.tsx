@@ -18,7 +18,6 @@ import {
 } from "@/hooks/useComments"
 import { usePRDetail } from "@/hooks/usePRDetail"
 import { useRealtimeComments } from "@/hooks/useRealtimeComments"
-import { useTypingIndicator } from "@/hooks/useTypingIndicator"
 import { recordRender } from "@/lib/measurements/renderCounter"
 import { cn } from "@/lib/utils"
 import type {
@@ -26,10 +25,6 @@ import type {
   MentionUser,
   ReactionEmoji,
 } from "@/types/comment"
-import {
-  SocketConnectionBadge,
-  SocketConnectionNotice,
-} from "@/components/realtime/SocketConnectionStatus"
 import CommentRenderMetricsPanel from "./CommentRenderMetricsPanel"
 import ReactionBar from "./ReactionBar"
 
@@ -251,7 +246,6 @@ export default function CommentList({
   const { data: allComments = [], isLoading } = useRealtimeComments(prId)
   const createComment = useCreateComment(prId)
   const toggleReaction = useToggleReaction(prId, currentUserId)
-  const { names: typingNames, onTyping, onTypingStop } = useTypingIndicator(prId)
   const { data: pr } = usePRDetail(prId)
   const [open, setOpen] = useState(true)
   const [input, setInput] = useState("")
@@ -310,9 +304,8 @@ export default function CommentList({
 
     createComment.mutate({ content: input.trim(), mentions })
     setInput("")
-    onTypingStop()
     isAtBottomRef.current = true
-  }, [createComment, input, mentionUsers, onTypingStop])
+  }, [createComment, input, mentionUsers])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -347,7 +340,6 @@ export default function CommentList({
               {generalComments.length}
             </span>
           )}
-          <SocketConnectionBadge />
         </div>
         <ChevronDown
           size={15}
@@ -360,8 +352,6 @@ export default function CommentList({
 
       {open && (
         <div id={commentsPanelId}>
-          <SocketConnectionNotice />
-
           <div
             onScroll={handleScroll}
             className="space-y-1.5 overflow-y-auto bg-slate-50 px-4 py-5 dark:bg-slate-950"
@@ -399,21 +389,6 @@ export default function CommentList({
             <div ref={chatEndRef} />
           </div>
 
-          {typingNames.length > 0 && (
-            <div className="flex items-center gap-1.5 border-t border-slate-100 bg-slate-50 px-4 py-1.5 text-[11px] text-slate-400 dark:border-slate-800 dark:bg-slate-950">
-              <span>
-                {typingNames.length === 1
-                  ? `${typingNames[0]} is typing`
-                  : `${typingNames[0]} and ${typingNames.length - 1} more are typing`}
-              </span>
-              <span className="flex items-end gap-0.5">
-                <span className="h-1 w-1 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
-                <span className="h-1 w-1 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
-                <span className="h-1 w-1 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
-              </span>
-            </div>
-          )}
-
           <div className="border-t border-slate-200 bg-white px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
             <div className="flex items-end gap-2">
               <label htmlFor={commentsInputId} className="sr-only">
@@ -424,11 +399,9 @@ export default function CommentList({
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value)
-                  onTyping()
                   e.target.style.height = "auto"
                   e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
                 }}
-                onBlur={onTypingStop}
                 onKeyDown={handleKeyDown}
                 placeholder="Write a comment. Enter to send, Shift+Enter for newline"
                 rows={1}

@@ -1,5 +1,4 @@
 import type { Server, Socket } from "socket.io"
-import type { Socket as ClientSocket } from "socket.io-client"
 import type { CommentWithAuthor, Reactions } from "../../types/comment"
 import type { BaseNotification } from "../../types/notification"
 
@@ -47,11 +46,6 @@ export type TypedServerSocket = Socket<
   ServerToClientEvents,
   InterServerEvents,
   SocketData
->
-
-export type TypedClientSocket = ClientSocket<
-  ServerToClientEvents,
-  ClientToServerEvents
 >
 
 export type ServerToClientEventName = keyof ServerToClientEvents

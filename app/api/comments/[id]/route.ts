@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
-import { emitCommentUpdated, emitCommentDeleted } from "@/lib/socket/emitter"
 
 /**
  * @swagger
@@ -63,8 +62,6 @@ export async function PATCH(
       },
     })
 
-    emitCommentUpdated(comment.pullRequestId, { ...updated, replies: [] })
-
     return NextResponse.json({ comment: updated })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -118,8 +115,6 @@ export async function DELETE(
     }
 
     await prisma.comment.delete({ where: { id } })
-
-    emitCommentDeleted(comment.pullRequestId, id)
 
     return NextResponse.json({ success: true })
   } catch {

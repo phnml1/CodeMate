@@ -1,15 +1,11 @@
 import { NextResponse, after } from "next/server"
 import { analyzeReview } from "@/lib/ai/analyze"
 import { getEnabledUserIds } from "@/lib/notification-settings"
-import {
-  notificationCompatSelect,
-  toBaseNotification,
-} from "@/lib/notifications/compat"
+import { notificationCompatSelect } from "@/lib/notifications/compat"
 import { prisma } from "@/lib/prisma"
 import { invalidateDashboardForUsers } from "@/lib/dashboard-cache"
 import { getRepositoryMemberIds } from "@/lib/repository-access"
 import { upsertReviewNotifications } from "@/lib/review-notifications"
-import { emitNotification } from "@/lib/socket/emitter"
 import { verifyWebhookSignature } from "@/lib/webhook-validator"
 
 export const maxDuration = 300
@@ -37,7 +33,7 @@ async function notifyUsers(params: {
 
   await Promise.all(
     recipients.map(async (userId) => {
-      const notification = await prisma.notification.create({
+      await prisma.notification.create({
         data: {
           type: params.type,
           title: params.title,
@@ -46,12 +42,6 @@ async function notifyUsers(params: {
           prId: params.prId,
         },
         select: notificationCompatSelect,
-      })
-
-      emitNotification(userId, {
-        ...toBaseNotification(notification),
-        prTitle: params.prTitle,
-        prNumber: params.prNumber,
       })
     })
   )

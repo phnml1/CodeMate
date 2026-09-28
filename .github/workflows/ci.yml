@@ -33,7 +33,6 @@ jobs:
       AUTH_URL: http://localhost:3000
       NEXTAUTH_URL: http://localhost:3000
       GITHUB_ID: e2e-client-id
-      NEXT_PUBLIC_REALTIME_MODE: polling
 
     steps:
     # 0) 코드 체크아웃 (캐시 설정을 위해 가장 먼저 실행)

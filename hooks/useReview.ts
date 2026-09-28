@@ -1,16 +1,8 @@
 "use client"
 
-import { useEffect } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import type { UseQueryOptions } from "@tanstack/react-query"
-import { useSocket } from "./useSocket"
 import type { Review } from "@/types/review"
-import type { BaseNotification } from "@/types/notification"
-import {
-  recordHandlerInvocation,
-  recordHandlerRegistered,
-  recordHandlerRemoved,
-} from "@/lib/measurements/socketMetrics"
 
 export const reviewQueryKey = (prId: string) => ["review", prId] as const
 type ReviewQueryKey = ReturnType<typeof reviewQueryKey>
@@ -59,34 +51,6 @@ export function useReviewQuery(prId: string, options?: ReviewQueryOptions) {
     staleTime: 30_000,
     ...options,
   })
-}
-
-export function useReviewRealtimeInvalidation(prId: string) {
-  const { socket } = useSocket()
-  const queryClient = useQueryClient()
-
-  // Socket: refetch review data when a review notification arrives.
-  useEffect(() => {
-    if (!socket) return
-
-    const handleNotification = (notification: BaseNotification) => {
-      recordHandlerInvocation("notification:new")
-      if (
-        (notification.type === "NEW_REVIEW" ||
-          notification.type === "REVIEW_FAILED") &&
-        notification.prId === prId
-      ) {
-        queryClient.invalidateQueries({ queryKey: reviewQueryKey(prId) })
-      }
-    }
-
-    recordHandlerRegistered("notification:new")
-    socket.on("notification:new", handleNotification)
-    return () => {
-      socket.off("notification:new", handleNotification)
-      recordHandlerRemoved("notification:new")
-    }
-  }, [socket, prId, queryClient])
 }
 
 export function useReview(prId: string) {
