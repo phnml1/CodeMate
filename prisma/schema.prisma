@@ -30,6 +30,9 @@ model User {
   notifications       Notification[]
   notificationSetting NotificationSetting?
   reviewSetting       ReviewSetting?
+  ownedCollaborationRooms      CollaborationRoom[]       @relation("CollaborationRoomOwner")
+  collaborationRoomMemberships CollaborationRoomMember[]
+  collaborationMessages        CollaborationMessage[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -135,6 +138,7 @@ model PullRequest {
   repoId      String
   reviews     Review[]
   comments    Comment[]
+  collaborationRooms CollaborationRoom[]
 
   mergedAt        DateTime?
   closedAt        DateTime?
@@ -239,6 +243,100 @@ model Comment {
 
   @@index([pullRequestId])
   @@index([authorId])
+}
+
+model CollaborationRoom {
+  id              String                  @id @default(cuid())
+  name            String
+  status          CollaborationRoomStatus @default(ACTIVE)
+  capacity        Int                     @default(8)
+
+  pullRequest     PullRequest             @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+  pullRequestId   String
+  owner           User                    @relation("CollaborationRoomOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId         String
+
+  members         CollaborationRoomMember[]
+  messages        CollaborationMessage[]
+
+  endedAt         DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([pullRequestId, status])
+  @@index([ownerId])
+}
+
+model CollaborationRoomMember {
+  id              String                      @id @default(cuid())
+  role            CollaborationRoomMemberRole @default(MEMBER)
+
+  room            CollaborationRoom           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId          String
+  user            User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+
+  joinedAt        DateTime                    @default(now())
+  leftAt          DateTime?
+  updatedAt       DateTime                    @updatedAt
+
+  @@unique([roomId, userId])
+  @@index([userId])
+  @@index([roomId, leftAt])
+}
+
+model CollaborationMessage {
+  id              String                      @id @default(cuid())
+  content         String                      @db.Text
+  clientMessageId String?
+
+  room            CollaborationRoom           @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId          String
+  author          User                        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId        String
+  codeReference   CollaborationCodeReference?
+
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  @@unique([roomId, authorId, clientMessageId])
+  @@index([roomId, createdAt])
+  @@index([authorId])
+}
+
+model CollaborationCodeReference {
+  id              String                    @id @default(cuid())
+  filePath        String
+  side            CollaborationCodeSide     @default(RIGHT)
+  startLine       Int
+  endLine         Int
+  startColumn     Int?
+  endColumn       Int?
+  baseSha         String?
+  headSha         String?
+  selectedText    String?                   @db.Text
+
+  message         CollaborationMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId       String                    @unique
+
+  createdAt       DateTime                  @default(now())
+
+  @@index([filePath])
+}
+
+enum CollaborationRoomStatus {
+  ACTIVE
+  ENDED
+}
+
+enum CollaborationRoomMemberRole {
+  OWNER
+  MEMBER
+}
+
+enum CollaborationCodeSide {
+  LEFT
+  RIGHT
 }
 
 model Notification {
