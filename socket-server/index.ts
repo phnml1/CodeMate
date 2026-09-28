@@ -36,6 +36,7 @@ const serverToClientEvents = new Set<ServerToClientEventName>([
   "inline:typing:start",
   "inline:typing:stop",
   "notification:new",
+  "collaboration:presence",
 ])
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -98,6 +99,9 @@ function emitInternalPayload(io: TypedServer, body: InternalSocketEmitPayload) {
       break
     case "notification:new":
       io.to(body.room).emit("notification:new", body.data)
+      break
+    case "collaboration:presence":
+      io.to(body.room).emit("collaboration:presence", body.data)
       break
   }
 }
