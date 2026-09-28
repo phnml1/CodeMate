@@ -31,10 +31,6 @@ jest.mock("@/lib/dashboard-cache", () => ({
   invalidateDashboardForUsers: jest.fn(),
 }))
 
-jest.mock("@/lib/socket/emitter", () => ({
-  emitNotification: jest.fn(),
-}))
-
 jest.mock("@/lib/notification-settings", () => ({
   getEnabledUserIds: jest.fn().mockResolvedValue(["user-1"]),
 }))

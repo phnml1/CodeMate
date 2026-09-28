@@ -1,7 +1,6 @@
 "use client";
 
 import PRDetailHeader from "./PRDetailHeader";
-import InlineTypingBanner from "./InlineTypingBanner";
 import MobileFileDropdown from "./MobileFileDropdown";
 import type { PullRequest } from "@/types/pulls";
 
@@ -23,7 +22,6 @@ export default function PRDetailStickyHeader({
         scrolled={scrolled}
         initialPullRequest={initialPullRequest}
       />
-      <InlineTypingBanner prId={prId} />
       <MobileFileDropdown prId={prId} />
     </div>
   );

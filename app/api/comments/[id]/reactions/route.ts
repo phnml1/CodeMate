@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { emitCommentReactionUpdated } from "@/lib/socket/emitter"
 import { NextResponse } from "next/server"
 import type { ReactionEmoji, Reactions } from "@/types/comment"
 
@@ -76,8 +75,6 @@ export async function POST(
         author: { select: { id: true, name: true, image: true } },
       },
     })
-
-    emitCommentReactionUpdated(comment.pullRequestId, id, updatedReactions)
 
     return NextResponse.json({ comment: updated })
   } catch {

@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, FileText, Clock } from "lucide-react";
 import { timeAgo } from "@/lib/date";
 import { PR_STATUS_STYLE } from "@/constants/pulls";
-import { SocketConnectionBadge } from "@/components/realtime/SocketConnectionStatus";
 import { useCachedPRDetail } from "@/hooks/pr-detail/usePRDetailCachedQueries";
 import type { PullRequest } from "@/types/pulls";
 import BranchChip from "./BranchChip";
@@ -46,8 +45,6 @@ export default function PRDetailHeader({
           <span className={`px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wider shrink-0 ${PR_STATUS_STYLE[displayPr.status]}`}>
             {displayPr.status}
           </span>
-
-          <SocketConnectionBadge className="hidden md:inline-flex" />
 
           <h1 className="text-xs md:text-sm font-bold text-slate-900 dark:text-white truncate flex-1 min-w-0">
             {displayPr.title}
@@ -107,7 +104,6 @@ export default function PRDetailHeader({
           {/* 우측: 통계 + 시간 */}
           <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-start gap-3 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2 text-[10px] md:text-xs font-bold">
-              <SocketConnectionBadge className="hidden md:inline-flex" />
               <span className="px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 rounded-full border border-emerald-100 dark:border-emerald-500/20">
                 +{displayPr.additions}
               </span>

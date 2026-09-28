@@ -4,7 +4,6 @@ import { useId, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCreateComment } from "@/hooks/useComments"
-import { useInlineTypingIndicator } from "@/hooks/useInlineTypingIndicator"
 
 interface InlineCommentFormProps {
   prId: string
@@ -22,17 +21,14 @@ export default function InlineCommentForm({
   const [content, setContent] = useState("")
   const textareaId = useId()
   const createComment = useCreateComment(prId)
-  const { onInlineTyping, onInlineTypingStop } = useInlineTypingIndicator(prId)
 
   const handleClose = () => {
-    onInlineTypingStop()
     onClose()
   }
 
   const handleSubmit = () => {
     if (!content.trim()) return
 
-    onInlineTypingStop()
     createComment.mutate(
       { content: content.trim(), filePath, lineNumber },
       {
@@ -55,9 +51,7 @@ export default function InlineCommentForm({
         value={content}
         onChange={(e) => {
           setContent(e.target.value)
-          onInlineTyping(filePath, lineNumber)
         }}
-        onBlur={onInlineTypingStop}
         onKeyDown={(e) => {
           if (e.key === "Escape") handleClose()
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
