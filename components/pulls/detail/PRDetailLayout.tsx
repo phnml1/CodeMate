@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
+import CollaborationRoomPanel from "@/components/collaboration/CollaborationRoomPanel";
 import { useShallow } from "zustand/react/shallow";
 import FloatingCommentsButton from "./FloatingCommentsButton";
 import IssueModalHost from "./IssueModalHost";
@@ -93,6 +94,8 @@ export default function PRDetailLayout({
             prId={id}
             onIssueClick={handleIssueClick}
           />
+
+          <CollaborationRoomPanel prId={id} currentUserId={currentUserId} />
 
           <PRDiffSection
             prId={id}
