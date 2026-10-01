@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { UseQueryOptions } from "@tanstack/react-query";
 import { handleUnauthorizedAutoLogout } from "@/lib/client-auth";
-import type { PRFile } from "@/types/pulls";
+import type { PRFile, WorkspacePRFilesResponse } from "@/types/pulls";
 
 const GITHUB_REAUTH_REQUIRED = "GITHUB_REAUTH_REQUIRED";
 
@@ -76,4 +76,38 @@ export function usePRFiles(id: string, options?: PRFilesQueryOptions) {
   }, [query.error]);
 
   return query;
+}
+
+export function useWorkspacePRFiles(id: string) {
+  const query = useQuery({
+    queryKey: ["pullRequestFilesWithRevision", id] as const,
+    queryFn: async (): Promise<WorkspacePRFilesResponse> => {
+      const response = await fetch(`/api/pulls/${id}/files?revision=1`)
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as
+          | { error?: string; code?: string }
+          | null
+        throw new PRFilesError(
+          body?.error ?? "PR 파일을 불러오지 못했습니다.",
+          response.status,
+          body?.code
+        )
+      }
+      return response.json()
+    },
+    retry: (failureCount, error) =>
+      !(error instanceof PRFilesError && (error.status === 401 || error.code === GITHUB_REAUTH_REQUIRED)) &&
+      failureCount < 3,
+  })
+
+  useEffect(() => {
+    if (!(query.error instanceof PRFilesError) || query.error.status !== 401) return
+    handleUnauthorizedAutoLogout(
+      query.error.code === GITHUB_REAUTH_REQUIRED
+        ? "GitHub 인증이 만료되어 다시 로그인합니다."
+        : "인증이 만료되어 다시 로그인합니다."
+    )
+  }, [query.error])
+
+  return query
 }

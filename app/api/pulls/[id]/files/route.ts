@@ -8,7 +8,7 @@ import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
 import { NextResponse } from "next/server"
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -41,14 +41,21 @@ export async function GET(
     const octokit = await getOctokit(session.user.id)
     const [owner, repo] = pr.repo.fullName.split("/")
 
-    const { data } = await octokit.pulls.listFiles({
+    const fileRequest = octokit.pulls.listFiles({
       owner,
       repo,
       pull_number: pr.number,
       per_page: 100,
     })
+    const includeRevision = new URL(request.url).searchParams.get("revision") === "1"
+    const [fileResult, pullResult] = await Promise.all([
+      fileRequest,
+      includeRevision
+        ? octokit.pulls.get({ owner, repo, pull_number: pr.number })
+        : Promise.resolve(null),
+    ])
 
-    const files = data.map(
+    const files = fileResult.data.map(
       ({ filename, status, additions, deletions, changes, patch }) => ({
         filename,
         status,
@@ -59,7 +66,15 @@ export async function GET(
       })
     )
 
-    return NextResponse.json({ files })
+    return NextResponse.json({
+      files,
+      ...(pullResult ? {
+        revision: {
+          baseSha: pullResult.data.base.sha,
+          headSha: pullResult.data.head.sha,
+        },
+      } : {}),
+    })
   } catch (error) {
     if (isGitHubReconnectRequiredError(error)) {
       return NextResponse.json(

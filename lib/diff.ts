@@ -9,18 +9,23 @@ export interface DiffLine {
 
 export function parsePatch(patch: string): DiffLine[] {
   const result: DiffLine[] = [];
-  let row = 0;
+  let oldLine = 0;
+  let newLine = 0;
 
   for (const line of patch.split("\n")) {
-    row++;
-    if (line.startsWith("@@")) {
-      result.push({ type: "hunk",    content: line,         oldNum: row, newNum: row });
-    } else if (line.startsWith("+")) {
-      result.push({ type: "added",   content: line.slice(1),             newNum: row });
-    } else if (line.startsWith("-")) {
-      result.push({ type: "removed", content: line.slice(1), oldNum: row              });
-    } else {
-      result.push({ type: "context", content: line.slice(1), oldNum: row, newNum: row });
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+    if (hunk) {
+      oldLine = Number(hunk[1]);
+      newLine = Number(hunk[2]);
+      result.push({ type: "hunk", content: line });
+    } else if (line.startsWith("+") && result.length > 0) {
+      result.push({ type: "added", content: line.slice(1), newNum: newLine++ });
+    } else if (line.startsWith("-") && result.length > 0) {
+      result.push({ type: "removed", content: line.slice(1), oldNum: oldLine++ });
+    } else if (line.startsWith(" ") && result.length > 0) {
+      result.push({ type: "context", content: line.slice(1), oldNum: oldLine++, newNum: newLine++ });
+    } else if (line.startsWith("\\ No newline at end of file") && result.length > 0) {
+      result.push({ type: "context", content: line });
     }
   }
   return result;

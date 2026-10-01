@@ -129,6 +129,27 @@ describe("GET /api/pulls/[id]/files", () => {
     })
   })
 
+  it("includes the PR revision when the workspace requests it", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindFirst.mockResolvedValue(samplePR)
+    const listFiles = jest.fn().mockResolvedValue({ data: sampleFiles })
+    const get = jest.fn().mockResolvedValue({
+      data: { base: { sha: "a".repeat(40) }, head: { sha: "b".repeat(40) } },
+    })
+    mockedGetOctokit.mockResolvedValue({ pulls: { listFiles, get } })
+
+    const response = await GET(
+      new Request("http://localhost/api/pulls/pr-1/files?revision=1"),
+      createParams()
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.revision).toEqual({ baseSha: "a".repeat(40), headSha: "b".repeat(40) })
+    expect(get).toHaveBeenCalledWith({ owner: "user", repo: "awesome-app", pull_number: 45 })
+  })
+
   it("normalizes missing patch values to null", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
     mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
