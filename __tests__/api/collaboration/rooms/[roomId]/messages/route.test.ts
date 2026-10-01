@@ -2,6 +2,7 @@ import { POST } from "@/app/api/collaboration/rooms/[roomId]/messages/route"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
+import { emitCollaborationMessage } from "@/lib/socket/emitter"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
@@ -26,10 +27,15 @@ jest.mock("@/lib/repository-access", () => ({
   buildAccessiblePullRequestWhere: jest.fn(),
 }))
 
+jest.mock("@/lib/socket/emitter", () => ({
+  emitCollaborationMessage: jest.fn(),
+}))
+
 const mockedAuth = auth as jest.Mock
 const mockedFindRoom = prisma.collaborationRoom.findFirst as jest.Mock
 const mockedFindMember = prisma.collaborationRoomMember.findUnique as jest.Mock
 const mockedCreateMessage = prisma.collaborationMessage.create as jest.Mock
+const mockedEmitMessage = emitCollaborationMessage as jest.Mock
 const mockedBuildAccessiblePullRequestWhere =
   buildAccessiblePullRequestWhere as jest.Mock
 
@@ -57,6 +63,31 @@ const sampleRoom = {
   updatedAt: now,
 }
 
+const sampleMessage = {
+  id: "message-1",
+  roomId: "room-1",
+  authorId: "user-2",
+  author: { id: "user-2", name: "Reviewer", image: null },
+  content: "이 줄 같이 볼까요?",
+  clientMessageId: "client-1",
+  codeReference: {
+    id: "code-ref-1",
+    filePath: "app/page.tsx",
+    side: "RIGHT",
+    startLine: 10,
+    endLine: 12,
+    startColumn: null,
+    endColumn: null,
+    baseSha: null,
+    headSha: null,
+    selectedText: null,
+    messageId: "message-1",
+    createdAt: now,
+  },
+  createdAt: now,
+  updatedAt: now,
+}
+
 function createRequest(body: unknown) {
   return new Request(
     "http://localhost/api/collaboration/rooms/room-1/messages",
@@ -73,6 +104,10 @@ const createParams = (roomId = "room-1") =>
   }
 
 describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
+  beforeEach(() => {
+    mockedEmitMessage.mockResolvedValue(undefined)
+  })
+
   afterEach(() => {
     jest.clearAllMocks()
   })
@@ -102,30 +137,7 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
     })
     mockedFindRoom.mockResolvedValue(sampleRoom)
     mockedFindMember.mockResolvedValue({ id: "member-2", leftAt: null })
-    mockedCreateMessage.mockResolvedValue({
-      id: "message-1",
-      roomId: "room-1",
-      authorId: "user-2",
-      author: { id: "user-2", name: "Reviewer", image: null },
-      content: "이 줄 같이 볼까요?",
-      clientMessageId: "client-1",
-      codeReference: {
-        id: "code-ref-1",
-        filePath: "app/page.tsx",
-        side: "RIGHT",
-        startLine: 10,
-        endLine: 12,
-        startColumn: null,
-        endColumn: null,
-        baseSha: null,
-        headSha: null,
-        selectedText: null,
-        messageId: "message-1",
-        createdAt: now,
-      },
-      createdAt: now,
-      updatedAt: now,
-    })
+    mockedCreateMessage.mockResolvedValue(sampleMessage)
 
     const response = await POST(
       createRequest({
@@ -136,6 +148,8 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
           side: "RIGHT",
           startLine: 10,
           endLine: 12,
+          baseSha: "a".repeat(40),
+          headSha: "b".repeat(40),
         },
       }),
       createParams()
@@ -144,6 +158,13 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
 
     expect(response.status).toBe(201)
     expect(body.message.id).toBe("message-1")
+    expect(mockedEmitMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "message-1",
+        roomId: "room-1",
+        content: "이 줄 같이 볼까요?",
+      })
+    )
     expect(mockedCreateMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -155,10 +176,37 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
               filePath: "app/page.tsx",
               startLine: 10,
               endLine: 12,
+              baseSha: "a".repeat(40),
+              headSha: "b".repeat(40),
             }),
           },
         }),
       })
     )
+  })
+
+  it("keeps the saved message when socket broadcast fails", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-2" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
+      repoId: { in: ["repo-1"] },
+    })
+    mockedFindRoom.mockResolvedValue(sampleRoom)
+    mockedFindMember.mockResolvedValue({ id: "member-2", leftAt: null })
+    mockedCreateMessage.mockResolvedValue(sampleMessage)
+    mockedEmitMessage.mockRejectedValueOnce(new Error("Socket unavailable"))
+    const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {})
+
+    try {
+      const response = await POST(
+        createRequest({ content: sampleMessage.content }),
+        createParams()
+      )
+
+      expect(response.status).toBe(201)
+      expect((await response.json()).message.id).toBe("message-1")
+      expect(consoleSpy).toHaveBeenCalled()
+    } finally {
+      consoleSpy.mockRestore()
+    }
   })
 })

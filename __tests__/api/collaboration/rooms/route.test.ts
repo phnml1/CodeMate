@@ -1,7 +1,8 @@
-import { POST } from "@/app/api/collaboration/rooms/route"
+import { GET, POST } from "@/app/api/collaboration/rooms/route"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
+import { getCollaborationPresence } from "@/lib/socket/presence"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
@@ -10,6 +11,7 @@ jest.mock("@/lib/auth", () => ({
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     $transaction: jest.fn(),
+    collaborationRoom: { findMany: jest.fn() },
     pullRequest: {
       findFirst: jest.fn(),
     },
@@ -19,12 +21,15 @@ jest.mock("@/lib/prisma", () => ({
 jest.mock("@/lib/repository-access", () => ({
   buildAccessiblePullRequestWhere: jest.fn(),
 }))
+jest.mock("@/lib/socket/presence", () => ({ getCollaborationPresence: jest.fn() }))
 
 const mockedAuth = auth as jest.Mock
 const mockedTransaction = prisma.$transaction as jest.Mock
 const mockedFindPullRequest = prisma.pullRequest.findFirst as jest.Mock
 const mockedBuildAccessiblePullRequestWhere =
   buildAccessiblePullRequestWhere as jest.Mock
+const mockedFindRooms = prisma.collaborationRoom.findMany as jest.Mock
+const mockedPresence = getCollaborationPresence as jest.Mock
 
 const now = new Date("2026-09-28T00:00:00.000Z")
 
@@ -137,5 +142,50 @@ describe("POST /api/collaboration/rooms", () => {
 
     expect(response.status).toBe(404)
     expect(body.error).toBe("Pull request not found")
+  })
+})
+
+describe("GET /api/collaboration/rooms", () => {
+  beforeEach(() => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindRooms.mockResolvedValue([sampleRoom])
+  })
+
+  afterEach(() => jest.clearAllMocks())
+
+  it("hides abandoned active rooms", async () => {
+    mockedPresence.mockResolvedValue({ startedAt: now.toISOString(), rooms: [{ roomId: "room-1", users: [] }] })
+
+    const response = await GET(new Request("http://localhost/api/collaboration/rooms?pullRequestId=pr-1"))
+    expect(response.status).toBe(200)
+    expect((await response.json()).rooms).toEqual([])
+  })
+
+  it("shows 1/8 when one of two recorded members has left", async () => {
+    mockedFindRooms.mockResolvedValue([{
+      ...sampleRoom,
+      members: [sampleRoom.members[0], {
+        ...sampleRoom.members[0], id: "member-2", userId: "user-2",
+        user: { id: "user-2", name: "Reviewer", image: null },
+      }],
+    }])
+    mockedPresence.mockResolvedValue({ startedAt: now.toISOString(), rooms: [{ roomId: "room-1", users: [
+      { userId: "user-1", status: "online" },
+    ] }] })
+
+    const response = await GET(new Request("http://localhost/api/collaboration/rooms?pullRequestId=pr-1"))
+    const { rooms } = await response.json()
+    expect(rooms).toHaveLength(1)
+    expect(rooms[0].memberCount).toBe(1)
+    expect(rooms[0].members.map((member: { userId: string }) => member.userId)).toEqual(["user-1"])
+  })
+
+  it("keeps a newly created room visible while its owner connects", async () => {
+    mockedFindRooms.mockResolvedValue([{ ...sampleRoom, createdAt: new Date() }])
+    mockedPresence.mockResolvedValue({ startedAt: now.toISOString(), rooms: [{ roomId: "room-1", users: [] }] })
+
+    const response = await GET(new Request("http://localhost/api/collaboration/rooms?pullRequestId=pr-1"))
+    expect((await response.json()).rooms).toHaveLength(1)
   })
 })

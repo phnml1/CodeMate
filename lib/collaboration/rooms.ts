@@ -1,6 +1,7 @@
 import type { Prisma } from "@/lib/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
 import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
+import { getCollaborationPresence } from "@/lib/socket/presence"
 import { z } from "zod"
 
 export const COLLABORATION_ROOM_DEFAULT_CAPACITY = 8
@@ -201,12 +202,8 @@ export async function ensureCollaborationRoomMember(
 }
 
 export async function getActiveMemberCount(roomId: string) {
-  return prisma.collaborationRoomMember.count({
-    where: {
-      roomId,
-      leftAt: null,
-    },
-  })
+  const { rooms } = await getCollaborationPresence([roomId])
+  return rooms[0].users.length
 }
 
 export function isUniqueConstraintError(error: unknown) {

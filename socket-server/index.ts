@@ -2,7 +2,7 @@ import { createServer } from "http"
 import type { IncomingMessage, ServerResponse } from "http"
 import { timingSafeEqual } from "crypto"
 import { Server } from "socket.io"
-import { setupSocketHandlers } from "./handlers"
+import { getCollaborationPresenceSnapshots, leaveCollaborationRoomFromUnload, setupSocketHandlers } from "./handlers"
 import type {
   InternalSocketEmitPayload,
   ServerToClientEventName,
@@ -11,6 +11,7 @@ import type {
 
 const port = parseInt(process.env.PORT || "4000", 10)
 const allowedOrigin = process.env.NEXTJS_URL || "http://localhost:3000"
+const startedAt = new Date().toISOString()
 
 function parseBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -37,6 +38,7 @@ const serverToClientEvents = new Set<ServerToClientEventName>([
   "inline:typing:stop",
   "notification:new",
   "collaboration:presence",
+  "collaboration:message",
 ])
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -103,6 +105,9 @@ function emitInternalPayload(io: TypedServer, body: InternalSocketEmitPayload) {
     case "collaboration:presence":
       io.to(body.room).emit("collaboration:presence", body.data)
       break
+    case "collaboration:message":
+      io.to(body.room).emit("collaboration:message", body.data)
+      break
   }
 }
 
@@ -111,6 +116,51 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
   if (req.method === "GET" && req.url === "/health") {
     res.writeHead(200, { "Content-Type": "text/plain" })
     res.end("ok")
+    return
+  }
+
+  if (req.method === "POST" && req.url === "/internal/collaboration/presence") {
+    if (!isAuthorizedInternalRequest(req)) {
+      res.writeHead(401)
+      res.end()
+      return
+    }
+    try {
+      const body = await parseBody(req)
+      if (!isObject(body) || !Array.isArray(body.roomIds) || body.roomIds.length > 50 || body.roomIds.some((roomId) => typeof roomId !== "string" || !roomId || roomId.length > 128)) {
+        res.writeHead(400)
+        res.end()
+        return
+      }
+      res.writeHead(200, { "Content-Type": "application/json" })
+      res.end(JSON.stringify({ startedAt, rooms: getCollaborationPresenceSnapshots(body.roomIds) }))
+    } catch {
+      res.writeHead(400)
+      res.end()
+    }
+    return
+  }
+
+  if (req.method === "POST" && req.url === "/internal/collaboration/leave") {
+    if (!isAuthorizedInternalRequest(req)) {
+      res.writeHead(401)
+      res.end()
+      return
+    }
+    try {
+      const body = await parseBody(req)
+      if (!isObject(body) || typeof body.roomId !== "string" || typeof body.userId !== "string" || typeof body.socketId !== "string" || !body.roomId || !body.userId || !body.socketId) {
+        res.writeHead(400)
+        res.end()
+        return
+      }
+      const presence = leaveCollaborationRoomFromUnload(io, body.roomId, body.userId, body.socketId)
+      res.writeHead(200, { "Content-Type": "application/json" })
+      res.end(JSON.stringify({ presence }))
+    } catch {
+      res.writeHead(400)
+      res.end()
+    }
     return
   }
 
