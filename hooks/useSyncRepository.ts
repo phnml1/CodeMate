@@ -6,7 +6,7 @@ interface SyncResult {
   detailHydrated?: number
 }
 
-async function syncRepository(repositoryId: string): Promise<SyncResult> {
+export async function syncRepository(repositoryId: string): Promise<SyncResult> {
   const res = await fetch(`/api/repositories/${repositoryId}/sync`, {
     method: "POST",
   })

@@ -6,7 +6,10 @@ import {
 import { useConnectRepository } from "@/hooks/useConnectRepository"
 import { useDisconnectRepository } from "@/hooks/useDisconnectRepository"
 import { usePullRequests } from "@/hooks/usePullRequests"
-import { useSyncRepository } from "@/hooks/useSyncRepository"
+import {
+  syncRepository,
+  useSyncRepository,
+} from "@/hooks/useSyncRepository"
 
 jest.mock("@tanstack/react-query", () => ({
   useInfiniteQuery: jest.fn(),
@@ -84,5 +87,23 @@ describe("repository and pull request query keys", () => {
       ["pullRequests"],
       ["pullRequest"],
     ])
+  })
+
+  it("posts to the repository sync endpoint", async () => {
+    const fetchSpy = jest.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ updated: 2, total: 2, detailHydrated: 1 }),
+    } as Response)
+
+    try {
+      const result = await syncRepository("repo-1")
+
+      expect(fetchSpy).toHaveBeenCalledWith("/api/repositories/repo-1/sync", {
+        method: "POST",
+      })
+      expect(result).toEqual({ updated: 2, total: 2, detailHydrated: 1 })
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })
