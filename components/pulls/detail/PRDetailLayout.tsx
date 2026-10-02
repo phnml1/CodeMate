@@ -95,7 +95,9 @@ export default function PRDetailLayout({
             onIssueClick={handleIssueClick}
           />
 
-          <CollaborationRoomPanel prId={id} currentUserId={currentUserId} />
+          {process.env.NEXT_PUBLIC_REALTIME_MODE !== "polling" && (
+            <CollaborationRoomPanel prId={id} currentUserId={currentUserId} />
+          )}
 
           <PRDiffSection
             prId={id}
