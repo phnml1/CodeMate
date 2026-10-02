@@ -44,6 +44,7 @@ export interface CollaborationRoom {
   }
   members: CollaborationRoomMember[]
   memberCount: number
+  occupiedCount?: number
   messageCount: number
   endedAt: string | null
   createdAt: string

@@ -57,7 +57,7 @@ export default function CollaborationRoomPanel({
         ) : rooms.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">아직 열린 협업방이 없습니다.</p>
         ) : rooms.map((room) => {
-          const full = room.memberCount >= room.capacity &&
+          const full = (room.occupiedCount ?? room.memberCount) >= room.capacity &&
             !room.members.some((member) => member.userId === currentUserId)
           return (
             <div key={room.id} className="flex min-w-0 items-center justify-between gap-3 py-2">

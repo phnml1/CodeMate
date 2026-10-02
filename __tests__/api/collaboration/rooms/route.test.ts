@@ -178,7 +178,29 @@ describe("GET /api/collaboration/rooms", () => {
     const { rooms } = await response.json()
     expect(rooms).toHaveLength(1)
     expect(rooms[0].memberCount).toBe(1)
+    expect(rooms[0].occupiedCount).toBe(1)
     expect(rooms[0].members.map((member: { userId: string }) => member.userId)).toEqual(["user-1"])
+  })
+
+  it("shows only online users while holding reconnecting seats", async () => {
+    mockedPresence.mockResolvedValue({ startedAt: now.toISOString(), rooms: [{ roomId: "room-1", users: [
+      { userId: "user-1", status: "online" },
+      { userId: "user-2", status: "reconnecting" },
+    ] }] })
+
+    const response = await GET(new Request("http://localhost/api/collaboration/rooms?pullRequestId=pr-1"))
+    const { rooms } = await response.json()
+    expect(rooms[0].memberCount).toBe(1)
+    expect(rooms[0].occupiedCount).toBe(2)
+  })
+
+  it("hides a room as soon as its last user is reconnecting", async () => {
+    mockedPresence.mockResolvedValue({ startedAt: now.toISOString(), rooms: [{ roomId: "room-1", users: [
+      { userId: "user-1", status: "reconnecting" },
+    ] }] })
+
+    const response = await GET(new Request("http://localhost/api/collaboration/rooms?pullRequestId=pr-1"))
+    expect((await response.json()).rooms).toEqual([])
   })
 
   it("keeps a newly created room visible while its owner connects", async () => {

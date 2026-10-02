@@ -17,6 +17,7 @@ import type {
   TypedServerSocket,
 } from "../lib/socket/types"
 import { authenticateSocket } from "./auth"
+import { syncCollaborationDisconnect } from "./disconnect-sync"
 
 type PresenceEntry = {
   memberId: string
@@ -174,6 +175,12 @@ function removeSocketFromCollaborationRoom(
           presenceByRoom.delete(roomId)
         }
         emitPresence(io, roomId)
+        void syncCollaborationDisconnect({
+          roomId,
+          memberId: entry.memberId,
+          userId: entry.userId,
+          disconnectedAt: entry.disconnectedAt!,
+        }).catch((error) => console.error("Collaboration disconnect sync failed", error))
       }, COLLABORATION_RECONNECT_GRACE_MS)
     } else {
       roomPresence.delete(entry.userId)

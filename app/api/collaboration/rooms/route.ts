@@ -57,13 +57,15 @@ export async function GET(request: Request) {
 
         const users = presenceByRoom.get(room.id)?.users ?? []
         const isRecentlyCreated = now - room.createdAt.getTime() < ROOM_JOIN_GRACE_MS
-        if (status === "ACTIVE" && users.length === 0 && !isRecentlyCreated) return []
+        const onlineCount = users.filter((user) => user.status === "online").length
+        if (status === "ACTIVE" && onlineCount === 0 && !isRecentlyCreated) return []
 
         const presentIds = new Set(users.map((user) => user.userId))
         return [{
           ...serialized,
           members: serialized.members.filter((member) => presentIds.has(member.userId)),
-          memberCount: presentIds.size,
+          memberCount: onlineCount,
+          occupiedCount: presentIds.size,
         }]
       }),
     }, { headers: { "Cache-Control": "no-store" } })
