@@ -29,16 +29,17 @@ describe("PR detail heading", () => {
 
   afterEach(() => jest.clearAllMocks())
 
-  it.each([false, true])("keeps a single h1 when scrolled is %s", (scrolled) => {
+  it.each([false, true])("hides the inactive header when scrolled is %s", (scrolled) => {
     const html = renderToStaticMarkup(React.createElement(PRDetailStickyHeader, {
       prId: pullRequest.id,
       scrolled,
       initialPullRequest: pullRequest,
     }))
 
-    expect(html.match(/<h1\b/g)).toHaveLength(1)
-    expect(html).toContain('<span aria-hidden="true"')
-    expect(html.includes('inert=""')).toBe(!scrolled)
+    expect(html.match(/<h1\b/g)).toHaveLength(2)
+    expect(html.match(/inert=""/g)).toHaveLength(1)
+    expect(html.match(/<div inert="" aria-hidden="true"/g)).toHaveLength(1)
+    expect(html.includes('inert="" aria-hidden="true" class="transition-all')).toBe(!scrolled)
     expect(html).toContain(pullRequest.title)
   })
 })

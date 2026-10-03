@@ -20,6 +20,7 @@ export default function PRDetailStickyHeader({
       <div className="sticky top-0 z-20 h-0 overflow-visible">
         <div
           inert={!scrolled}
+          aria-hidden={!scrolled}
           className={`transition-all duration-200 ${
             scrolled
               ? "translate-y-0 opacity-100"
@@ -34,11 +35,13 @@ export default function PRDetailStickyHeader({
           <MobileFileDropdown prId={prId} />
         </div>
       </div>
-      <PRDetailHeader
-        prId={prId}
-        initialPullRequest={initialPullRequest}
-      />
-      <MobileFileDropdown prId={prId} />
+      <div inert={scrolled} aria-hidden={scrolled}>
+        <PRDetailHeader
+          prId={prId}
+          initialPullRequest={initialPullRequest}
+        />
+        <MobileFileDropdown prId={prId} />
+      </div>
     </>
   );
 }
