@@ -7,6 +7,7 @@ import {
   serializeCollaborationMessage,
 } from "@/lib/collaboration/rooms"
 import { prisma } from "@/lib/prisma"
+import { emitCollaborationMessage } from "@/lib/socket/emitter"
 import { NextResponse } from "next/server"
 
 type RouteContext = {
@@ -116,10 +117,14 @@ export async function POST(request: Request, { params }: RouteContext) {
         include: collaborationMessageInclude,
       })
 
-      return NextResponse.json(
-        { message: serializeCollaborationMessage(message) },
-        { status: 201 }
-      )
+      const serializedMessage = serializeCollaborationMessage(message)
+      try {
+        await emitCollaborationMessage(serializedMessage)
+      } catch (error) {
+        console.error("[collaboration messages] Socket broadcast failed:", error)
+      }
+
+      return NextResponse.json({ message: serializedMessage }, { status: 201 })
     } catch (error) {
       if (parsed.data.clientMessageId && isUniqueConstraintError(error)) {
         const existingMessage = await prisma.collaborationMessage.findUnique({

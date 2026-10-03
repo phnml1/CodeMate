@@ -1,6 +1,7 @@
 import type { Server, Socket } from "socket.io"
 import type { CommentWithAuthor, Reactions } from "../../types/comment"
 import type { BaseNotification } from "../../types/notification"
+import type { CollaborationMessage } from "../../types/collaboration"
 
 export interface ServerToClientEvents {
   "comment:new": (comment: CommentWithAuthor) => void
@@ -17,6 +18,10 @@ export interface ServerToClientEvents {
   "inline:typing:stop": (data: { userId: string }) => void
   "notification:new": (notification: BaseNotification) => void
   "collaboration:presence": (presence: CollaborationPresenceSnapshot) => void
+  "collaboration:message": (message: CollaborationMessage) => void
+  "collaboration:location": (location: CollaborationLocation) => void
+  "collaboration:location:clear": (data: { roomId: string; userId: string }) => void
+  "collaboration:typing": (typing: CollaborationTypingEvent) => void
 }
 
 export interface ClientToServerEvents {
@@ -37,6 +42,18 @@ export interface ClientToServerEvents {
   "collaboration:heartbeat": (
     data: { roomId: string },
     ack: (response: CollaborationHeartbeatAck) => void
+  ) => void
+  "collaboration:location": (
+    data: CollaborationLocationInput,
+    ack: (response: CollaborationLocationAck) => void
+  ) => void
+  "collaboration:location:stop": (
+    data: { roomId: string },
+    ack: (response: CollaborationLocationAck) => void
+  ) => void
+  "collaboration:typing": (
+    data: CollaborationTypingInput,
+    ack: (response: CollaborationLocationAck) => void
   ) => void
 }
 
@@ -64,11 +81,65 @@ export interface CollaborationPresenceSnapshot {
   users: CollaborationPresenceUser[]
 }
 
+export interface CollaborationCodeSelection {
+  side: "LEFT" | "RIGHT"
+  startLine: number
+  endLine: number
+}
+
+export interface CollaborationTextSelection extends CollaborationCodeSelection {
+  startOffset: number
+  endOffset: number
+}
+
+export interface CollaborationViewport {
+  top: number
+  left: number
+  lineOffset?: number
+}
+
+export interface CollaborationLocationInput {
+  roomId: string
+  filePath: string
+  baseSha: string
+  headSha: string
+  side: "LEFT" | "RIGHT"
+  line: number | null
+  selection: CollaborationCodeSelection | null
+  textSelection?: CollaborationTextSelection | null
+  viewport?: CollaborationViewport
+}
+
+export interface CollaborationLocation extends CollaborationLocationInput {
+  userId: string
+  updatedAt: string
+}
+
+export interface CollaborationTypingAnchor {
+  filePath: string
+  side: "LEFT" | "RIGHT"
+  startLine: number
+  baseSha: string
+  headSha: string
+}
+
+export interface CollaborationTypingInput {
+  roomId: string
+  anchor: CollaborationTypingAnchor | null
+  isTyping: boolean
+}
+
+export interface CollaborationTypingEvent extends CollaborationTypingInput {
+  userId: string
+  userName: string
+}
+
 export type CollaborationAckErrorCode =
   | "INVALID_TOKEN"
   | "FORBIDDEN"
   | "ROOM_FULL"
   | "NOT_JOINED"
+  | "INVALID_LOCATION"
 
 export type CollaborationJoinAck =
   | {
@@ -77,6 +148,7 @@ export type CollaborationJoinAck =
       heartbeatIntervalMs: number
       reconnectGraceMs: number
       presence: CollaborationPresenceSnapshot
+      locations: CollaborationLocation[]
     }
   | {
       ok: false
@@ -106,6 +178,16 @@ export type CollaborationHeartbeatAck =
       }
     }
 
+export type CollaborationLocationAck =
+  | { ok: true; roomId: string }
+  | {
+      ok: false
+      error: {
+        code: CollaborationAckErrorCode
+        message: string
+      }
+    }
+
 export type TypedServer = Server<
   ClientToServerEvents,
   ServerToClientEvents,
@@ -125,10 +207,16 @@ export type ServerToClientEventName = keyof ServerToClientEvents
 export type ServerToClientPayload<Event extends ServerToClientEventName> =
   Parameters<ServerToClientEvents[Event]>[0]
 
+type InternalSocketEventName = Exclude<
+  ServerToClientEventName,
+  "collaboration:location" | "collaboration:location:clear"
+  | "collaboration:typing"
+>
+
 export type InternalSocketEmitPayload = {
-  [Event in ServerToClientEventName]: {
+  [Event in InternalSocketEventName]: {
     room: string
     event: Event
     data: ServerToClientPayload<Event>
   }
-}[ServerToClientEventName]
+}[InternalSocketEventName]

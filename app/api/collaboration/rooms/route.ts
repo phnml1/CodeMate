@@ -8,7 +8,10 @@ import {
 } from "@/lib/collaboration/rooms"
 import { prisma } from "@/lib/prisma"
 import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
+import { getCollaborationPresence } from "@/lib/socket/presence"
 import { NextResponse } from "next/server"
+
+const ROOM_JOIN_GRACE_MS = 45_000
 
 export async function GET(request: Request) {
   try {
@@ -40,9 +43,32 @@ export async function GET(request: Request) {
       take: 50,
     })
 
+    const activeRooms = rooms.filter((room) => room.status === "ACTIVE")
+    const presence = activeRooms.length > 0
+      ? await getCollaborationPresence(activeRooms.map((room) => room.id))
+      : null
+    const presenceByRoom = new Map(presence?.rooms.map((snapshot) => [snapshot.roomId, snapshot]))
+    const now = Date.now()
+
     return NextResponse.json({
-      rooms: rooms.map(serializeCollaborationRoom),
-    })
+      rooms: rooms.flatMap((room) => {
+        const serialized = serializeCollaborationRoom(room)
+        if (room.status !== "ACTIVE") return [serialized]
+
+        const users = presenceByRoom.get(room.id)?.users ?? []
+        const isRecentlyCreated = now - room.createdAt.getTime() < ROOM_JOIN_GRACE_MS
+        const onlineCount = users.filter((user) => user.status === "online").length
+        if (status === "ACTIVE" && onlineCount === 0 && !isRecentlyCreated) return []
+
+        const presentIds = new Set(users.map((user) => user.userId))
+        return [{
+          ...serialized,
+          members: serialized.members.filter((member) => presentIds.has(member.userId)),
+          memberCount: onlineCount,
+          occupiedCount: presentIds.size,
+        }]
+      }),
+    }, { headers: { "Cache-Control": "no-store" } })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

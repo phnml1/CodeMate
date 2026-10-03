@@ -3,17 +3,21 @@ import {
   COLLABORATION_RECONNECT_GRACE_MS,
   verifyCollaborationRoomSocketToken,
 } from "../lib/collaboration/socket-token"
+import { collaborationLocationSchema, collaborationTypingSchema } from "../lib/collaboration/location"
 import type {
   CollaborationAckErrorCode,
   CollaborationHeartbeatAck,
   CollaborationJoinAck,
   CollaborationLeaveAck,
+  CollaborationLocation,
+  CollaborationLocationAck,
   CollaborationPresenceSnapshot,
   CollaborationPresenceUser,
   TypedServer,
   TypedServerSocket,
 } from "../lib/socket/types"
 import { authenticateSocket } from "./auth"
+import { syncCollaborationDisconnect } from "./disconnect-sync"
 
 type PresenceEntry = {
   memberId: string
@@ -22,11 +26,13 @@ type PresenceEntry = {
   socketIds: Set<string>
   lastSeenAt: number
   disconnectedAt: number | null
+  lastDisconnectedSocketId: string | null
   removalTimer: NodeJS.Timeout | null
 }
 
 const presenceByRoom = new Map<string, Map<string, PresenceEntry>>()
 const roomsBySocket = new Map<string, Set<string>>()
+const locationsByRoom = new Map<string, Map<string, CollaborationLocation>>()
 
 function collaborationRoomName(roomId: string) {
   return `collaboration:${roomId}`
@@ -84,16 +90,20 @@ function toPresenceUser(entry: PresenceEntry): CollaborationPresenceUser {
 }
 
 function createPresenceSnapshot(roomId: string): CollaborationPresenceSnapshot {
-  const roomPresence = getRoomPresence(roomId)
+  const roomPresence = presenceByRoom.get(roomId)
 
   return {
     roomId,
     generatedAt: new Date().toISOString(),
-    users: [...roomPresence.values()]
+    users: [...(roomPresence?.values() ?? [])]
       .filter(isSeatHeld)
       .map(toPresenceUser)
       .sort((a, b) => a.userName.localeCompare(b.userName)),
   }
+}
+
+export function getCollaborationPresenceSnapshots(roomIds: string[]) {
+  return roomIds.map(createPresenceSnapshot)
 }
 
 function emitPresence(io: TypedServer, roomId: string) {
@@ -101,6 +111,16 @@ function emitPresence(io: TypedServer, roomId: string) {
     "collaboration:presence",
     createPresenceSnapshot(roomId)
   )
+}
+
+function clearLocation(io: TypedServer, roomId: string, userId: string) {
+  const locations = locationsByRoom.get(roomId)
+  if (!locations?.delete(userId)) return
+  if (locations.size === 0) locationsByRoom.delete(roomId)
+  io.to(collaborationRoomName(roomId)).emit("collaboration:location:clear", {
+    roomId,
+    userId,
+  })
 }
 
 function registerRoomHandlers(socket: TypedServerSocket) {
@@ -133,6 +153,7 @@ function removeSocketFromCollaborationRoom(
   entry.lastSeenAt = Date.now()
 
   if (entry.socketIds.size === 0) {
+    entry.lastDisconnectedSocketId = socket.id
     if (entry.removalTimer) {
       clearTimeout(entry.removalTimer)
       entry.removalTimer = null
@@ -149,13 +170,21 @@ function removeSocketFromCollaborationRoom(
         }
 
         latestRoomPresence.delete(entry.userId)
+        clearLocation(io, roomId, entry.userId)
         if (latestRoomPresence.size === 0) {
           presenceByRoom.delete(roomId)
         }
         emitPresence(io, roomId)
+        void syncCollaborationDisconnect({
+          roomId,
+          memberId: entry.memberId,
+          userId: entry.userId,
+          disconnectedAt: entry.disconnectedAt!,
+        }).catch((error) => console.error("Collaboration disconnect sync failed", error))
       }, COLLABORATION_RECONNECT_GRACE_MS)
     } else {
       roomPresence.delete(entry.userId)
+      clearLocation(io, roomId, entry.userId)
       if (roomPresence.size === 0) {
         presenceByRoom.delete(roomId)
       }
@@ -163,6 +192,29 @@ function removeSocketFromCollaborationRoom(
   }
 
   emitPresence(io, roomId)
+}
+
+export function leaveCollaborationRoomFromUnload(
+  io: TypedServer,
+  roomId: string,
+  userId: string,
+  socketId: string
+) {
+  const socket = io.sockets.sockets.get(socketId)
+  if (socket && socket.data.userId === userId && roomsBySocket.get(socketId)?.has(roomId)) {
+    removeSocketFromCollaborationRoom(io, socket, roomId, { holdReconnectSeat: false })
+    return createPresenceSnapshot(roomId)
+  }
+
+  const roomPresence = presenceByRoom.get(roomId)
+  const entry = roomPresence?.get(userId)
+  if (!roomPresence || !entry || entry.socketIds.size > 0 || entry.lastDisconnectedSocketId !== socketId) return createPresenceSnapshot(roomId)
+  if (entry.removalTimer) clearTimeout(entry.removalTimer)
+  roomPresence.delete(userId)
+  clearLocation(io, roomId, userId)
+  if (roomPresence.size === 0) presenceByRoom.delete(roomId)
+  emitPresence(io, roomId)
+  return createPresenceSnapshot(roomId)
 }
 
 function registerCollaborationRoomHandlers(
@@ -205,6 +257,7 @@ function registerCollaborationRoomHandlers(
         socketIds: new Set<string>(),
         lastSeenAt: Date.now(),
         disconnectedAt: null,
+        lastDisconnectedSocketId: null,
         removalTimer: null,
       } satisfies PresenceEntry)
 
@@ -213,6 +266,7 @@ function registerCollaborationRoomHandlers(
     entry.socketIds.add(socket.id)
     entry.lastSeenAt = Date.now()
     entry.disconnectedAt = null
+    entry.lastDisconnectedSocketId = null
     roomPresence.set(payload.userId, entry)
 
     socket.join(collaborationRoomName(payload.roomId))
@@ -225,6 +279,7 @@ function registerCollaborationRoomHandlers(
       heartbeatIntervalMs: COLLABORATION_HEARTBEAT_INTERVAL_MS,
       reconnectGraceMs: COLLABORATION_RECONNECT_GRACE_MS,
       presence,
+      locations: [...(locationsByRoom.get(payload.roomId)?.values() ?? [])],
     }
 
     ack(response)
@@ -267,6 +322,75 @@ function registerCollaborationRoomHandlers(
       serverTime: new Date().toISOString(),
     }
     ack(response)
+  })
+
+  socket.on("collaboration:location", (input, ack) => {
+    if (typeof ack !== "function") return
+    const parsed = collaborationLocationSchema.safeParse(input)
+    if (!parsed.success) {
+      ack(createErrorAck("INVALID_LOCATION", "Invalid code location"))
+      return
+    }
+
+    const { roomId } = parsed.data
+    const joined = roomsBySocket.get(socket.id)?.has(roomId)
+    const entry = presenceByRoom.get(roomId)?.get(socket.data.userId)
+    if (!joined || !entry?.socketIds.has(socket.id)) {
+      ack(createErrorAck("NOT_JOINED", "Socket has not joined this room"))
+      return
+    }
+
+    const location: CollaborationLocation = {
+      ...parsed.data,
+      userId: socket.data.userId,
+      updatedAt: new Date().toISOString(),
+    }
+    let locations = locationsByRoom.get(roomId)
+    if (!locations) {
+      locations = new Map()
+      locationsByRoom.set(roomId, locations)
+    }
+    locations.set(socket.data.userId, location)
+    socket.to(collaborationRoomName(roomId)).emit("collaboration:location", location)
+    const response: CollaborationLocationAck = { ok: true, roomId }
+    ack(response)
+  })
+
+  socket.on("collaboration:location:stop", (input, ack) => {
+    if (typeof ack !== "function") return
+    const roomId = input?.roomId
+    if (typeof roomId !== "string" || !roomId) {
+      ack(createErrorAck("INVALID_LOCATION", "Invalid room"))
+      return
+    }
+    if (!roomsBySocket.get(socket.id)?.has(roomId)) {
+      ack(createErrorAck("NOT_JOINED", "Socket has not joined this room"))
+      return
+    }
+    clearLocation(io, roomId, socket.data.userId)
+    ack({ ok: true, roomId })
+  })
+
+  socket.on("collaboration:typing", (input, ack) => {
+    if (typeof ack !== "function") return
+    const parsed = collaborationTypingSchema.safeParse(input)
+    if (!parsed.success) {
+      ack(createErrorAck("INVALID_LOCATION", "Invalid typing state"))
+      return
+    }
+    const { roomId } = parsed.data
+    const joined = roomsBySocket.get(socket.id)?.has(roomId)
+    const entry = presenceByRoom.get(roomId)?.get(socket.data.userId)
+    if (!joined || !entry?.socketIds.has(socket.id)) {
+      ack(createErrorAck("NOT_JOINED", "Socket has not joined this room"))
+      return
+    }
+    socket.to(collaborationRoomName(roomId)).emit("collaboration:typing", {
+      ...parsed.data,
+      userId: socket.data.userId,
+      userName: socket.data.userName,
+    })
+    ack({ ok: true, roomId })
   })
 
   socket.on("disconnect", () => {

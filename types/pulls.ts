@@ -72,3 +72,7 @@ export interface PRFile {
 export interface PRFilesResponse {
   files: PRFile[];
 }
+
+export interface WorkspacePRFilesResponse extends PRFilesResponse {
+  revision: { baseSha: string; headSha: string };
+}

@@ -3,6 +3,7 @@ import { verifyCollaborationRoomSocketToken } from "@/lib/collaboration/socket-t
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
+import { getCollaborationPresence } from "@/lib/socket/presence"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
@@ -24,12 +25,13 @@ jest.mock("@/lib/prisma", () => ({
 jest.mock("@/lib/repository-access", () => ({
   buildAccessiblePullRequestWhere: jest.fn(),
 }))
+jest.mock("@/lib/socket/presence", () => ({ getCollaborationPresence: jest.fn() }))
 
 const mockedAuth = auth as jest.Mock
 const mockedTransaction = prisma.$transaction as jest.Mock
 const mockedFindRoom = prisma.collaborationRoom.findFirst as jest.Mock
 const mockedFindMember = prisma.collaborationRoomMember.findUnique as jest.Mock
-const mockedCountMembers = prisma.collaborationRoomMember.count as jest.Mock
+const mockedPresence = getCollaborationPresence as jest.Mock
 const mockedBuildAccessiblePullRequestWhere =
   buildAccessiblePullRequestWhere as jest.Mock
 
@@ -116,7 +118,7 @@ describe("POST /api/collaboration/rooms/[roomId]/socket-token", () => {
     })
     mockedFindRoom.mockResolvedValue(sampleRoom)
     mockedFindMember.mockResolvedValue(null)
-    mockedCountMembers.mockResolvedValue(2)
+    mockedPresence.mockResolvedValue({ rooms: [{ roomId: "room-1", users: [{ userId: "user-1" }, { userId: "user-3" }] }] })
 
     const response = await POST(createRequest(), createParams())
     const body = await response.json()

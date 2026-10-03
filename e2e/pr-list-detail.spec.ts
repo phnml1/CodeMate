@@ -14,6 +14,10 @@ test("PR 목록에서 선택한 PR 상세로 진입한다", async ({ page }) => 
     page.getByRole("heading", { level: 1, name: pullRequest.title })
   ).toBeVisible()
   await expect(page.getByText(E2E_REPOSITORY.name, { exact: true })).toBeVisible()
-  await expect(page.getByText(`#${pullRequest.number}`, { exact: true })).toBeVisible()
+  await expect(
+    page.getByRole("heading", { level: 1, name: pullRequest.title })
+      .locator("..")
+      .getByText(`#${pullRequest.number}`, { exact: true })
+  ).toBeVisible()
   await expect(page.getByText("main", { exact: true })).toBeVisible()
 })
