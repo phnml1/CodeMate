@@ -1,6 +1,23 @@
 import { createHmac, timingSafeEqual } from "crypto"
 import type { TypedServerSocket, SocketData } from "../lib/socket/types"
 
+interface SocketAuthPayload {
+  userId: string
+  userName: string
+  exp: number
+}
+
+function isSocketAuthPayload(value: unknown): value is SocketAuthPayload {
+  if (typeof value !== "object" || value === null) return false
+
+  const payload = value as Partial<Record<keyof SocketAuthPayload, unknown>>
+  return (
+    typeof payload.userId === "string" &&
+    typeof payload.userName === "string" &&
+    typeof payload.exp === "number"
+  )
+}
+
 function safeEqualHex(actual: string, expected: string) {
   if (!/^[a-f0-9]+$/i.test(actual)) {
     return false
@@ -43,13 +60,9 @@ export function authenticateSocket(
   }
 
   try {
-    const data = JSON.parse(Buffer.from(payload, "base64url").toString())
+    const data: unknown = JSON.parse(Buffer.from(payload, "base64url").toString())
 
-    if (
-      typeof data.userId !== "string" ||
-      typeof data.userName !== "string" ||
-      typeof data.exp !== "number"
-    ) {
+    if (!isSocketAuthPayload(data)) {
       console.error("[Socket Auth] Invalid token payload")
       return null
     }
