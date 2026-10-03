@@ -29,7 +29,7 @@ export default function RepoList({
   } = repositoriesQuery
 
   const connectMutation = useConnectRepository()
-  const { mutate: disconnect } = useDisconnectRepository()
+  const disconnectMutation = useDisconnectRepository()
 
   if (isLoading) {
     return (
@@ -89,6 +89,10 @@ export default function RepoList({
                   : "저장소 연결 중 오류가 발생했습니다."
                 : null
             }
+            isDisconnecting={
+              disconnectMutation.isPending &&
+              disconnectMutation.variables === repo.repositoryId
+            }
             onConnect={() =>
               connectMutation.mutate({
                 githubId: repo.id,
@@ -98,7 +102,9 @@ export default function RepoList({
                 canAdminister: repo.canAdminister,
               })
             }
-            onDisconnect={() => repo.repositoryId && disconnect(repo.repositoryId)}
+            onDisconnect={() =>
+              repo.repositoryId && disconnectMutation.mutate(repo.repositoryId)
+            }
           />
         ))}
       </div>

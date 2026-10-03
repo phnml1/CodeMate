@@ -3,6 +3,7 @@ import { Suspense } from "react"
 import PRFilterBar from "@/components/pulls/PRFilterBar"
 import PRList from "@/components/pulls/PRList"
 import PRPageHeader from "@/components/pulls/PRPageHeader"
+import PRAutoSync from "@/components/pulls/PRAutoSync"
 import { PageContainer } from "@/components/layout/PageContainer"
 
 export const metadata: Metadata = {
@@ -14,6 +15,9 @@ export default function Page() {
   return (
     <PageContainer>
       <PRPageHeader />
+      <Suspense>
+        <PRAutoSync />
+      </Suspense>
       <PRFilterBar />
       <Suspense>
         <PRList />
