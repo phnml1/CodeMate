@@ -46,9 +46,9 @@ export default function PRDetailHeader({
             {displayPr.status}
           </span>
 
-          <h1 className="text-xs md:text-sm font-bold text-slate-900 dark:text-white truncate flex-1 min-w-0">
+          <span aria-hidden="true" className="text-xs md:text-sm font-bold text-slate-900 dark:text-white truncate flex-1 min-w-0">
             {displayPr.title}
-          </h1>
+          </span>
 
           <span className="text-[10px] text-slate-400 font-mono shrink-0 hidden sm:block">
             #{displayPr.number}
