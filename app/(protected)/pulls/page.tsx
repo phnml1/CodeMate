@@ -14,10 +14,10 @@ export const metadata: Metadata = {
 export default function Page() {
   return (
     <PageContainer>
+      <PRPageHeader />
       <Suspense>
         <PRAutoSync />
       </Suspense>
-      <PRPageHeader />
       <PRFilterBar />
       <Suspense>
         <PRList />
