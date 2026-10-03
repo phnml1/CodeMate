@@ -94,7 +94,11 @@ test.describe("responsive PR workflows", () => {
       await expect(
         page.getByText(E2E_REPOSITORY.name, { exact: true }).first()
       ).toBeVisible()
-      await expect(page.getByText(`#${navigationPR.number}`, { exact: true })).toBeVisible()
+      await expect(
+        page.getByRole("heading", { level: 1, name: navigationPR.title })
+          .locator("..")
+          .getByText(`#${navigationPR.number}`, { exact: true })
+      ).toBeVisible()
       await expectResponsiveFileNavigation(
         page,
         viewport.expectsMobileFilePicker
