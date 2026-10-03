@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import CollaborationRoomPanel from "@/components/collaboration/CollaborationRoomPanel";
 import { useShallow } from "zustand/react/shallow";
@@ -38,11 +38,26 @@ export default function PRDetailLayout({
       }))
     );
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const commentsRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [commentsVisible, setCommentsVisible] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<ReviewIssue | null>(null);
 
   usePRDetailReset(id);
   usePRDetailDeepLink(id);
+
+  useEffect(() => {
+    const root = scrollContainerRef.current;
+    const target = commentsRef.current;
+    if (!root || !target) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setCommentsVisible(entry.isIntersecting),
+      { root }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [id]);
 
   const handleScroll = () => {
     const el = scrollContainerRef.current;
@@ -105,14 +120,14 @@ export default function PRDetailLayout({
             onIssueClick={handleIssueClick}
           />
 
-          <div id="general-comments" className="scroll-mt-36">
+          <div id="general-comments" ref={commentsRef} className="scroll-mt-36">
             {commentSlot}
           </div>
         </div>
 
         <FloatingCommentsButton
           prId={id}
-          visible={scrolled}
+          visible={scrolled && !commentsVisible}
           onClick={handleScrollToComments}
         />
 
