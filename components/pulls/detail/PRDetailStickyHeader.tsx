@@ -19,6 +19,7 @@ export default function PRDetailStickyHeader({
     <>
       <div className="sticky top-0 z-20 h-0 overflow-visible">
         <div
+          inert={!scrolled}
           className={`transition-all duration-200 ${
             scrolled
               ? "translate-y-0 opacity-100"

@@ -38,6 +38,7 @@ describe("PR detail heading", () => {
 
     expect(html.match(/<h1\b/g)).toHaveLength(1)
     expect(html).toContain('<span aria-hidden="true"')
+    expect(html.includes('inert=""')).toBe(!scrolled)
     expect(html).toContain(pullRequest.title)
   })
 })
