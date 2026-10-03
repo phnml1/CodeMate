@@ -39,6 +39,7 @@ interface RepoCardProps {
   onConnect?: () => void
   onDisconnect?: () => void
   isConnecting?: boolean
+  isDisconnecting?: boolean
   connectError?: string | null
 }
 
@@ -51,6 +52,7 @@ export default function RepoCard({
   onConnect,
   onDisconnect,
   isConnecting = false,
+  isDisconnecting = false,
   connectError = null,
 }: RepoCardProps) {
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
@@ -96,10 +98,15 @@ export default function RepoCard({
               {syncMessage && (
                 <span className="text-xs font-medium text-slate-500">{syncMessage}</span>
               )}
+              {isDisconnecting && (
+                <span className="text-xs font-medium text-slate-500">
+                  연결 해제 중...
+                </span>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
-                disabled={isSyncing || !repositoryId}
+                disabled={isSyncing || isDisconnecting || !repositoryId}
                 onClick={() => {
                   if (!repositoryId) return
 
@@ -143,13 +150,18 @@ export default function RepoCard({
                 variant="ghost"
                 size="icon"
                 onClick={onDisconnect}
+                disabled={isDisconnecting}
                 title="저장소 연결 해제"
                 className={cn(
                   controlStyles.iconButton,
                   "text-slate-400 hover:border-rose-100 hover:bg-rose-50 hover:text-rose-500"
                 )}
               >
-                <Trash2 size={18} aria-hidden />
+                {isDisconnecting ? (
+                  <Loader2 size={18} className="animate-spin" aria-hidden />
+                ) : (
+                  <Trash2 size={18} aria-hidden />
+                )}
               </Button>
             </>
           ) : (
