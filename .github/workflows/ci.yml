@@ -24,12 +24,22 @@ jobs:
           --health-interval 2s
           --health-timeout 5s
           --health-retries 15
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
     # CI 환경 변수 설정 (많은 툴들이 CI 환경에서 다르게 동작)
     env:
       CI: true
       E2E_TEST_MODE: 1
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/codemate_e2e
       DIRECT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/codemate_e2e
+      REDIS_URL: redis://localhost:6379
       AUTH_URL: http://localhost:3000
       NEXTAUTH_URL: http://localhost:3000
       GITHUB_ID: e2e-client-id
@@ -151,6 +161,9 @@ jobs:
         fi
         echo "tsconfig.json 및 typescript 확인됨 — tsc 실행"
         npx tsc --noEmit
+
+    - name: Build Socket server
+      run: npm run build:socket
 
     # 7) 테스트 실행 — package.json에 test 스크립트가 정의되어 있을 때만 실행
     - name: Run tests

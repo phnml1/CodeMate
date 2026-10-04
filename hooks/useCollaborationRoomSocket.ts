@@ -37,6 +37,9 @@ export type CollaborationSocketStatus =
 const DEFAULT_SOCKET_URL = "http://localhost:4000"
 const RECONNECT_DELAY_MS = 1_200
 const TYPING_EXPIRY_MS = 4_000
+const UNAVAILABLE_RETRY_DELAY_MS = 3_000
+
+class CollaborationSocketUnavailableError extends Error {}
 
 function getSocketUrl() {
   return (
@@ -52,6 +55,9 @@ async function fetchRoomSocketToken(roomId: string) {
   })
 
   if (!response.ok) {
+    if (response.status === 503) {
+      throw new CollaborationSocketUnavailableError("협업방 연결을 확인할 수 없습니다. 재연결 중입니다.")
+    }
     const body = (await response.json().catch(() => null)) as
       | { error?: string }
       | null
@@ -90,6 +96,17 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
   const [locations, setLocations] = useState<Record<string, CollaborationLocation>>({})
   const [typingUsers, setTypingUsers] = useState<Record<string, CollaborationTypingEvent>>({})
 
+  const acceptPresence = useCallback((nextPresence: CollaborationPresenceSnapshot) => {
+    setPresence((current) => {
+      if (current?.roomId !== nextPresence.roomId || current.revision === undefined || nextPresence.revision === undefined) {
+        return nextPresence
+      }
+      if (current.revision > nextPresence.revision) return current
+      if (current.revision === nextPresence.revision && current.generatedAt > nextPresence.generatedAt) return current
+      return nextPresence
+    })
+  }, [])
+
   const clearTypingUser = useCallback((userId: string) => {
     const timer = typingTimersRef.current.get(userId)
     if (timer) window.clearTimeout(timer)
@@ -116,6 +133,22 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
     }
   }, [])
 
+  const scheduleReconnect = useCallback((roomId: string, delayMs = RECONNECT_DELAY_MS) => {
+    if (manualDisconnectRef.current) return
+    clearReconnectTimer()
+    setStatus("reconnecting")
+    reconnectTimerRef.current = window.setTimeout(() => {
+      if (manualDisconnectRef.current) return
+      void joinRoomRef.current(roomId).catch(() => {})
+    }, delayMs)
+  }, [clearReconnectTimer])
+
+  const handleSocketUnavailable = useCallback((roomId: string) => {
+    setError("실시간 연결이 끊겼습니다. 재연결 중입니다.")
+    socketRef.current?.disconnect()
+    scheduleReconnect(roomId, UNAVAILABLE_RETRY_DELAY_MS)
+  }, [scheduleReconnect])
+
   const sendHeartbeat = useCallback((roomId: string) => {
     const socket = socketRef.current
     if (!socket?.connected) return
@@ -125,12 +158,24 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
       { roomId },
       (response: CollaborationHeartbeatAck) => {
         if (!response.ok) {
+          if (response.error.code === "NOT_JOINED") {
+            stopHeartbeat()
+            void joinRoomRef.current(roomId).catch((nextError) => {
+              setError(nextError.message)
+            })
+            return
+          }
+          if (response.error.code === "SERVICE_UNAVAILABLE") {
+            stopHeartbeat()
+            handleSocketUnavailable(roomId)
+            return
+          }
           setError(response.error.message)
           setStatus("error")
         }
       }
     )
-  }, [])
+  }, [handleSocketUnavailable, stopHeartbeat])
 
   const startHeartbeat = useCallback(
     (roomId: string, intervalMs: number) => {
@@ -169,19 +214,24 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
             const nextError =
               response.error.code === "ROOM_FULL"
                 ? "협업방 정원이 찼습니다."
+                : response.error.code === "SERVICE_UNAVAILABLE"
+                ? "협업방 연결을 확인할 수 없습니다. 재연결 중입니다."
                 : response.error.message
-            roomIdRef.current = null
-            setActiveRoomId(null)
+            const retry = response.error.code === "SERVICE_UNAVAILABLE"
+            roomIdRef.current = retry ? roomId : null
+            if (!retry) setActiveRoomId(null)
             setPresence(null)
+            setLocations({})
             setError(nextError)
-            setStatus("error")
+            if (retry) scheduleReconnect(roomId, UNAVAILABLE_RETRY_DELAY_MS)
+            else setStatus("error")
             reject?.(new Error(nextError))
             return
           }
 
           roomIdRef.current = response.roomId
           setActiveRoomId(response.roomId)
-          setPresence(response.presence)
+          acceptPresence(response.presence)
           setLocations(Object.fromEntries(response.locations.map((location) => [location.userId, location])))
           for (const timer of typingTimersRef.current.values()) window.clearTimeout(timer)
           typingTimersRef.current.clear()
@@ -199,7 +249,7 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
         }
       )
     },
-    [queryClient, startHeartbeat]
+    [acceptPresence, queryClient, scheduleReconnect, startHeartbeat]
   )
 
   const joinRoom = useCallback(
@@ -209,9 +259,7 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
         joinAttempt === joinAttemptRef.current && !manualDisconnectRef.current
       clearReconnectTimer()
       manualDisconnectRef.current = false
-      setStatus((current) =>
-        current === "connected" ? "reconnecting" : "connecting"
-      )
+      setStatus(roomIdRef.current ? "reconnecting" : "connecting")
       setError(null)
 
       let tokenResponse: CollaborationSocketTokenResponse
@@ -220,7 +268,11 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
       } catch (nextError) {
         if (!isCurrent()) return
         setError(nextError instanceof Error ? nextError.message : "협업방에 연결하지 못했습니다.")
-        setStatus("error")
+        if (nextError instanceof CollaborationSocketUnavailableError || nextError instanceof TypeError) {
+          scheduleReconnect(roomId, UNAVAILABLE_RETRY_DELAY_MS)
+        } else {
+          setStatus("error")
+        }
         throw nextError
       }
       if (!isCurrent()) return
@@ -246,7 +298,7 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
             auth: { token: tokenResponse.token },
             autoConnect: false,
             reconnection: false,
-            transports: ["websocket", "polling"],
+            transports: ["websocket"],
           }) as CollaborationClientSocket
           socket = createdSocket
           socketRef.current = socket
@@ -257,7 +309,7 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
 
           socket.on("collaboration:presence", (nextPresence) => {
             if (nextPresence.roomId === roomIdRef.current) {
-              setPresence(nextPresence)
+              acceptPresence(nextPresence)
             }
           })
 
@@ -303,17 +355,11 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
               return
             }
 
-            setStatus("reconnecting")
+            setPresence(null)
+            setLocations({})
             const reconnectRoomId = roomIdRef.current
             if (!reconnectRoomId) return
-
-            clearReconnectTimer()
-            reconnectTimerRef.current = window.setTimeout(() => {
-              void joinRoomRef.current(reconnectRoomId).catch((nextError) => {
-                setError(nextError.message)
-                setStatus("error")
-              })
-            }, RECONNECT_DELAY_MS)
+            scheduleReconnect(reconnectRoomId)
           })
 
           socket.on("connect_error", (connectError) => {
@@ -322,14 +368,7 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
             setStatus("reconnecting")
             const reconnectRoomId = roomIdRef.current
             if (!reconnectRoomId) return
-
-            clearReconnectTimer()
-            reconnectTimerRef.current = window.setTimeout(() => {
-              void joinRoomRef.current(reconnectRoomId).catch((nextError) => {
-                setError(nextError.message)
-                setStatus("error")
-              })
-            }, RECONNECT_DELAY_MS)
+            scheduleReconnect(reconnectRoomId)
           })
         }
 
@@ -362,7 +401,7 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
         socket.connect()
       })
     },
-    [clearReconnectTimer, clearTypingUser, joinWithToken, queryClient, stopHeartbeat]
+    [acceptPresence, clearReconnectTimer, clearTypingUser, joinWithToken, queryClient, scheduleReconnect, stopHeartbeat]
   )
 
   useEffect(() => {
@@ -375,25 +414,32 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
       const roomId = roomIdRef.current
       if (!socket?.connected || !roomId) return
       socket.emit("collaboration:location", { roomId, ...location }, (response) => {
-        if (!response.ok) setError(response.error.message)
+        if (!response.ok) {
+          if (response.error.code === "SERVICE_UNAVAILABLE") handleSocketUnavailable(roomId)
+          else setError(response.error.message)
+        }
       })
     },
-    []
+    [handleSocketUnavailable]
   )
 
   const stopSharingLocation = useCallback(() => {
     const socket = socketRef.current
     const roomId = roomIdRef.current
     if (!socket?.connected || !roomId) return
-    socket.emit("collaboration:location:stop", { roomId }, () => {})
-  }, [])
+    socket.emit("collaboration:location:stop", { roomId }, (response) => {
+      if (!response.ok && response.error.code === "SERVICE_UNAVAILABLE") handleSocketUnavailable(roomId)
+    })
+  }, [handleSocketUnavailable])
 
   const publishTyping = useCallback((anchor: CollaborationTypingAnchor | null, isTyping: boolean) => {
     const socket = socketRef.current
     const roomId = roomIdRef.current
     if (!socket?.connected || !roomId) return
-    socket.emit("collaboration:typing", { roomId, anchor, isTyping }, () => {})
-  }, [])
+    socket.emit("collaboration:typing", { roomId, anchor, isTyping }, (response) => {
+      if (!response.ok && response.error.code === "SERVICE_UNAVAILABLE") handleSocketUnavailable(roomId)
+    })
+  }, [handleSocketUnavailable])
 
   const sendLeaveBeacon = useCallback((roomId: string, socketId: string) => {
     const url = `/api/collaboration/rooms/${encodeURIComponent(roomId)}/leave`

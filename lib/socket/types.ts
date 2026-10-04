@@ -78,6 +78,7 @@ export interface CollaborationPresenceUser {
 export interface CollaborationPresenceSnapshot {
   roomId: string
   generatedAt: string
+  revision?: number
   users: CollaborationPresenceUser[]
 }
 
@@ -140,6 +141,7 @@ export type CollaborationAckErrorCode =
   | "ROOM_FULL"
   | "NOT_JOINED"
   | "INVALID_LOCATION"
+  | "SERVICE_UNAVAILABLE"
 
 export type CollaborationJoinAck =
   | {

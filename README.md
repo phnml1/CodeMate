@@ -700,6 +700,31 @@ Socket.IO는 별도 프로세스인 `npm run dev:socket`으로 실행한다.
 브라우저는 일반 화면에서 Socket.IO client를 로드하지 않는다.
 standalone Socket.IO 서버는 이후 협업방 전용 realtime runtime으로 사용한다.
 
+로컬 Redis adapter를 사용하려면 `docker compose up -d redis`로 Redis를 시작하고
+Socket 서버 환경에 `REDIS_URL=redis://localhost:6379`를 설정한다.
+`REDIS_URL`이 없으면 단일 인스턴스 모드로 실행하고, 설정했는데 연결할 수 없으면 서버 시작이 실패한다.
+`/health`는 Redis 연결이 끊긴 동안 503을 반환한다.
+Railway에서는 Socket 서비스와 같은 환경의 비공개 Redis `REDIS_URL`을 참조한다.
+Redis가 설정되면 정원, presence, 소켓 lease, 코드 위치도 Redis에서 공유한다.
+같은 사용자의 여러 탭은 정원 한 자리로 계산한다. 연결이 끊기면 30초간 재접속 자리를 유지한다.
+서버 강제 종료 시 마지막 heartbeat 이후 80초가 지나면 다음 조회/입장에서 자리를 정리한다.
+다른 참여자의 heartbeat로 화면에 반영되는 시간은 최대 약 105초다.
+Redis 또는 adapter 연결이 끊기면 새 입장과 인원 조회는 실패(503)하고 기존 소켓은 재연결한다.
+재연결 중 메시지는 REST로 4초마다 조회하며, 재입장 뒤 메시지와 코드 대화를 다시 불러온다.
+Socket 서버는 15초마다 만료 lease와 실패한 DB 퇴장 동기화를 재시도하고,
+60초마다 오래된 DB 참여 기록을 현재 presence와 대조한다. 이 내부 요청에는
+`SOCKET_INTERNAL_SECRET`과 Socket 서비스에서 접근 가능한 `NEXTJS_URL`이 필요하다.
+종료 신호를 받으면 신규 입장을 막고 로컬 소켓의 퇴장을 Redis에 반영한 뒤 서버를 닫는다.
+Socket 서버 로그는 JSON 구조화 로그로 남기며 `replicaId`, `roomId`, `event`,
+`errorCode`, 입장 지연, broadcast 지연을 포함한다. 메시지 본문과 토큰은 기록하지 않는다.
+내부 secret이 있는 요청만 `GET /metrics`에서 활성 연결 수, 입장 거절, Redis 오류,
+broadcast 지연 지표를 조회할 수 있다.
+Socket 서비스를 2개 이상으로 늘리기 전에는 `REDIS_URL`을 설정한 상태에서
+`__tests__/socket-server/redis-adapter.test.ts` 통합 테스트를 통과시킨다. 이 테스트는
+두 Socket 복제본, Redis 공유 presence, 동시 9명 입장 중 8명 성공, 한 사용자의 두 탭,
+복제본 간 메시지와 코드 위치 전달, 서버 종료 후 재연결 폭주를 검증한다. 이 검증 전에는
+운영 Socket 서비스 replica를 1개로 유지하고, 통과 후 스테이징 2개, 운영 2개 순서로 확장한다.
+
 #### 테스트:
 - [ ] 협업방 WebSocket 연결 성공
 - [ ] 협업방 메시지 실시간 전송/수신

@@ -18,6 +18,9 @@ import type {
 } from "../lib/socket/types"
 import { authenticateSocket } from "./auth"
 import { syncCollaborationDisconnect } from "./disconnect-sync"
+import { incrementActiveConnections, logCollaborationEvent } from "./observability"
+import { registerRedisCollaborationRoomHandlers } from "./redis-handlers"
+import type { RedisPresenceStore } from "./redis-presence"
 
 type PresenceEntry = {
   memberId: string
@@ -425,22 +428,37 @@ function registerTypingHandlers(socket: TypedServerSocket) {
   })
 }
 
-export function setupSocketHandlers(io: TypedServer) {
+export function setupSocketHandlers(
+  io: TypedServer,
+  redisPresence?: RedisPresenceStore,
+  canAcceptConnection: () => boolean = () => true
+) {
   io.on("connection", (socket) => {
+    incrementActiveConnections(1)
+    socket.once("disconnect", () => incrementActiveConnections(-1))
+
+    if (!canAcceptConnection()) {
+      logCollaborationEvent("socket.connection.rejected", { errorCode: "SERVICE_UNAVAILABLE" }, "warn")
+      socket.disconnect(true)
+      return
+    }
     const userData = authenticateSocket(socket)
 
     if (!userData) {
+      logCollaborationEvent("socket.connection.rejected", { errorCode: "UNAUTHORIZED" }, "warn")
       socket.disconnect(true)
       return
     }
 
     socket.data.userId = userData.userId
     socket.data.userName = userData.userName
+    logCollaborationEvent("socket.connection.accepted")
 
     socket.join(`user:${userData.userId}`)
 
     registerRoomHandlers(socket)
-    registerCollaborationRoomHandlers(io, socket)
+    if (redisPresence) registerRedisCollaborationRoomHandlers(io, socket, redisPresence, canAcceptConnection)
+    else registerCollaborationRoomHandlers(io, socket)
     registerTypingHandlers(socket)
   })
 }

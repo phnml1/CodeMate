@@ -20,6 +20,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   if (!secret) return NextResponse.json({ error: "Socket unavailable" }, { status: 503 })
 
   try {
+    const membership = await prisma.collaborationRoomMember.findUnique({
+      where: { roomId_userId: { roomId, userId: session.user.id } },
+      select: { id: true, updatedAt: true },
+    })
     const socketUrl = process.env.SOCKET_SERVER_URL ?? process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:4000"
     const response = await fetch(new URL("/internal/collaboration/leave", socketUrl), {
       method: "POST",
@@ -33,9 +37,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
       throw new Error("Invalid socket leave response")
     }
 
-    if (!presence.users.some((user) => user.userId === session.user.id)) {
+    if (membership && !presence.users.some((user) => user.userId === session.user.id)) {
       await prisma.collaborationRoomMember.updateMany({
-        where: { roomId, userId: session.user.id, leftAt: null },
+        where: {
+          id: membership.id,
+          roomId,
+          userId: session.user.id,
+          leftAt: null,
+          updatedAt: membership.updatedAt,
+        },
         data: { leftAt: new Date() },
       })
     }

@@ -11,6 +11,7 @@ import {
   createCollaborationRoomSocketToken,
 } from "@/lib/collaboration/socket-token"
 import { prisma } from "@/lib/prisma"
+import { CollaborationPresenceUnavailableError } from "@/lib/socket/presence"
 import { NextResponse } from "next/server"
 
 type RouteContext = {
@@ -45,11 +46,9 @@ export async function POST(_request: Request, { params }: RouteContext) {
       select: { id: true, leftAt: true },
     })
 
-    if (!existingMember || existingMember.leftAt) {
-      const memberCount = await getActiveMemberCount(room.id)
-      if (memberCount >= room.capacity) {
-        return NextResponse.json({ error: "Room is full" }, { status: 409 })
-      }
+    const memberCount = await getActiveMemberCount(room.id)
+    if ((!existingMember || existingMember.leftAt) && memberCount >= room.capacity) {
+      return NextResponse.json({ error: "Room is full" }, { status: 409 })
     }
 
     const member = await prisma.$transaction(async (tx) => {
@@ -78,7 +77,10 @@ export async function POST(_request: Request, { params }: RouteContext) {
       heartbeatIntervalMs: COLLABORATION_HEARTBEAT_INTERVAL_MS,
       reconnectGraceMs: COLLABORATION_RECONNECT_GRACE_MS,
     })
-  } catch {
+  } catch (error) {
+    if (error instanceof CollaborationPresenceUnavailableError) {
+      return NextResponse.json({ error: "Collaboration presence unavailable" }, { status: 503 })
+    }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

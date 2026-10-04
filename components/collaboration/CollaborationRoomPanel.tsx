@@ -42,9 +42,9 @@ export default function CollaborationRoomPanel({
         <div className="flex items-center gap-2">
           <Radio className="size-4 text-emerald-600" />
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">실시간 협업방</h2>
-          <span className="text-xs text-slate-500">{rooms.length}</span>
+          <span className="text-xs text-slate-500">{isPending || isError ? "—" : rooms.length}</span>
         </div>
-        <Button type="button" size="sm" disabled={createRoom.isPending} onClick={() => void createAndOpenRoom()}>
+        <Button type="button" size="sm" disabled={createRoom.isPending || isPending || isError} onClick={() => void createAndOpenRoom()}>
           {createRoom.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
           협업방 시작
         </Button>
@@ -53,7 +53,7 @@ export default function CollaborationRoomPanel({
         {isPending ? (
           <p className="text-sm text-slate-500">협업방을 불러오는 중입니다.</p>
         ) : isError ? (
-          <p role="alert" className="text-sm text-rose-600">협업방 목록을 불러오지 못했습니다.</p>
+          <p role="alert" className="text-sm text-rose-600">협업방 인원을 확인할 수 없습니다. 연결 복구를 기다리는 중입니다.</p>
         ) : rooms.length === 0 ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">아직 열린 협업방이 없습니다.</p>
         ) : rooms.map((room) => {

@@ -3,7 +3,7 @@ import { verifyCollaborationRoomSocketToken } from "@/lib/collaboration/socket-t
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
-import { getCollaborationPresence } from "@/lib/socket/presence"
+import { CollaborationPresenceUnavailableError, getCollaborationPresence } from "@/lib/socket/presence"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
@@ -25,7 +25,10 @@ jest.mock("@/lib/prisma", () => ({
 jest.mock("@/lib/repository-access", () => ({
   buildAccessiblePullRequestWhere: jest.fn(),
 }))
-jest.mock("@/lib/socket/presence", () => ({ getCollaborationPresence: jest.fn() }))
+jest.mock("@/lib/socket/presence", () => ({
+  ...jest.requireActual("@/lib/socket/presence"),
+  getCollaborationPresence: jest.fn(),
+}))
 
 const mockedAuth = auth as jest.Mock
 const mockedTransaction = prisma.$transaction as jest.Mock
@@ -58,6 +61,7 @@ describe("POST /api/collaboration/rooms/[roomId]/socket-token", () => {
 
   beforeEach(() => {
     process.env.SOCKET_INTERNAL_SECRET = "test-socket-secret"
+    mockedPresence.mockResolvedValue({ rooms: [{ roomId: "room-1", users: [] }] })
   })
 
   afterEach(() => {
@@ -125,5 +129,17 @@ describe("POST /api/collaboration/rooms/[roomId]/socket-token", () => {
 
     expect(response.status).toBe(409)
     expect(body.error).toBe("Room is full")
+  })
+
+  it("refuses a token even for an existing member while presence is unavailable", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindRoom.mockResolvedValue(sampleRoom)
+    mockedFindMember.mockResolvedValue({ id: "member-1", leftAt: null })
+    mockedPresence.mockRejectedValue(new CollaborationPresenceUnavailableError())
+
+    const response = await POST(createRequest(), createParams())
+    expect(response.status).toBe(503)
+    expect(mockedTransaction).not.toHaveBeenCalled()
   })
 })
