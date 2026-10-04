@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
 jest.mock("@/lib/auth", () => ({ auth: jest.fn() }))
-jest.mock("@/lib/prisma", () => ({ prisma: { collaborationRoomMember: { updateMany: jest.fn() } } }))
+jest.mock("@/lib/prisma", () => ({ prisma: { collaborationRoomMember: { findUnique: jest.fn(), updateMany: jest.fn() } } }))
 
 const params = { params: Promise.resolve({ roomId: "room-1" }) }
 const request = (socketId: unknown) => new Request("http://localhost/api/collaboration/rooms/room-1/leave", {
@@ -19,6 +19,9 @@ describe("POST /api/collaboration/rooms/[roomId]/leave", () => {
   beforeEach(() => {
     process.env.SOCKET_INTERNAL_SECRET = "test-secret"
     ;(auth as jest.Mock).mockResolvedValue({ user: { id: "user-1" } })
+    ;(prisma.collaborationRoomMember.findUnique as jest.Mock).mockResolvedValue({
+      id: "member-1", updatedAt: new Date("2026-10-04T00:00:00.000Z"),
+    })
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ presence: { roomId: "room-1", users: [] } }),
@@ -40,7 +43,10 @@ describe("POST /api/collaboration/rooms/[roomId]/leave", () => {
       body: JSON.stringify({ roomId: "room-1", userId: "user-1", socketId: "socket-1" }),
     }))
     expect(prisma.collaborationRoomMember.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { roomId: "room-1", userId: "user-1", leftAt: null },
+      where: {
+        id: "member-1", roomId: "room-1", userId: "user-1", leftAt: null,
+        updatedAt: new Date("2026-10-04T00:00:00.000Z"),
+      },
     }))
   })
 

@@ -2,7 +2,7 @@ import { GET, POST } from "@/app/api/collaboration/rooms/route"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
-import { getCollaborationPresence } from "@/lib/socket/presence"
+import { CollaborationPresenceUnavailableError, getCollaborationPresence } from "@/lib/socket/presence"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
@@ -21,7 +21,10 @@ jest.mock("@/lib/prisma", () => ({
 jest.mock("@/lib/repository-access", () => ({
   buildAccessiblePullRequestWhere: jest.fn(),
 }))
-jest.mock("@/lib/socket/presence", () => ({ getCollaborationPresence: jest.fn() }))
+jest.mock("@/lib/socket/presence", () => ({
+  ...jest.requireActual("@/lib/socket/presence"),
+  getCollaborationPresence: jest.fn(),
+}))
 
 const mockedAuth = auth as jest.Mock
 const mockedTransaction = prisma.$transaction as jest.Mock
@@ -153,6 +156,14 @@ describe("GET /api/collaboration/rooms", () => {
   })
 
   afterEach(() => jest.clearAllMocks())
+
+  it("does not show stale counts when presence is unavailable", async () => {
+    mockedPresence.mockRejectedValue(new CollaborationPresenceUnavailableError())
+
+    const response = await GET(new Request("http://localhost/api/collaboration/rooms?pullRequestId=pr-1"))
+    expect(response.status).toBe(503)
+    expect((await response.json()).rooms).toBeUndefined()
+  })
 
   it("hides abandoned active rooms", async () => {
     mockedPresence.mockResolvedValue({ startedAt: now.toISOString(), rooms: [{ roomId: "room-1", users: [] }] })

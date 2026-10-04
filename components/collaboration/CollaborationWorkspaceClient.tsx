@@ -209,9 +209,9 @@ export default function CollaborationWorkspaceClient({
     () => selectedFile?.patch ? parsePatch(selectedFile.patch) : [],
     [selectedFile]
   )
-  const participants = presence?.users ?? []
-  const onlineParticipantCount = participants.filter((user) => user.status === "online").length
   const connected = status === "connected" && activeRoomId === room.id
+  const participants = connected ? presence?.users ?? [] : []
+  const onlineParticipantCount = participants.filter((user) => user.status === "online").length
   const messagesQuery = useCollaborationMessages(room.id, connected)
   const messages = useMemo(
     () => messagesQuery.data?.pages.slice().reverse().flatMap((page) => page.messages) ?? [],
@@ -512,7 +512,7 @@ export default function CollaborationWorkspaceClient({
             </span>
             <span className="inline-flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300">
               <Users className="size-3.5" />
-              {onlineParticipantCount}/{room.capacity}
+              {connected && presence ? onlineParticipantCount : "—"}/{room.capacity}
             </span>
           </div>
         </div>
@@ -557,6 +557,11 @@ export default function CollaborationWorkspaceClient({
           </div>
         )}
         {navigationError && <p role="alert" className="mt-2 pl-10 text-xs text-rose-600">{navigationError}</p>}
+        {status === "reconnecting" && room.status === "ACTIVE" && (
+          <p role="status" className="mt-2 pl-10 text-xs text-amber-700 dark:text-amber-400">
+            실시간 연결을 복구하는 중입니다. 대화는 계속 갱신됩니다.
+          </p>
+        )}
         {error && room.status === "ACTIVE" && (
           <div role="alert" className="mt-2 flex items-center gap-2 pl-10 text-xs text-rose-600 dark:text-rose-400">
             <span>{error}</span>

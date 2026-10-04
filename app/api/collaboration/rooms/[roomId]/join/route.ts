@@ -7,6 +7,7 @@ import {
   serializeCollaborationRoom,
 } from "@/lib/collaboration/rooms"
 import { prisma } from "@/lib/prisma"
+import { CollaborationPresenceUnavailableError } from "@/lib/socket/presence"
 import { NextResponse } from "next/server"
 
 type RouteContext = {
@@ -41,11 +42,9 @@ export async function POST(_request: Request, { params }: RouteContext) {
       select: { id: true, leftAt: true },
     })
 
-    if (!existingMember || existingMember.leftAt) {
-      const memberCount = await getActiveMemberCount(room.id)
-      if (memberCount >= room.capacity) {
-        return NextResponse.json({ error: "Room is full" }, { status: 409 })
-      }
+    const memberCount = await getActiveMemberCount(room.id)
+    if ((!existingMember || existingMember.leftAt) && memberCount >= room.capacity) {
+      return NextResponse.json({ error: "Room is full" }, { status: 409 })
     }
 
     const updatedRoom = await prisma.$transaction(async (tx) => {
@@ -58,7 +57,10 @@ export async function POST(_request: Request, { params }: RouteContext) {
     })
 
     return NextResponse.json({ room: serializeCollaborationRoom(updatedRoom) })
-  } catch {
+  } catch (error) {
+    if (error instanceof CollaborationPresenceUnavailableError) {
+      return NextResponse.json({ error: "Collaboration presence unavailable" }, { status: 503 })
+    }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

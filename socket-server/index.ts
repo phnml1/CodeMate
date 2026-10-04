@@ -3,6 +3,14 @@ import type { IncomingMessage, ServerResponse } from "http"
 import { timingSafeEqual } from "crypto"
 import { Server } from "socket.io"
 import { getCollaborationPresenceSnapshots, leaveCollaborationRoomFromUnload, setupSocketHandlers } from "./handlers"
+import { attachRedisAdapter, type RedisAdapterConnection } from "./redis"
+import {
+  drainRedisCollaborationConnections,
+  getRedisPresenceSnapshots,
+  leaveRedisRoomFromUnload,
+  reconcileRedisPresence,
+} from "./redis-handlers"
+import { getSocketMetrics, logCollaborationEvent, recordBroadcast } from "./observability"
 import type {
   InternalSocketEmitPayload,
   ServerToClientEventName,
@@ -12,6 +20,16 @@ import type {
 const port = parseInt(process.env.PORT || "4000", 10)
 const allowedOrigin = process.env.NEXTJS_URL || "http://localhost:3000"
 const startedAt = new Date().toISOString()
+let redisAdapter: RedisAdapterConnection | null = null
+let draining = false
+let reconciliationTimer: NodeJS.Timeout | null = null
+let reconciliationRunning = false
+let lastDbReconciliationAt = 0
+const reconciliationAbort = new AbortController()
+
+function isReady() {
+  return !draining && (redisAdapter ? redisAdapter.isReady() : process.env.REDIS_URL === undefined)
+}
 
 function parseBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -74,6 +92,8 @@ function isAuthorizedInternalRequest(req: IncomingMessage) {
 }
 
 function emitInternalPayload(io: TypedServer, body: InternalSocketEmitPayload) {
+  const startedAt = Date.now()
+  const roomId = body.room.startsWith("collaboration:") ? body.room.slice("collaboration:".length) : undefined
   switch (body.event) {
     case "comment:new":
       io.to(body.room).emit("comment:new", body.data)
@@ -109,19 +129,36 @@ function emitInternalPayload(io: TypedServer, body: InternalSocketEmitPayload) {
       io.to(body.room).emit("collaboration:message", body.data)
       break
   }
+  recordBroadcast(body.event, roomId, startedAt, true)
 }
 
 const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-  // Health check
   if (req.method === "GET" && req.url === "/health") {
-    res.writeHead(200, { "Content-Type": "text/plain" })
-    res.end("ok")
+    const ready = isReady()
+    res.writeHead(ready ? 200 : 503, { "Content-Type": "text/plain" })
+    res.end(ready ? "ok" : "Redis unavailable")
+    return
+  }
+
+  if (req.method === "GET" && req.url === "/metrics") {
+    if (!isAuthorizedInternalRequest(req)) {
+      res.writeHead(401, { "Content-Type": "application/json" })
+      res.end(JSON.stringify({ error: "Unauthorized" }))
+      return
+    }
+    res.writeHead(200, { "Content-Type": "application/json" })
+    res.end(JSON.stringify(getSocketMetrics()))
     return
   }
 
   if (req.method === "POST" && req.url === "/internal/collaboration/presence") {
     if (!isAuthorizedInternalRequest(req)) {
       res.writeHead(401)
+      res.end()
+      return
+    }
+    if (!isReady()) {
+      res.writeHead(503)
       res.end()
       return
     }
@@ -132,10 +169,14 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
         res.end()
         return
       }
+      const rooms = redisAdapter
+        ? await getRedisPresenceSnapshots(io, redisAdapter.presence, body.roomIds)
+        : getCollaborationPresenceSnapshots(body.roomIds)
       res.writeHead(200, { "Content-Type": "application/json" })
-      res.end(JSON.stringify({ startedAt, rooms: getCollaborationPresenceSnapshots(body.roomIds) }))
-    } catch {
-      res.writeHead(400)
+      res.end(JSON.stringify({ startedAt, rooms }))
+    } catch (error) {
+      logCollaborationEvent("collaboration.internal.presence.failed", {}, "error", error)
+      res.writeHead(error instanceof Error && error.message === "Invalid JSON" ? 400 : 503)
       res.end()
     }
     return
@@ -147,6 +188,11 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
       res.end()
       return
     }
+    if (!isReady()) {
+      res.writeHead(503)
+      res.end()
+      return
+    }
     try {
       const body = await parseBody(req)
       if (!isObject(body) || typeof body.roomId !== "string" || typeof body.userId !== "string" || typeof body.socketId !== "string" || !body.roomId || !body.userId || !body.socketId) {
@@ -154,11 +200,14 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
         res.end()
         return
       }
-      const presence = leaveCollaborationRoomFromUnload(io, body.roomId, body.userId, body.socketId)
+      const presence = redisAdapter
+        ? await leaveRedisRoomFromUnload(io, redisAdapter.presence, body.roomId, body.userId, body.socketId)
+        : leaveCollaborationRoomFromUnload(io, body.roomId, body.userId, body.socketId)
       res.writeHead(200, { "Content-Type": "application/json" })
       res.end(JSON.stringify({ presence }))
-    } catch {
-      res.writeHead(400)
+    } catch (error) {
+      logCollaborationEvent("collaboration.internal.leave.failed", {}, "error", error)
+      res.writeHead(error instanceof Error && error.message === "Invalid JSON" ? 400 : 503)
       res.end()
     }
     return
@@ -169,6 +218,11 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
     if (!isAuthorizedInternalRequest(req)) {
       res.writeHead(401, { "Content-Type": "application/json" })
       res.end(JSON.stringify({ error: "Unauthorized" }))
+      return
+    }
+    if (!isReady()) {
+      res.writeHead(503, { "Content-Type": "application/json" })
+      res.end(JSON.stringify({ error: "Socket unavailable" }))
       return
     }
 
@@ -195,14 +249,83 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
 })
 
 const io: TypedServer = new Server(httpServer, {
+  transports: ["websocket"],
   cors: {
     origin: allowedOrigin,
     credentials: true,
   },
 })
 
-setupSocketHandlers(io)
+async function startSocketServer() {
+  redisAdapter = await attachRedisAdapter(io, process.env.REDIS_URL, () => {
+    for (const socket of io.sockets.sockets.values()) socket.disconnect(true)
+  })
+  setupSocketHandlers(io, redisAdapter?.presence, isReady)
+  httpServer.listen(port, () => {
+    logCollaborationEvent("socket.server.ready", { port, mode: redisAdapter ? "redis" : "single-instance" })
+  })
+  if (redisAdapter) {
+    const tick = async () => {
+      if (reconciliationRunning || !isReady() || !redisAdapter) return
+      reconciliationRunning = true
+      try {
+        await reconcileRedisPresence(io, redisAdapter.presence)
+        if (Date.now() - lastDbReconciliationAt >= 60_000) {
+          lastDbReconciliationAt = Date.now()
+          if (await redisAdapter.presence.tryAcquireDbReconciliation()) {
+            const secret = process.env.SOCKET_INTERNAL_SECRET
+            if (!secret) throw new Error("SOCKET_INTERNAL_SECRET is missing")
+            const response = await fetch(new URL("/api/internal/collaboration/reconcile", process.env.NEXTJS_URL ?? "http://localhost:3000"), {
+              method: "POST",
+              headers: { "x-socket-secret": secret },
+              signal: AbortSignal.any([reconciliationAbort.signal, AbortSignal.timeout(30_000)]),
+            })
+            if (!response.ok) throw new Error(`Collaboration DB reconciliation failed: ${response.status}`)
+          }
+        }
+      } catch (error) {
+        logCollaborationEvent("collaboration.reconciliation.failed", {}, "error", error)
+      } finally {
+        reconciliationRunning = false
+      }
+    }
+    reconciliationTimer = setInterval(() => void tick(), 15_000)
+    void tick()
+  }
+}
 
-httpServer.listen(port, () => {
-  console.log(`> Socket.io server ready on port ${port}`)
+async function shutdown() {
+  if (draining) return
+  draining = true
+  reconciliationAbort.abort()
+  if (reconciliationTimer) clearInterval(reconciliationTimer)
+  const deadline = setTimeout(() => {
+    logCollaborationEvent("socket.shutdown.timed_out", {}, "error")
+    process.exit(1)
+  }, 10_000)
+  try {
+    if (redisAdapter) {
+      await drainRedisCollaborationConnections(io, redisAdapter.presence)
+    } else {
+      for (const socket of io.sockets.sockets.values()) socket.disconnect(true)
+    }
+    await new Promise<void>((resolve) => io.close(() => resolve()))
+    redisAdapter?.close()
+  } finally {
+    clearTimeout(deadline)
+  }
+}
+
+process.once("SIGTERM", () => void shutdown().catch((error) => {
+  logCollaborationEvent("socket.shutdown.failed", {}, "error", error)
+  process.exit(1)
+}))
+process.once("SIGINT", () => void shutdown().catch((error) => {
+  logCollaborationEvent("socket.shutdown.failed", {}, "error", error)
+  process.exit(1)
+}))
+
+void startSocketServer().catch((error) => {
+  logCollaborationEvent("socket.start.failed", {}, "error", error)
+  process.exitCode = 1
 })

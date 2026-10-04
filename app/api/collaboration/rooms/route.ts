@@ -8,7 +8,7 @@ import {
 } from "@/lib/collaboration/rooms"
 import { prisma } from "@/lib/prisma"
 import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
-import { getCollaborationPresence } from "@/lib/socket/presence"
+import { CollaborationPresenceUnavailableError, getCollaborationPresence } from "@/lib/socket/presence"
 import { NextResponse } from "next/server"
 
 const ROOM_JOIN_GRACE_MS = 45_000
@@ -69,7 +69,10 @@ export async function GET(request: Request) {
         }]
       }),
     }, { headers: { "Cache-Control": "no-store" } })
-  } catch {
+  } catch (error) {
+    if (error instanceof CollaborationPresenceUnavailableError) {
+      return NextResponse.json({ error: "Collaboration presence unavailable" }, { status: 503 })
+    }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
