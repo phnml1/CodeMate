@@ -15,7 +15,7 @@ export default function MobileFileDropdown({
   prId,
 }: MobileFileDropdownProps) {
   const { data: files = [], isPending, isError } = useCachedPRFiles(prId);
-  const { selectAndScrollToFile } = usePRDetailFileNavigation();
+  const { selectAndScrollToFile } = usePRDetailFileNavigation(prId);
   const mobileFileListId = `mobile-file-list-${prId}`;
   const { selectedFile, mobileFileOpen, setMobileFileOpen } = usePRDetailStore(
     useShallow((state) => ({

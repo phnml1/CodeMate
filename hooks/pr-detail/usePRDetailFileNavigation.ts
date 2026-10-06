@@ -1,43 +1,23 @@
 "use client";
 
 import { useCallback } from "react";
-import { useShallow } from "zustand/react/shallow";
-import {
-  getDiffFileId,
-  getDiffLineId,
-  scrollToElementById,
-} from "@/lib/pr-detail/diffUtils";
 import { usePRDetailStore } from "@/stores/prDetailStore";
 
-export function usePRDetailFileNavigation() {
-  const { expandDiff, selectFile, setMobileFileOpen } = usePRDetailStore(
-    useShallow((state) => ({
-      expandDiff: state.expandDiff,
-      selectFile: state.selectFile,
-      setMobileFileOpen: state.setMobileFileOpen,
-    }))
-  );
+export function usePRDetailFileNavigation(prId: string) {
+  const navigateToFile = usePRDetailStore((state) => state.navigateToFile);
 
   const selectAndScrollToFile = useCallback(
     (filename: string) => {
-      selectFile(filename);
-      setMobileFileOpen(false);
-      scrollToElementById(getDiffFileId(filename), {
-        behavior: "smooth",
-        block: "start",
-      });
+      navigateToFile(prId, filename);
     },
-    [selectFile, setMobileFileOpen]
+    [navigateToFile, prId]
   );
 
   const selectAndScrollToLine = useCallback(
     (filePath: string, lineNumber: number) => {
-      expandDiff(filePath);
-      selectFile(filePath);
-      setMobileFileOpen(false);
-      scrollToElementById(getDiffLineId(filePath, lineNumber));
+      navigateToFile(prId, filePath, lineNumber);
     },
-    [expandDiff, selectFile, setMobileFileOpen]
+    [navigateToFile, prId]
   );
 
   return { selectAndScrollToFile, selectAndScrollToLine };

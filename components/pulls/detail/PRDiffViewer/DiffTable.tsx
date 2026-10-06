@@ -21,6 +21,7 @@ interface DiffTableProps {
   prId?: string
   filePath?: string
   currentUserId?: string
+  onComposerOpenChange?: (open: boolean) => void
 }
 
 export default function DiffTable({
@@ -31,6 +32,7 @@ export default function DiffTable({
   prId,
   filePath,
   currentUserId = "",
+  onComposerOpenChange,
 }: DiffTableProps) {
   const [hoveredLine, setHoveredLine] = useState<number | null>(null)
   const [openFormLine, setOpenFormLine] = useState<number | null>(null)
@@ -94,7 +96,10 @@ export default function DiffTable({
                       aria-label={`${line.newNum}번 줄에 인라인 댓글 추가`}
                       aria-expanded={isFormOpen}
                       title="댓글 추가"
-                      onClick={() => setOpenFormLine(isFormOpen ? null : line.newNum!)}
+                      onClick={() => {
+                        setOpenFormLine(isFormOpen ? null : line.newNum!)
+                        onComposerOpenChange?.(!isFormOpen)
+                      }}
                       className="cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
                     >
                       <Plus size={13} className="text-blue-500" />
@@ -125,7 +130,10 @@ export default function DiffTable({
                       prId={prId!}
                       filePath={filePath!}
                       lineNumber={line.newNum!}
-                      onClose={() => setOpenFormLine(null)}
+                      onClose={() => {
+                        setOpenFormLine(null)
+                        onComposerOpenChange?.(false)
+                      }}
                     />
                   </td>
                 </tr>

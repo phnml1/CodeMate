@@ -2,25 +2,38 @@
 
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import { useCachedPRFiles } from "@/hooks/pr-detail/usePRDetailCachedQueries";
 import { usePRDetailFileNavigation } from "@/hooks/pr-detail/usePRDetailFileNavigation";
 
 export function usePRDetailDeepLink(prId: string) {
-  const initializedRef = useRef<string | null>(null);
+  const handledRef = useRef<string | null>(null);
   const searchParams = useSearchParams();
-  const { selectAndScrollToLine } = usePRDetailFileNavigation();
+  const filePath = searchParams.get("filePath");
+  const lineNumber = searchParams.get("lineNumber");
+  const { data: files, isPending } = useCachedPRFiles(prId);
+  const { selectAndScrollToLine } = usePRDetailFileNavigation(prId);
 
   useEffect(() => {
-    const filePath = searchParams.get("filePath");
-    const lineNumber = searchParams.get("lineNumber");
+    if (!filePath || !lineNumber) {
+      handledRef.current = null;
+      return;
+    }
 
-    if (initializedRef.current === prId) return;
-    initializedRef.current = prId;
+    const lineNum = Number(lineNumber);
+    if (!Number.isInteger(lineNum) || lineNum < 1) {
+      handledRef.current = null;
+      return;
+    }
+    if (isPending) return;
+    if (!files?.some((file) => file.filename === filePath)) {
+      handledRef.current = null;
+      return;
+    }
 
-    if (!filePath || !lineNumber) return;
-
-    const lineNum = Number.parseInt(lineNumber, 10);
-    if (Number.isNaN(lineNum)) return;
+    const key = `${prId}:${filePath}:${lineNum}`;
+    if (handledRef.current === key) return;
+    handledRef.current = key;
 
     selectAndScrollToLine(filePath, lineNum);
-  }, [prId, searchParams, selectAndScrollToLine]);
+  }, [prId, filePath, lineNumber, files, isPending, selectAndScrollToLine]);
 }

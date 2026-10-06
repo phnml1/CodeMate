@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type RefObject } from "react";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -28,12 +28,14 @@ interface PRDiffSectionProps {
   prId: string;
   currentUserId: string;
   onIssueClick: (issue: ReviewIssue) => void;
+  scrollRootRef: RefObject<HTMLDivElement | null>;
 }
 
 export default function PRDiffSection({
   prId,
   currentUserId,
   onIssueClick,
+  scrollRootRef,
 }: PRDiffSectionProps) {
   const { data: files = [], isPending, isError } = useCachedPRFiles(prId);
   const { data: review } = useCachedReview(prId);
@@ -73,6 +75,7 @@ export default function PRDiffSection({
           prId={prId}
           currentUserId={currentUserId}
           inlineComments={inlineCommentsByFile[file.filename] ?? EMPTY_COMMENTS}
+          scrollRootRef={scrollRootRef}
         />
       ))}
     </>
