@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { ArrowUpRight, Loader2, Plus, Radio, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -21,30 +22,46 @@ export default function CollaborationRoomPanel({
   const { data: rooms = [], isPending, isError } = useCollaborationRooms(prId)
   const createRoom = useCreateCollaborationRoom(prId)
   const [error, setError] = useState<string | null>(null)
+  const [isEntering, setIsEntering] = useState(false)
+  const enteringRef = useRef(false)
 
-  const openRoom = (room: CollaborationRoom) => {
-    router.push(`/collaboration/rooms/${room.id}`)
-  }
-
-  const createAndOpenRoom = async () => {
+  const openRoom = async (existingRoom?: CollaborationRoom) => {
+    if (enteringRef.current) return
+    enteringRef.current = true
+    setIsEntering(true)
     setError(null)
     try {
-      const room = await createRoom.mutateAsync()
-      openRoom(room)
+      const room = existingRoom ?? await createRoom.mutateAsync()
+      // Keep the overlay until navigation unmounts this panel, not just until creation completes.
+      router.push(`/collaboration/rooms/${room.id}`)
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "협업방을 만들지 못했습니다.")
+      enteringRef.current = false
+      setIsEntering(false)
+      setError(nextError instanceof Error ? nextError.message : "협업방에 입장하지 못했습니다.")
     }
   }
 
   return (
-    <section className="border-y border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+    <section aria-busy={isEntering} className="border-y border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+      {isEntering && createPortal(
+        <div
+          role="status"
+          aria-live="polite"
+          aria-label="협업방에 입장하는 중입니다."
+          className="fixed inset-0 z-[100] flex cursor-wait items-center justify-center bg-white/80 dark:bg-black/70"
+        >
+          <Loader2 aria-hidden="true" className="size-10 animate-spin text-emerald-600 motion-reduce:animate-none dark:text-emerald-400" />
+          <span className="sr-only">협업방에 입장하는 중입니다.</span>
+        </div>,
+        document.body,
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-2">
           <Radio className="size-4 text-emerald-600" />
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">실시간 협업방</h2>
           <span className="text-xs text-slate-500">{isPending || isError ? "—" : rooms.length}</span>
         </div>
-        <Button type="button" size="sm" disabled={createRoom.isPending || isPending || isError} onClick={() => void createAndOpenRoom()}>
+        <Button type="button" size="sm" disabled={isEntering || createRoom.isPending || isPending || isError} onClick={() => void openRoom()}>
           {createRoom.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
           협업방 시작
         </Button>
@@ -70,7 +87,7 @@ export default function CollaborationRoomPanel({
                   {full && <span className="shrink-0 text-amber-700 dark:text-amber-400">정원 마감</span>}
                 </p>
               </div>
-              <Button type="button" variant="outline" size="sm" disabled={full} onClick={() => openRoom(room)}>
+              <Button type="button" variant="outline" size="sm" disabled={isEntering || full} onClick={() => void openRoom(room)}>
                 <ArrowUpRight /> 입장
               </Button>
             </div>
