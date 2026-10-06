@@ -3,8 +3,10 @@
 import { useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 import { ArrowUpRight, Loader2, Plus, Radio, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { workspacePRFilesQueryOptions } from "@/hooks/usePRFiles"
 import {
   useCollaborationRooms,
   useCreateCollaborationRoom,
@@ -19,11 +21,15 @@ export default function CollaborationRoomPanel({
   currentUserId: string
 }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { data: rooms = [], isPending, isError } = useCollaborationRooms(prId)
   const createRoom = useCreateCollaborationRoom(prId)
   const [error, setError] = useState<string | null>(null)
   const [isEntering, setIsEntering] = useState(false)
   const enteringRef = useRef(false)
+  const prefetchRevisionFiles = () => {
+    void queryClient.prefetchQuery(workspacePRFilesQueryOptions(prId))
+  }
 
   const openRoom = async (existingRoom?: CollaborationRoom) => {
     if (enteringRef.current) return
@@ -61,7 +67,7 @@ export default function CollaborationRoomPanel({
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">실시간 협업방</h2>
           <span className="text-xs text-slate-500">{isPending || isError ? "—" : rooms.length}</span>
         </div>
-        <Button type="button" size="sm" disabled={isEntering || createRoom.isPending || isPending || isError} onClick={() => void openRoom()}>
+        <Button type="button" size="sm" disabled={isEntering || createRoom.isPending || isPending || isError} onMouseEnter={prefetchRevisionFiles} onFocus={prefetchRevisionFiles} onClick={() => void openRoom()}>
           {createRoom.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
           협업방 시작
         </Button>
@@ -87,7 +93,7 @@ export default function CollaborationRoomPanel({
                   {full && <span className="shrink-0 text-amber-700 dark:text-amber-400">정원 마감</span>}
                 </p>
               </div>
-              <Button type="button" variant="outline" size="sm" disabled={isEntering || full} onClick={() => void openRoom(room)}>
+              <Button type="button" variant="outline" size="sm" disabled={isEntering || full} onMouseEnter={prefetchRevisionFiles} onFocus={prefetchRevisionFiles} onClick={() => void openRoom(room)}>
                 <ArrowUpRight /> 입장
               </Button>
             </div>
