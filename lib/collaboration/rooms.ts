@@ -2,6 +2,7 @@ import type { Prisma } from "@/lib/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
 import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
 import { getCollaborationPresence } from "@/lib/socket/presence"
+import { getCollaborationPresenceScope } from "@/lib/collaboration/presence-scope"
 import { z } from "zod"
 
 export const COLLABORATION_ROOM_DEFAULT_CAPACITY = 8
@@ -167,6 +168,7 @@ export async function findAccessibleCollaborationRoom(
   return prisma.collaborationRoom.findFirst({
     where: {
       id: roomId,
+      presenceScope: getCollaborationPresenceScope(),
       pullRequest: accessiblePullRequestWhere,
     },
     include: collaborationRoomInclude,

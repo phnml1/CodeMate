@@ -123,6 +123,7 @@ describe("POST /api/collaboration/rooms", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           pullRequestId: "pr-1",
+          presenceScope: "local",
           ownerId: "user-1",
           members: {
             create: {
@@ -171,6 +172,9 @@ describe("GET /api/collaboration/rooms", () => {
     const response = await GET(new Request("http://localhost/api/collaboration/rooms?pullRequestId=pr-1"))
     expect(response.status).toBe(200)
     expect((await response.json()).rooms).toEqual([])
+    expect(mockedFindRooms).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ presenceScope: "local" }),
+    }))
   })
 
   it("shows 1/8 when one of two recorded members has left", async () => {

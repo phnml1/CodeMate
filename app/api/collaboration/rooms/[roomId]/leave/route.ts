@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import type { CollaborationPresenceSnapshot } from "@/lib/socket/types"
 import { NextResponse } from "next/server"
+import { getCollaborationPresenceScope } from "@/lib/collaboration/presence-scope"
 
 export async function POST(request: Request, { params }: { params: Promise<{ roomId: string }> }) {
   const session = await auth()
@@ -20,24 +21,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
   if (!secret) return NextResponse.json({ error: "Socket unavailable" }, { status: 503 })
 
   try {
-    const membership = await prisma.collaborationRoomMember.findUnique({
-      where: { roomId_userId: { roomId, userId: session.user.id } },
+    const presenceScope = getCollaborationPresenceScope()
+    const membership = await prisma.collaborationRoomMember.findFirst({
+      where: { roomId, userId: session.user.id, room: { presenceScope } },
       select: { id: true, updatedAt: true },
     })
+    if (!membership) return new Response(null, { status: 204 })
     const socketUrl = process.env.SOCKET_SERVER_URL ?? process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:4000"
     const response = await fetch(new URL("/internal/collaboration/leave", socketUrl), {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-socket-secret": secret },
+      headers: { "Content-Type": "application/json", "x-socket-secret": secret, "x-collaboration-scope": presenceScope },
       body: JSON.stringify({ roomId, userId: session.user.id, socketId }),
       signal: AbortSignal.timeout(3_000),
     })
     if (!response.ok) throw new Error(`Socket leave failed: ${response.status}`)
-    const { presence } = (await response.json()) as { presence: CollaborationPresenceSnapshot }
-    if (presence.roomId !== roomId || !Array.isArray(presence.users)) {
+    const data = (await response.json()) as { presenceScope: string; presence: CollaborationPresenceSnapshot }
+    const { presence } = data
+    if (data.presenceScope !== presenceScope || presence.roomId !== roomId || !Array.isArray(presence.users)) {
       throw new Error("Invalid socket leave response")
     }
 
-    if (membership && !presence.users.some((user) => user.userId === session.user.id)) {
+    if (!presence.users.some((user) => user.userId === session.user.id)) {
       await prisma.collaborationRoomMember.updateMany({
         where: {
           id: membership.id,
@@ -45,6 +49,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ roo
           userId: session.user.id,
           leftAt: null,
           updatedAt: membership.updatedAt,
+          room: { presenceScope },
         },
         data: { leftAt: new Date() },
       })

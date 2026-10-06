@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getCollaborationPresence, CollaborationPresenceUnavailableError } from "@/lib/socket/presence"
 import { COLLABORATION_PRESENCE_CONVERGENCE_MS } from "@/lib/collaboration/socket-token"
 import { NextResponse } from "next/server"
+import { getCollaborationPresenceScope } from "@/lib/collaboration/presence-scope"
 
 const BATCH_SIZE = 50
 
@@ -24,9 +25,13 @@ export async function POST(request: Request) {
   let reconciled = 0
 
   try {
+    const presenceScope = getCollaborationPresenceScope()
+    if (request.headers.get("x-collaboration-scope") !== presenceScope) {
+      return NextResponse.json({ error: "Collaboration scope mismatch" }, { status: 409 })
+    }
     do {
       const members = await prisma.collaborationRoomMember.findMany({
-        where: { leftAt: null, updatedAt: { lte: cutoff }, room: { status: "ACTIVE" } },
+        where: { leftAt: null, updatedAt: { lte: cutoff }, room: { status: "ACTIVE", presenceScope } },
         select: { id: true, roomId: true, userId: true, updatedAt: true },
         orderBy: { id: "asc" },
         take: BATCH_SIZE,
@@ -46,6 +51,7 @@ export async function POST(request: Request) {
             userId: member.userId,
             leftAt: null,
             updatedAt: member.updatedAt,
+            room: { presenceScope },
           },
           data: { leftAt: new Date() },
         })

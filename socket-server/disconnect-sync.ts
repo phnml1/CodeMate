@@ -1,3 +1,5 @@
+import { getCollaborationPresenceScope } from "../lib/collaboration/presence-scope"
+
 export async function syncCollaborationDisconnect(input: {
   roomId: string
   memberId: string
@@ -9,7 +11,7 @@ export async function syncCollaborationDisconnect(input: {
 
   const response = await fetch(new URL("/api/internal/collaboration/disconnect", process.env.NEXTJS_URL ?? "http://localhost:3000"), {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-socket-secret": secret },
+    headers: { "Content-Type": "application/json", "x-socket-secret": secret, "x-collaboration-scope": getCollaborationPresenceScope() },
     body: JSON.stringify({ ...input, disconnectedAt: new Date(input.disconnectedAt).toISOString() }),
     signal: AbortSignal.timeout(3_000),
   })
