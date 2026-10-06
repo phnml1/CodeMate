@@ -1,4 +1,5 @@
 import {
+  infiniteQueryOptions,
   useInfiniteQuery,
   useMutation,
   useQueryClient,
@@ -98,6 +99,15 @@ async function fetchMessages(roomId: string, cursor: string | null) {
   return (await response.json()) as CollaborationMessagesResponse
 }
 
+export function collaborationMessagesQueryOptions(roomId: string) {
+  return infiniteQueryOptions({
+    queryKey: collaborationMessagesQueryKey(roomId),
+    queryFn: ({ pageParam }) => fetchMessages(roomId, pageParam),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  })
+}
+
 export function appendCollaborationMessage(
   queryClient: QueryClient,
   message: CollaborationMessage
@@ -118,10 +128,7 @@ export function useCollaborationMessages(
   realtimeConnected: boolean
 ) {
   return useInfiniteQuery({
-    queryKey: collaborationMessagesQueryKey(roomId ?? ""),
-    queryFn: ({ pageParam }) => fetchMessages(roomId!, pageParam),
-    initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    ...collaborationMessagesQueryOptions(roomId ?? ""),
     enabled: Boolean(roomId),
     refetchInterval: roomId
       ? realtimeConnected

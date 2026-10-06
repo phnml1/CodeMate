@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { ArrowUpRight, Loader2, Plus, Radio, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { workspacePRFilesQueryOptions } from "@/hooks/usePRFiles"
+import { collaborationMessagesQueryOptions } from "@/hooks/useCollaborationMessages"
 import {
   useCollaborationRooms,
   useCreateCollaborationRoom,
@@ -29,6 +30,11 @@ export default function CollaborationRoomPanel({
   const enteringRef = useRef(false)
   const prefetchRevisionFiles = () => {
     void queryClient.prefetchQuery(workspacePRFilesQueryOptions(prId))
+  }
+  const prefetchExistingRoom = (roomId: string) => {
+    prefetchRevisionFiles()
+    router.prefetch(`/collaboration/rooms/${roomId}`)
+    void queryClient.prefetchInfiniteQuery(collaborationMessagesQueryOptions(roomId))
   }
 
   const openRoom = async (existingRoom?: CollaborationRoom) => {
@@ -93,7 +99,7 @@ export default function CollaborationRoomPanel({
                   {full && <span className="shrink-0 text-amber-700 dark:text-amber-400">정원 마감</span>}
                 </p>
               </div>
-              <Button type="button" variant="outline" size="sm" disabled={isEntering || full} onMouseEnter={prefetchRevisionFiles} onFocus={prefetchRevisionFiles} onClick={() => void openRoom(room)}>
+              <Button type="button" variant="outline" size="sm" disabled={isEntering || full} onMouseEnter={() => prefetchExistingRoom(room.id)} onFocus={() => prefetchExistingRoom(room.id)} onClick={() => void openRoom(room)}>
                 <ArrowUpRight /> 입장
               </Button>
             </div>

@@ -4,8 +4,10 @@ import CollaborationRoomPanel from "@/components/collaboration/CollaborationRoom
 import type { CollaborationRoom } from "@/types/collaboration"
 
 const mockPush = jest.fn()
+const mockPrefetchRoute = jest.fn()
 const mockCreate = jest.fn()
 const mockPrefetchQuery = jest.fn()
+const mockPrefetchInfiniteQuery = jest.fn()
 const mockButtons = new Map<string, React.ButtonHTMLAttributes<HTMLButtonElement>>()
 let mockState: unknown[] = []
 let mockStateIndex = 0
@@ -25,11 +27,11 @@ jest.mock("react-dom", () => ({
   ...jest.requireActual("react-dom"),
   createPortal: (children: React.ReactNode) => children,
 }))
-jest.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush }) }))
+jest.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush, prefetch: mockPrefetchRoute }) }))
 jest.mock("@/lib/client-auth", () => ({ handleUnauthorizedAutoLogout: jest.fn() }))
 jest.mock("@tanstack/react-query", () => ({
   ...jest.requireActual("@tanstack/react-query"),
-  useQueryClient: () => ({ prefetchQuery: mockPrefetchQuery }),
+  useQueryClient: () => ({ prefetchQuery: mockPrefetchQuery, prefetchInfiniteQuery: mockPrefetchInfiniteQuery }),
 }))
 jest.mock("@/hooks/useCollaborationRooms", () => ({
   useCollaborationRooms: () => ({ data: mockRooms, isPending: false, isError: false }),
@@ -108,7 +110,7 @@ describe("CollaborationRoomPanel entry overlay", () => {
     expect(render()).toContain("fixed inset-0")
   })
 
-  it("prefetches revision files on hover and focus without joining", () => {
+  it("prefetches only the hovered existing room route and messages without joining", () => {
     render()
     mockButtons.get("입장")!.onMouseEnter!({} as React.MouseEvent<HTMLButtonElement>)
     mockButtons.get("협업방 시작")!.onFocus!({} as React.FocusEvent<HTMLButtonElement>)
@@ -116,6 +118,10 @@ describe("CollaborationRoomPanel entry overlay", () => {
     expect(mockPrefetchQuery).toHaveBeenCalledTimes(2)
     expect(mockPrefetchQuery.mock.calls[0][0].queryKey).toEqual(["pullRequestFilesWithRevision", "pr-1"])
     expect(mockPrefetchQuery.mock.calls[1][0].queryKey).toEqual(["pullRequestFilesWithRevision", "pr-1"])
+    expect(mockPrefetchRoute).toHaveBeenCalledTimes(1)
+    expect(mockPrefetchRoute).toHaveBeenCalledWith("/collaboration/rooms/room-1")
+    expect(mockPrefetchInfiniteQuery).toHaveBeenCalledTimes(1)
+    expect(mockPrefetchInfiniteQuery.mock.calls[0][0].queryKey).toEqual(["collaborationMessages", "room-1"])
     expect(mockCreate).not.toHaveBeenCalled()
     expect(mockPush).not.toHaveBeenCalled()
   })
