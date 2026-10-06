@@ -149,10 +149,10 @@ export default function CollaborationWorkspaceClient({
   const { activeRoomId, error, joinRoom, leaveOnUnload, leaveRoom, locations, presence, publishLocation, publishTyping, status, stopSharingLocation, typingUsers } =
     useCollaborationRoomSocket(handleIncomingMessage)
 
-  const leaveForPullRequest = useCallback(async () => {
+  const leaveForPullRequest = useCallback(() => {
     if (leavingRef.current || !window.confirm("협업방에서 나가시겠습니까?")) return
     leavingRef.current = true
-    await leaveRoom()
+    leaveRoom()
     router.replace(`/pulls/${room.pullRequestId}`)
   }, [leaveRoom, room.pullRequestId, router])
 
@@ -171,7 +171,8 @@ export default function CollaborationWorkspaceClient({
         return
       }
       leavingRef.current = true
-      void leaveRoom().finally(() => window.history.back())
+      leaveRoom()
+      window.history.back()
     }
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
       if (leavingRef.current) return
@@ -493,7 +494,7 @@ export default function CollaborationWorkspaceClient({
       <header className="shrink-0 border-b border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-950 sm:px-5">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <Button type="button" variant="ghost" size="icon-sm" title="PR 상세로 돌아가기" aria-label="PR 상세로 돌아가기" onClick={() => void leaveForPullRequest()}>
+            <Button type="button" variant="ghost" size="icon-sm" title="PR 상세로 돌아가기" aria-label="PR 상세로 돌아가기" onClick={leaveForPullRequest}>
               <ArrowLeft />
             </Button>
             <div className="min-w-0">

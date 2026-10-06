@@ -11,6 +11,7 @@ import {
   reconcileRedisPresence,
 } from "./redis-handlers"
 import { getSocketMetrics, logCollaborationEvent, recordBroadcast } from "./observability"
+import { getCollaborationPresenceScope } from "../lib/collaboration/presence-scope"
 import type {
   InternalSocketEmitPayload,
   ServerToClientEventName,
@@ -20,6 +21,7 @@ import type {
 const port = parseInt(process.env.PORT || "4000", 10)
 const allowedOrigin = process.env.NEXTJS_URL || "http://localhost:3000"
 const startedAt = new Date().toISOString()
+const presenceScope = getCollaborationPresenceScope()
 let redisAdapter: RedisAdapterConnection | null = null
 let draining = false
 let reconciliationTimer: NodeJS.Timeout | null = null
@@ -157,6 +159,11 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
       res.end()
       return
     }
+    if (req.headers["x-collaboration-scope"] !== presenceScope) {
+      res.writeHead(409)
+      res.end()
+      return
+    }
     if (!isReady()) {
       res.writeHead(503)
       res.end()
@@ -173,7 +180,7 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
         ? await getRedisPresenceSnapshots(io, redisAdapter.presence, body.roomIds)
         : getCollaborationPresenceSnapshots(body.roomIds)
       res.writeHead(200, { "Content-Type": "application/json" })
-      res.end(JSON.stringify({ startedAt, rooms }))
+      res.end(JSON.stringify({ startedAt, presenceScope, rooms }))
     } catch (error) {
       logCollaborationEvent("collaboration.internal.presence.failed", {}, "error", error)
       res.writeHead(error instanceof Error && error.message === "Invalid JSON" ? 400 : 503)
@@ -185,6 +192,11 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
   if (req.method === "POST" && req.url === "/internal/collaboration/leave") {
     if (!isAuthorizedInternalRequest(req)) {
       res.writeHead(401)
+      res.end()
+      return
+    }
+    if (req.headers["x-collaboration-scope"] !== presenceScope) {
+      res.writeHead(409)
       res.end()
       return
     }
@@ -204,7 +216,7 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
         ? await leaveRedisRoomFromUnload(io, redisAdapter.presence, body.roomId, body.userId, body.socketId)
         : leaveCollaborationRoomFromUnload(io, body.roomId, body.userId, body.socketId)
       res.writeHead(200, { "Content-Type": "application/json" })
-      res.end(JSON.stringify({ presence }))
+      res.end(JSON.stringify({ presenceScope, presence }))
     } catch (error) {
       logCollaborationEvent("collaboration.internal.leave.failed", {}, "error", error)
       res.writeHead(error instanceof Error && error.message === "Invalid JSON" ? 400 : 503)
@@ -262,7 +274,7 @@ async function startSocketServer() {
   })
   setupSocketHandlers(io, redisAdapter?.presence, isReady)
   httpServer.listen(port, () => {
-    logCollaborationEvent("socket.server.ready", { port, mode: redisAdapter ? "redis" : "single-instance" })
+    logCollaborationEvent("socket.server.ready", { port, presenceScope, mode: redisAdapter ? "redis" : "single-instance" })
   })
   if (redisAdapter) {
     const tick = async () => {
@@ -277,7 +289,7 @@ async function startSocketServer() {
             if (!secret) throw new Error("SOCKET_INTERNAL_SECRET is missing")
             const response = await fetch(new URL("/api/internal/collaboration/reconcile", process.env.NEXTJS_URL ?? "http://localhost:3000"), {
               method: "POST",
-              headers: { "x-socket-secret": secret },
+              headers: { "x-socket-secret": secret, "x-collaboration-scope": presenceScope },
               signal: AbortSignal.any([reconciliationAbort.signal, AbortSignal.timeout(30_000)]),
             })
             if (!response.ok) throw new Error(`Collaboration DB reconciliation failed: ${response.status}`)

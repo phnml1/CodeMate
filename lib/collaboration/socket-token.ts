@@ -1,4 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from "crypto"
+import { getCollaborationPresenceScope } from "./presence-scope"
 
 export const COLLABORATION_SOCKET_TOKEN_TTL_SECONDS = 60
 export const COLLABORATION_HEARTBEAT_INTERVAL_MS = 25_000
@@ -10,6 +11,7 @@ export const COLLABORATION_PRESENCE_CONVERGENCE_MS =
   COLLABORATION_CRASH_CONVERGENCE_MS + COLLABORATION_HEARTBEAT_INTERVAL_MS
 
 export type CollaborationRoomTokenPayload = {
+  presenceScope: string
   typ: "collaboration-room"
   roomId: string
   memberId: string
@@ -23,7 +25,7 @@ export type CollaborationRoomTokenPayload = {
 
 export type CreateCollaborationRoomTokenInput = Omit<
   CollaborationRoomTokenPayload,
-  "typ" | "iat" | "exp" | "nonce"
+  "typ" | "iat" | "exp" | "nonce" | "presenceScope"
 > & {
   ttlSeconds?: number
 }
@@ -57,6 +59,7 @@ function isCollaborationRoomTokenPayload(
 
   return (
     candidate.typ === "collaboration-room" &&
+    typeof candidate.presenceScope === "string" &&
     typeof candidate.roomId === "string" &&
     typeof candidate.memberId === "string" &&
     typeof candidate.userId === "string" &&
@@ -79,6 +82,7 @@ export function createCollaborationRoomSocketToken(
 
   const issuedAt = Math.floor(Date.now() / 1000)
   const payload: CollaborationRoomTokenPayload = {
+    presenceScope: getCollaborationPresenceScope(),
     typ: "collaboration-room",
     roomId: input.roomId,
     memberId: input.memberId,
@@ -113,6 +117,7 @@ export function verifyCollaborationRoomSocketToken(
   try {
     const decoded = JSON.parse(Buffer.from(encodedPayload, "base64url").toString())
     if (!isCollaborationRoomTokenPayload(decoded)) return null
+    if (decoded.presenceScope !== getCollaborationPresenceScope()) return null
 
     if (decoded.exp < Math.floor(Date.now() / 1000)) return null
 

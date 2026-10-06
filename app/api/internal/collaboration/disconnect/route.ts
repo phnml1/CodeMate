@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "crypto"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
+import { getCollaborationPresenceScope } from "@/lib/collaboration/presence-scope"
 
 export async function POST(request: Request) {
   const secret = process.env.SOCKET_INTERNAL_SECRET
@@ -11,6 +12,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const presenceScope = getCollaborationPresenceScope()
+  if (request.headers.get("x-collaboration-scope") !== presenceScope) {
+    return NextResponse.json({ error: "Collaboration scope mismatch" }, { status: 409 })
+  }
   const body = await request.json().catch(() => null)
   const { roomId, memberId, userId, disconnectedAt } = body ?? {}
   const disconnectedTime = typeof disconnectedAt === "string" ? Date.parse(disconnectedAt) : NaN
@@ -25,6 +30,7 @@ export async function POST(request: Request) {
       userId,
       leftAt: null,
       updatedAt: { lte: new Date(disconnectedTime) },
+      room: { presenceScope },
     },
     data: { leftAt: new Date(disconnectedTime) },
   })

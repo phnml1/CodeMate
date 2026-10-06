@@ -250,6 +250,7 @@ model CollaborationRoom {
   name            String
   status          CollaborationRoomStatus @default(ACTIVE)
   capacity        Int                     @default(8)
+  presenceScope   String                  @default("production")
 
   pullRequest     PullRequest             @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
   pullRequestId   String
@@ -265,6 +266,7 @@ model CollaborationRoom {
 
   @@index([pullRequestId, status])
   @@index([ownerId])
+  @@index([presenceScope, status])
 }
 
 model CollaborationRoomMember {
