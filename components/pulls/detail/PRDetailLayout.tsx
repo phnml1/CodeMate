@@ -118,6 +118,7 @@ export default function PRDetailLayout({
             prId={id}
             currentUserId={currentUserId}
             onIssueClick={handleIssueClick}
+            scrollRootRef={scrollContainerRef}
           />
 
           <div id="general-comments" ref={commentsRef} className="scroll-mt-36">

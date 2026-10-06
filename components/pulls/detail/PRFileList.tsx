@@ -21,7 +21,7 @@ function PRFileList({ prId }: PRFileListProps) {
   const setSidebarCollapsed = usePRDetailStore(
     (state) => state.setSidebarCollapsed
   );
-  const { selectAndScrollToFile } = usePRDetailFileNavigation();
+  const { selectAndScrollToFile } = usePRDetailFileNavigation(prId);
   const { commentCountsByFile } = usePRCommentGroups(prId);
 
   return (

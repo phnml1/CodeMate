@@ -9,14 +9,21 @@ interface PRDetailState {
   mobileFileOpen: boolean;
   // 파일별 diff 접힘 상태 (filename → collapsed)
   collapsedDiffs: Record<string, boolean>;
+  navigationTarget: {
+    prId: string;
+    filePath: string;
+    lineNumber?: number;
+    requestId: number;
+  } | null;
+  navigationRequestId: number;
 }
 
 interface PRDetailActions {
-  selectFile: (filename: string) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setMobileFileOpen: (open: boolean) => void;
   toggleDiff: (filename: string) => void;
-  expandDiff: (filename: string) => void;
+  navigateToFile: (prId: string, filePath: string, lineNumber?: number) => void;
+  finishNavigation: (requestId: number) => void;
   // PR 이동 시 상태 초기화
   reset: (initialFile?: string) => void;
 }
@@ -26,9 +33,8 @@ export const usePRDetailStore = create<PRDetailState & PRDetailActions>((set) =>
   sidebarCollapsed: false,
   mobileFileOpen: false,
   collapsedDiffs: {},
-
-  selectFile: (filename) =>
-    set({ selectedFile: filename, mobileFileOpen: false }),
+  navigationTarget: null,
+  navigationRequestId: 0,
 
   setSidebarCollapsed: (collapsed) =>
     set({ sidebarCollapsed: collapsed }),
@@ -44,18 +50,32 @@ export const usePRDetailStore = create<PRDetailState & PRDetailActions>((set) =>
       },
     })),
 
-  expandDiff: (filename) =>
-    set((state) => ({
-      collapsedDiffs: {
-        ...state.collapsedDiffs,
-        [filename]: false,
-      },
-    })),
+  navigateToFile: (prId, filePath, lineNumber) =>
+    set((state) => {
+      const requestId = state.navigationRequestId + 1;
+      return {
+        selectedFile: filePath,
+        mobileFileOpen: false,
+        collapsedDiffs: lineNumber == null
+          ? state.collapsedDiffs
+          : { ...state.collapsedDiffs, [filePath]: false },
+        navigationTarget: { prId, filePath, lineNumber, requestId },
+        navigationRequestId: requestId,
+      };
+    }),
+
+  finishNavigation: (requestId) =>
+    set((state) =>
+      state.navigationTarget?.requestId === requestId
+        ? { navigationTarget: null }
+        : state
+    ),
 
   reset: (initialFile) =>
     set({
       selectedFile: initialFile,
       mobileFileOpen: false,
       collapsedDiffs: {},
+      navigationTarget: null,
     }),
 }));
