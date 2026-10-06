@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { UseQueryOptions } from "@tanstack/react-query";
 import { handleUnauthorizedAutoLogout } from "@/lib/client-auth";
 import type { PRFile, WorkspacePRFilesResponse } from "@/types/pulls";
@@ -78,9 +78,12 @@ export function usePRFiles(id: string, options?: PRFilesQueryOptions) {
   return query;
 }
 
-export function useWorkspacePRFiles(id: string) {
-  const query = useQuery({
-    queryKey: ["pullRequestFilesWithRevision", id] as const,
+export const workspacePRFilesQueryKey = (id: string) =>
+  ["pullRequestFilesWithRevision", id] as const
+
+export function workspacePRFilesQueryOptions(id: string) {
+  return queryOptions({
+    queryKey: workspacePRFilesQueryKey(id),
     queryFn: async (): Promise<WorkspacePRFilesResponse> => {
       const response = await fetch(`/api/pulls/${id}/files?revision=1`)
       if (!response.ok) {
@@ -99,6 +102,10 @@ export function useWorkspacePRFiles(id: string) {
       !(error instanceof PRFilesError && (error.status === 401 || error.code === GITHUB_REAUTH_REQUIRED)) &&
       failureCount < 3,
   })
+}
+
+export function useWorkspacePRFiles(id: string) {
+  const query = useQuery(workspacePRFilesQueryOptions(id))
 
   useEffect(() => {
     if (!(query.error instanceof PRFilesError) || query.error.status !== 401) return

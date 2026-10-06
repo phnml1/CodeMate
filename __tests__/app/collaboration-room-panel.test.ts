@@ -5,6 +5,7 @@ import type { CollaborationRoom } from "@/types/collaboration"
 
 const mockPush = jest.fn()
 const mockCreate = jest.fn()
+const mockPrefetchQuery = jest.fn()
 const mockButtons = new Map<string, React.ButtonHTMLAttributes<HTMLButtonElement>>()
 let mockState: unknown[] = []
 let mockStateIndex = 0
@@ -25,6 +26,11 @@ jest.mock("react-dom", () => ({
   createPortal: (children: React.ReactNode) => children,
 }))
 jest.mock("next/navigation", () => ({ useRouter: () => ({ push: mockPush }) }))
+jest.mock("@/lib/client-auth", () => ({ handleUnauthorizedAutoLogout: jest.fn() }))
+jest.mock("@tanstack/react-query", () => ({
+  ...jest.requireActual("@tanstack/react-query"),
+  useQueryClient: () => ({ prefetchQuery: mockPrefetchQuery }),
+}))
 jest.mock("@/hooks/useCollaborationRooms", () => ({
   useCollaborationRooms: () => ({ data: mockRooms, isPending: false, isError: false }),
   useCreateCollaborationRoom: () => ({ mutateAsync: mockCreate, isPending: false }),
@@ -100,6 +106,18 @@ describe("CollaborationRoomPanel entry overlay", () => {
     expect(mockPush).toHaveBeenCalledTimes(1)
     expect(render()).toContain('aria-busy="true"')
     expect(render()).toContain("fixed inset-0")
+  })
+
+  it("prefetches revision files on hover and focus without joining", () => {
+    render()
+    mockButtons.get("입장")!.onMouseEnter!({} as React.MouseEvent<HTMLButtonElement>)
+    mockButtons.get("협업방 시작")!.onFocus!({} as React.FocusEvent<HTMLButtonElement>)
+
+    expect(mockPrefetchQuery).toHaveBeenCalledTimes(2)
+    expect(mockPrefetchQuery.mock.calls[0][0].queryKey).toEqual(["pullRequestFilesWithRevision", "pr-1"])
+    expect(mockPrefetchQuery.mock.calls[1][0].queryKey).toEqual(["pullRequestFilesWithRevision", "pr-1"])
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockPush).not.toHaveBeenCalled()
   })
 
   it("removes the overlay on creation failure and permits a retry", async () => {
