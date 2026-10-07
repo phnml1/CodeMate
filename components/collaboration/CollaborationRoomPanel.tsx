@@ -8,6 +8,7 @@ import { ArrowUpRight, Loader2, Plus, Radio, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { workspacePRFilesQueryOptions } from "@/hooks/usePRFiles"
 import { collaborationMessagesQueryOptions } from "@/hooks/useCollaborationMessages"
+import { markCollaborationPerformance, observeCollaborationLoading } from "@/lib/collaboration/client-performance"
 import {
   useCollaborationRooms,
   useCreateCollaborationRoom,
@@ -39,6 +40,8 @@ export default function CollaborationRoomPanel({
 
   const openRoom = async (existingRoom?: CollaborationRoom) => {
     if (enteringRef.current) return
+    markCollaborationPerformance("entry.click")
+    observeCollaborationLoading()
     enteringRef.current = true
     setIsEntering(true)
     setError(null)

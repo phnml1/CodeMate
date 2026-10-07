@@ -11,6 +11,7 @@ import {
   createCollaborationRoomSocketToken,
 } from "@/lib/collaboration/socket-token"
 import { prisma } from "@/lib/prisma"
+import { createCollaborationServerTimer } from "@/lib/collaboration/server-performance"
 import { CollaborationPresenceUnavailableError } from "@/lib/socket/presence"
 import { NextResponse } from "next/server"
 
@@ -19,21 +20,33 @@ type RouteContext = {
 }
 
 export async function POST(_request: Request, { params }: RouteContext) {
+  const timer = createCollaborationServerTimer("collaboration.token.issue")
+  let roomId: string | undefined
+  const respond = (body: Record<string, unknown>, status: number) => {
+    const serverTiming = timer.finish(String(status), roomId)
+    const response = NextResponse.json(body, { status })
+    if (serverTiming) response.headers.set("Server-Timing", serverTiming)
+    return response
+  }
   try {
     const session = await auth()
+    timer.checkpoint("auth")
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return respond({ error: "Unauthorized" }, 401)
     }
 
-    const { roomId } = await params
-    const room = await findAccessibleCollaborationRoom(session.user.id, roomId)
+    const resolvedParams = await params
+    roomId = resolvedParams.roomId
+    timer.checkpoint("params")
+    const room = await findAccessibleCollaborationRoom(session.user.id, resolvedParams.roomId)
+    timer.checkpoint("roomLookup")
 
     if (!room) {
-      return NextResponse.json({ error: "Room not found" }, { status: 404 })
+      return respond({ error: "Room not found" }, 404)
     }
 
     if (room.status === "ENDED") {
-      return NextResponse.json({ error: "Room has ended" }, { status: 409 })
+      return respond({ error: "Room has ended" }, 409)
     }
 
     const existingMember = await prisma.collaborationRoomMember.findUnique({
@@ -45,10 +58,12 @@ export async function POST(_request: Request, { params }: RouteContext) {
       },
       select: { id: true, leftAt: true },
     })
+    timer.checkpoint("memberLookup")
 
     const memberCount = await getActiveMemberCount(room.id)
+    timer.checkpoint("presence")
     if ((!existingMember || existingMember.leftAt) && memberCount >= room.capacity) {
-      return NextResponse.json({ error: "Room is full" }, { status: 409 })
+      return respond({ error: "Room is full" }, 409)
     }
 
     const member = await prisma.$transaction(async (tx) => {
@@ -58,6 +73,7 @@ export async function POST(_request: Request, { params }: RouteContext) {
         session.user.id
       )
     })
+    timer.checkpoint("memberUpsert")
 
     const userName =
       member.user.name ?? session.user.name ?? session.user.email ?? "Unknown user"
@@ -68,19 +84,20 @@ export async function POST(_request: Request, { params }: RouteContext) {
       userName,
       capacity: room.capacity,
     })
+    timer.checkpoint("sign")
 
-    return NextResponse.json({
+    return respond({
       token,
       roomId: room.id,
       expiresAt: new Date(payload.exp * 1000).toISOString(),
       ttlSeconds: COLLABORATION_SOCKET_TOKEN_TTL_SECONDS,
       heartbeatIntervalMs: COLLABORATION_HEARTBEAT_INTERVAL_MS,
       reconnectGraceMs: COLLABORATION_RECONNECT_GRACE_MS,
-    })
+    }, 200)
   } catch (error) {
     if (error instanceof CollaborationPresenceUnavailableError) {
-      return NextResponse.json({ error: "Collaboration presence unavailable" }, { status: 503 })
+      return respond({ error: "Collaboration presence unavailable" }, 503)
     }
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return respond({ error: "Internal server error" }, 500)
   }
 }

@@ -8,6 +8,7 @@ import {
   collaborationMessagesQueryKey,
 } from "@/hooks/useCollaborationMessages"
 import { collaborationCodeThreadsQueryKey } from "@/hooks/useCollaborationCodeThreads"
+import { markCollaborationPerformance } from "@/lib/collaboration/client-performance"
 import type {
   ClientToServerEvents,
   CollaborationHeartbeatAck,
@@ -50,25 +51,29 @@ function getSocketUrl() {
 }
 
 async function fetchRoomSocketToken(roomId: string) {
-  const response = await fetch(`/api/collaboration/rooms/${roomId}/socket-token`, {
-    method: "POST",
-  })
+  markCollaborationPerformance("token.start")
+  try {
+    const response = await fetch(`/api/collaboration/rooms/${roomId}/socket-token`, {
+      method: "POST",
+    })
 
-  if (!response.ok) {
-    if (response.status === 503) {
-      throw new CollaborationSocketUnavailableError("협업방 연결을 확인할 수 없습니다. 재연결 중입니다.")
+    if (!response.ok) {
+      if (response.status === 503) {
+        throw new CollaborationSocketUnavailableError("협업방 연결을 확인할 수 없습니다. 재연결 중입니다.")
+      }
+      const body = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null
+      throw new Error(
+        body?.error === "Room is full"
+          ? "협업방 정원이 찼습니다."
+          : body?.error ?? "협업방 연결 토큰을 발급받지 못했습니다."
+      )
     }
-    const body = (await response.json().catch(() => null)) as
-      | { error?: string }
-      | null
-    throw new Error(
-      body?.error === "Room is full"
-        ? "협업방 정원이 찼습니다."
-        : body?.error ?? "협업방 연결 토큰을 발급받지 못했습니다."
-    )
+    return (await response.json()) as CollaborationSocketTokenResponse
+  } finally {
+    markCollaborationPerformance("token.done")
   }
-
-  return (await response.json()) as CollaborationSocketTokenResponse
 }
 
 export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMessage) => void) {
@@ -206,10 +211,12 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
         return
       }
 
+      markCollaborationPerformance("join.emit")
       socket.emit(
         "collaboration:join",
         { token: tokenResponse.token },
         (response: CollaborationJoinAck) => {
+          markCollaborationPerformance("join.ack")
           if (isCurrent && !isCurrent()) {
             resolve?.()
             return
@@ -258,6 +265,7 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
 
   const joinRoom = useCallback(
     async (roomId: string) => {
+      markCollaborationPerformance("join.start")
       const joinAttempt = ++joinAttemptRef.current
       const isCurrent = () =>
         joinAttempt === joinAttemptRef.current && !manualDisconnectRef.current
@@ -308,6 +316,7 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
           socketRef.current = socket
 
           socket.on("connect", () => {
+            markCollaborationPerformance("socket.connected")
             lastSocketIdRef.current = createdSocket.id ?? null
           })
 
@@ -403,6 +412,7 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
         socket.once("connect", onConnect)
         socket.once("connect_error", onInitialConnectError)
 
+        markCollaborationPerformance("socket.connect.start")
         socket.connect()
       })
     },

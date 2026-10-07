@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
@@ -26,6 +26,7 @@ import { useCollaborationRoomSocket } from "@/hooks/useCollaborationRoomSocket"
 import { useCollaborationCodeThreads } from "@/hooks/useCollaborationCodeThreads"
 import { useCollaborationMessages } from "@/hooks/useCollaborationMessages"
 import { useWorkspacePRFiles } from "@/hooks/usePRFiles"
+import { markCollaborationPerformance, measureCollaborationPerformance } from "@/lib/collaboration/client-performance"
 import { parsePatch } from "@/lib/diff"
 import type { CollaborationLocation, CollaborationTextSelection, CollaborationViewport } from "@/lib/socket/types"
 import type { CollaborationCodeAnchor, CollaborationCodeReference, CollaborationMessage, CollaborationRoom } from "@/types/collaboration"
@@ -115,6 +116,9 @@ export default function CollaborationWorkspaceClient({
   const messageHistoryReadyRef = useRef(false)
   const chatOpenRef = useRef(false)
   const leavingRef = useRef(false)
+  useLayoutEffect(() => {
+    markCollaborationPerformance("workspace.commit")
+  }, [])
   const openChat = () => {
     chatOpenRef.current = true
     setChatOpen(true)
@@ -146,6 +150,9 @@ export default function CollaborationWorkspaceClient({
     useWorkspacePRFiles(room.pullRequestId)
   const files = fileData?.files ?? EMPTY_FILES
   const revision = fileData?.revision
+  useLayoutEffect(() => {
+    if (revision && files.length) markCollaborationPerformance("files.commit")
+  }, [files, revision])
   const { activeRoomId, error, joinRoom, leaveOnUnload, leaveRoom, locations, presence, publishLocation, publishTyping, status, stopSharingLocation, typingUsers } =
     useCollaborationRoomSocket(handleIncomingMessage)
 
@@ -206,11 +213,16 @@ export default function CollaborationWorkspaceClient({
 
   const selectedFile =
     files.find((file) => file.filename === selectedFileName) ?? files[0]
-  const lines = useMemo(
-    () => selectedFile?.patch ? parsePatch(selectedFile.patch) : [],
-    [selectedFile]
-  )
+  const lines = useMemo(() => {
+    const patch = selectedFile?.patch
+    return patch
+      ? measureCollaborationPerformance("diff.parse", () => parsePatch(patch))
+      : []
+  }, [selectedFile])
   const connected = status === "connected" && activeRoomId === room.id
+  useLayoutEffect(() => {
+    if (connected) markCollaborationPerformance("connected.commit")
+  }, [connected])
   const participants = connected ? presence?.users ?? [] : []
   const onlineParticipantCount = participants.filter((user) => user.status === "online").length
   const messagesQuery = useCollaborationMessages(room.id, connected)
