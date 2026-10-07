@@ -1,8 +1,9 @@
 "use client"
 
-import { Fragment, useMemo } from "react"
+import { Fragment, useLayoutEffect, useMemo } from "react"
 import { MessageSquare, MessageSquarePlus } from "lucide-react"
 import InlineCollaborationThread from "@/components/collaboration/InlineCollaborationThread"
+import { markCollaborationPerformance } from "@/lib/collaboration/client-performance"
 import { DIFF_CODE_CLASS, DIFF_ROW_CLASS, DIFF_SYMBOL } from "@/constants/diff"
 import type { DiffLine } from "@/lib/diff"
 import type {
@@ -54,6 +55,17 @@ export default function CollaborationDiffViewer({
   onOpenThread,
   onCloseThread,
 }: CollaborationDiffViewerProps) {
+  useLayoutEffect(() => {
+    markCollaborationPerformance("diff.commit")
+    let secondFrame = 0
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => markCollaborationPerformance("diff.paint-proxy"))
+    })
+    return () => {
+      cancelAnimationFrame(firstFrame)
+      cancelAnimationFrame(secondFrame)
+    }
+  }, [])
   const threadCounts = useMemo(
     () => new Map(threadSummaries.map((thread) => [`${thread.side}:${thread.startLine}`, thread.count])),
     [threadSummaries]

@@ -58,9 +58,11 @@ const createParams = (roomId = "room-1") =>
 
 describe("POST /api/collaboration/rooms/[roomId]/socket-token", () => {
   const previousSecret = process.env.SOCKET_INTERNAL_SECRET
+  const previousPerfLogs = process.env.COLLABORATION_PERF_LOGS
 
   beforeEach(() => {
     process.env.SOCKET_INTERNAL_SECRET = "test-socket-secret"
+    delete process.env.COLLABORATION_PERF_LOGS
     mockedPresence.mockResolvedValue({ rooms: [{ roomId: "room-1", users: [] }] })
   })
 
@@ -70,6 +72,9 @@ describe("POST /api/collaboration/rooms/[roomId]/socket-token", () => {
     } else {
       process.env.SOCKET_INTERNAL_SECRET = previousSecret
     }
+    if (previousPerfLogs === undefined) delete process.env.COLLABORATION_PERF_LOGS
+    else process.env.COLLABORATION_PERF_LOGS = previousPerfLogs
+    jest.restoreAllMocks()
     jest.clearAllMocks()
   })
 
@@ -113,6 +118,41 @@ describe("POST /api/collaboration/rooms/[roomId]/socket-token", () => {
     )
     expect(body.heartbeatIntervalMs).toBeGreaterThan(0)
     expect(body.reconnectGraceMs).toBeGreaterThan(0)
+    expect(response.headers.has("Server-Timing")).toBe(false)
+  })
+
+  it("reports phase durations without logging the issued token when enabled", async () => {
+    process.env.COLLABORATION_PERF_LOGS = "1"
+    const log = jest.spyOn(console, "info").mockImplementation(() => {})
+    mockedAuth.mockResolvedValue({ user: { id: "user-1", name: "Reviewer" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindRoom.mockResolvedValue(sampleRoom)
+    mockedFindMember.mockResolvedValue({ id: "member-1", leftAt: null })
+    mockedTransaction.mockImplementation((callback) => callback({
+      collaborationRoomMember: {
+        upsert: jest.fn().mockResolvedValue({
+          id: "member-1",
+          user: { id: "user-1", name: "Reviewer", image: null },
+        }),
+      },
+    }))
+
+    const response = await POST(createRequest(), createParams())
+    const body = await response.json()
+    const timing = response.headers.get("Server-Timing")
+
+    expect(response.status).toBe(200)
+    expect(timing).toContain("roomLookup;dur=")
+    expect(timing).toContain("presence;dur=")
+    expect(timing).toContain("memberUpsert;dur=")
+    expect(log).toHaveBeenCalledTimes(1)
+    const event = JSON.parse(log.mock.calls[0][0])
+    expect(event).toEqual(expect.objectContaining({
+      event: "collaboration.token.issue",
+      outcome: "200",
+      roomId: "room-1",
+    }))
+    expect(JSON.stringify(event)).not.toContain(body.token)
   })
 
   it("returns 409 when a new member would exceed room capacity", async () => {
