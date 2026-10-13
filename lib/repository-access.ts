@@ -44,9 +44,11 @@ async function ensureRepositoryMembershipTable(): Promise<void> {
 
 export async function getAccessibleRepositoryIds(
   userId: string,
-  repositoryId?: string
+  repositoryId?: string,
+  onMembershipTableChecked?: () => void
 ): Promise<string[]> {
   await ensureRepositoryMembershipTable()
+  onMembershipTableChecked?.()
 
   const memberships = await prisma.userRepository.findMany({
     where: {
@@ -76,9 +78,14 @@ export async function buildAccessibleRepositoryWhere(
 
 export async function buildAccessiblePullRequestWhere(
   userId: string,
-  repositoryId?: string
+  repositoryId?: string,
+  onMembershipTableChecked?: () => void
 ): Promise<Prisma.PullRequestWhereInput> {
-  const ids = await getAccessibleRepositoryIds(userId, repositoryId)
+  const ids = await getAccessibleRepositoryIds(
+    userId,
+    repositoryId,
+    onMembershipTableChecked
+  )
 
   return {
     repoId: {

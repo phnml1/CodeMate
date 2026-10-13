@@ -142,7 +142,9 @@ describe("POST /api/collaboration/rooms/[roomId]/socket-token", () => {
     const timing = response.headers.get("Server-Timing")
 
     expect(response.status).toBe(200)
-    expect(timing).toContain("roomLookup;dur=")
+    expect(timing).toContain("repoMembership;dur=")
+    expect(timing).toContain("roomQuery;dur=")
+    expect(timing).toContain("roomLookupTotal;dur=")
     expect(timing).toContain("presence;dur=")
     expect(timing).toContain("memberUpsert;dur=")
     expect(log).toHaveBeenCalledTimes(1)

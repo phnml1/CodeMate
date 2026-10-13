@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
+import {
+  createCollaborationServerTimer,
+  timeCollaborationAuth,
+} from "@/lib/collaboration/server-performance"
 
 // 라우트
 const ROUTES = {
@@ -24,9 +28,14 @@ function isProtectedPath(pathname: string): boolean {
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const session = await auth()
+  const timer = pathname.startsWith("/collaboration/rooms/")
+    ? createCollaborationServerTimer("collaboration.proxy.auth")
+    : null
+  const session = timer ? await timeCollaborationAuth(timer, () => auth()) : await auth()
+  timer?.checkpoint("auth")
   const isLoggedIn = !!session
   const isProtected = isProtectedPath(pathname)
+  timer?.finish(isLoggedIn ? "authenticated" : "unauthenticated", pathname.split("/")[3])
 
   // 미인증 사용자가 보호 페이지 접근 → 로그인으로 리다이렉트
   if (isProtected && !isLoggedIn) {

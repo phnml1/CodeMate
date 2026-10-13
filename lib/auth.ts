@@ -3,11 +3,26 @@ import type { NextAuthConfig } from "next-auth"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import GitHub from "next-auth/providers/github"
 import { prisma } from "./prisma"
+import { timeCollaborationAuthQuery } from "./collaboration/server-performance"
+
+// PrismaPg driver adapter usage changes the inferred adapter signature.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const prismaAdapter = PrismaAdapter(prisma as any)
 
 export const authConfig = {
-  // PrismaPg driver adapter usage changes the inferred adapter signature.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  adapter: PrismaAdapter(prisma as any),
+  adapter: {
+    ...prismaAdapter,
+    getSessionAndUser(sessionToken) {
+      return timeCollaborationAuthQuery("sessionLookup", async () =>
+        prismaAdapter.getSessionAndUser!(sessionToken)
+      )
+    },
+    updateSession(data) {
+      return timeCollaborationAuthQuery("sessionRefresh", async () =>
+        prismaAdapter.updateSession!(data)
+      )
+    },
+  },
   providers: [
     GitHub({
       clientId: process.env.GITHUB_ID!,
@@ -48,10 +63,12 @@ export const authConfig = {
       if (session.user) {
         session.user.id = user.id
 
-        const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
-          select: { githubId: true },
-        })
+        const dbUser = await timeCollaborationAuthQuery("profileLookup", () =>
+          prisma.user.findUnique({
+            where: { id: user.id },
+            select: { githubId: true },
+          })
+        )
 
         if (dbUser) {
           session.user.githubId = dbUser.githubId !== null ? Number(dbUser.githubId) : null

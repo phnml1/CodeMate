@@ -1,5 +1,6 @@
 import { findAccessibleCollaborationRoom } from "@/lib/collaboration/rooms"
 import { prisma } from "@/lib/prisma"
+import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
 
 jest.mock("@/lib/prisma", () => ({ prisma: { collaborationRoom: { findFirst: jest.fn() } } }))
 jest.mock("@/lib/repository-access", () => ({
@@ -18,4 +19,35 @@ it("limits direct room access to the current environment even when repository ac
     if (previous === undefined) delete process.env.COLLABORATION_PRESENCE_SCOPE
     else process.env.COLLABORATION_PRESENCE_SCOPE = previous
   }
+})
+
+it("reports membership table and repository access before the room query", async () => {
+  const stages: string[] = []
+  ;(buildAccessiblePullRequestWhere as jest.Mock).mockImplementationOnce(async (
+    _userId,
+    _repositoryId,
+    onMembershipTableChecked
+  ) => {
+    onMembershipTableChecked?.()
+    stages.push("membershipTable")
+    return { repoId: { in: ["repo-1"] } }
+  })
+  ;(prisma.collaborationRoom.findFirst as jest.Mock).mockImplementationOnce(async () => {
+    stages.push("roomQuery")
+    return null
+  })
+
+  await findAccessibleCollaborationRoom(
+    "user-1",
+    "room-1",
+    () => stages.push("repoMembership"),
+    () => stages.push("tableChecked")
+  )
+
+  expect(stages).toEqual([
+    "tableChecked",
+    "membershipTable",
+    "repoMembership",
+    "roomQuery",
+  ])
 })

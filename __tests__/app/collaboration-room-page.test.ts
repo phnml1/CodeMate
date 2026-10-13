@@ -21,7 +21,12 @@ describe("CollaborationRoomPage", () => {
 
     const page = await CollaborationRoomPage({ params: Promise.resolve({ roomId: "room-1" }) })
 
-    expect(findAccessibleCollaborationRoom).toHaveBeenCalledWith("user-1", "room-1")
+    expect(findAccessibleCollaborationRoom).toHaveBeenCalledWith(
+      "user-1",
+      "room-1",
+      expect.any(Function),
+      expect.any(Function)
+    )
     expect(page.props).toEqual({ room, currentUserId: "user-1" })
   })
 

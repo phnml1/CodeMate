@@ -8,6 +8,10 @@ import {
 } from "@/lib/collaboration/rooms"
 import { prisma } from "@/lib/prisma"
 import { emitCollaborationMessage } from "@/lib/socket/emitter"
+import {
+  createCollaborationServerTimer,
+  timeCollaborationAuth,
+} from "@/lib/collaboration/server-performance"
 import { NextResponse } from "next/server"
 
 type RouteContext = {
@@ -56,21 +60,41 @@ export async function GET(request: Request, { params }: RouteContext) {
 }
 
 export async function POST(request: Request, { params }: RouteContext) {
+  const timer = createCollaborationServerTimer("collaboration.message.post")
+  let roomId: string | undefined
+  const respond = (body: Record<string, unknown>, status: number, outcome = String(status)) => {
+    const serverTiming = timer.finish(outcome, roomId)
+    const response = NextResponse.json(body, { status })
+    if (serverTiming) response.headers.set("Server-Timing", serverTiming)
+    return response
+  }
+
   try {
-    const session = await auth()
+    const session = await timeCollaborationAuth(timer, () => auth())
+    timer.checkpoint("auth")
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return respond({ error: "Unauthorized" }, 401)
     }
 
-    const { roomId } = await params
-    const room = await findAccessibleCollaborationRoom(session.user.id, roomId)
+    const resolvedRoomId = (await params).roomId
+    roomId = resolvedRoomId
+    timer.checkpoint("params")
+    const room = await timer.measure("roomLookupTotal", () =>
+      findAccessibleCollaborationRoom(
+        session.user.id,
+        resolvedRoomId,
+        () => timer.checkpoint("repoMembership"),
+        () => timer.checkpoint("membershipTable")
+      )
+    )
+    timer.checkpoint("roomQuery")
 
     if (!room) {
-      return NextResponse.json({ error: "Room not found" }, { status: 404 })
+      return respond({ error: "Room not found" }, 404)
     }
 
     if (room.status === "ENDED") {
-      return NextResponse.json({ error: "Room has ended" }, { status: 409 })
+      return respond({ error: "Room has ended" }, 409)
     }
 
     const member = await prisma.collaborationRoomMember.findUnique({
@@ -82,21 +106,17 @@ export async function POST(request: Request, { params }: RouteContext) {
       },
       select: { id: true, leftAt: true },
     })
+    timer.checkpoint("memberLookup")
 
     if (!member || member.leftAt) {
-      return NextResponse.json(
-        { error: "Join room before sending messages" },
-        { status: 403 }
-      )
+      return respond({ error: "Join room before sending messages" }, 403)
     }
 
     const json = await request.json().catch(() => null)
     const parsed = createCollaborationMessageSchema.safeParse(json)
+    timer.checkpoint("validate")
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid request body", issues: parsed.error.flatten() },
-        { status: 400 }
-      )
+      return respond({ error: "Invalid request body", issues: parsed.error.flatten() }, 400)
     }
 
     try {
@@ -116,16 +136,26 @@ export async function POST(request: Request, { params }: RouteContext) {
         },
         include: collaborationMessageInclude,
       })
+      timer.checkpoint("dbCreate")
 
       const serializedMessage = serializeCollaborationMessage(message)
+      timer.checkpoint("serialize")
+      let broadcastFailed = false
       try {
         await emitCollaborationMessage(serializedMessage)
       } catch (error) {
+        broadcastFailed = true
         console.error("[collaboration messages] Socket broadcast failed:", error)
       }
+      timer.checkpoint("socketEmit")
 
-      return NextResponse.json({ message: serializedMessage }, { status: 201 })
+      return respond(
+        { message: serializedMessage },
+        201,
+        broadcastFailed ? "201:socket_emit_failed" : "201"
+      )
     } catch (error) {
+      timer.checkpoint("messagePathError")
       if (parsed.data.clientMessageId && isUniqueConstraintError(error)) {
         const existingMessage = await prisma.collaborationMessage.findUnique({
           where: {
@@ -137,17 +167,18 @@ export async function POST(request: Request, { params }: RouteContext) {
           },
           include: collaborationMessageInclude,
         })
+        timer.checkpoint("dedupeLookup")
 
         if (existingMessage) {
-          return NextResponse.json({
+          return respond({
             message: serializeCollaborationMessage(existingMessage),
-          })
+          }, 200)
         }
       }
 
       throw error
     }
   } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return respond({ error: "Internal server error" }, 500)
   }
 }
