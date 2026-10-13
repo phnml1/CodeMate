@@ -104,11 +104,17 @@ const createParams = (roomId = "room-1") =>
   }
 
 describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
+  const previousPerfLogs = process.env.COLLABORATION_PERF_LOGS
+
   beforeEach(() => {
+    delete process.env.COLLABORATION_PERF_LOGS
     mockedEmitMessage.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
+    if (previousPerfLogs === undefined) delete process.env.COLLABORATION_PERF_LOGS
+    else process.env.COLLABORATION_PERF_LOGS = previousPerfLogs
+    jest.restoreAllMocks()
     jest.clearAllMocks()
   })
 
@@ -157,6 +163,7 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
     const body = await response.json()
 
     expect(response.status).toBe(201)
+    expect(response.headers.has("Server-Timing")).toBe(false)
     expect(body.message.id).toBe("message-1")
     expect(mockedEmitMessage).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -186,6 +193,8 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
   })
 
   it("keeps the saved message when socket broadcast fails", async () => {
+    process.env.COLLABORATION_PERF_LOGS = "1"
+    const log = jest.spyOn(console, "info").mockImplementation(() => {})
     mockedAuth.mockResolvedValue({ user: { id: "user-2" } })
     mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
       repoId: { in: ["repo-1"] },
@@ -205,8 +214,50 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
       expect(response.status).toBe(201)
       expect((await response.json()).message.id).toBe("message-1")
       expect(consoleSpy).toHaveBeenCalled()
+      expect(JSON.parse(log.mock.calls[0][0]).outcome).toBe("201:socket_emit_failed")
     } finally {
       consoleSpy.mockRestore()
     }
+  })
+
+  it("reports POST phases without logging message content when enabled", async () => {
+    process.env.COLLABORATION_PERF_LOGS = "1"
+    const log = jest.spyOn(console, "info").mockImplementation(() => {})
+    mockedAuth.mockResolvedValue({ user: { id: "user-2" } })
+    mockedBuildAccessiblePullRequestWhere.mockImplementation(async (
+      _userId,
+      _repositoryId,
+      onMembershipTableChecked
+    ) => {
+      onMembershipTableChecked?.()
+      return { repoId: { in: ["repo-1"] } }
+    })
+    mockedFindRoom.mockResolvedValue(sampleRoom)
+    mockedFindMember.mockResolvedValue({ id: "member-2", leftAt: null })
+    mockedCreateMessage.mockResolvedValue(sampleMessage)
+
+    const response = await POST(
+      createRequest({ content: sampleMessage.content, clientMessageId: "client-1" }),
+      createParams()
+    )
+    const timing = response.headers.get("Server-Timing")
+
+    expect(response.status).toBe(201)
+    expect(timing).toContain("auth;dur=")
+    expect(timing).toContain("membershipTable;dur=")
+    expect(timing).toContain("repoMembership;dur=")
+    expect(timing).toContain("roomQuery;dur=")
+    expect(timing).toContain("roomLookupTotal;dur=")
+    expect(timing).toContain("memberLookup;dur=")
+    expect(timing).toContain("dbCreate;dur=")
+    expect(timing).toContain("socketEmit;dur=")
+    expect(log).toHaveBeenCalledTimes(1)
+    const event = JSON.parse(log.mock.calls[0][0])
+    expect(event).toEqual(expect.objectContaining({
+      event: "collaboration.message.post",
+      outcome: "201",
+      roomId: "room-1",
+    }))
+    expect(JSON.stringify(event)).not.toContain(sampleMessage.content)
   })
 })

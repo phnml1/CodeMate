@@ -161,9 +161,16 @@ export async function findAccessiblePullRequest(
 
 export async function findAccessibleCollaborationRoom(
   userId: string,
-  roomId: string
+  roomId: string,
+  onAccessResolved?: () => void,
+  onMembershipTableChecked?: () => void
 ) {
-  const accessiblePullRequestWhere = await buildAccessiblePullRequestWhere(userId)
+  const accessiblePullRequestWhere = await buildAccessiblePullRequestWhere(
+    userId,
+    undefined,
+    onMembershipTableChecked
+  )
+  onAccessResolved?.()
 
   return prisma.collaborationRoom.findFirst({
     where: {

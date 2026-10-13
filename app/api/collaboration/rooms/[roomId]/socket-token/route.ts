@@ -11,7 +11,10 @@ import {
   createCollaborationRoomSocketToken,
 } from "@/lib/collaboration/socket-token"
 import { prisma } from "@/lib/prisma"
-import { createCollaborationServerTimer } from "@/lib/collaboration/server-performance"
+import {
+  createCollaborationServerTimer,
+  timeCollaborationAuth,
+} from "@/lib/collaboration/server-performance"
 import { CollaborationPresenceUnavailableError } from "@/lib/socket/presence"
 import { NextResponse } from "next/server"
 
@@ -29,7 +32,7 @@ export async function POST(_request: Request, { params }: RouteContext) {
     return response
   }
   try {
-    const session = await auth()
+    const session = await timeCollaborationAuth(timer, () => auth())
     timer.checkpoint("auth")
     if (!session?.user?.id) {
       return respond({ error: "Unauthorized" }, 401)
@@ -38,8 +41,15 @@ export async function POST(_request: Request, { params }: RouteContext) {
     const resolvedParams = await params
     roomId = resolvedParams.roomId
     timer.checkpoint("params")
-    const room = await findAccessibleCollaborationRoom(session.user.id, resolvedParams.roomId)
-    timer.checkpoint("roomLookup")
+    const room = await timer.measure("roomLookupTotal", () =>
+      findAccessibleCollaborationRoom(
+        session.user.id,
+        resolvedParams.roomId,
+        () => timer.checkpoint("repoMembership"),
+        () => timer.checkpoint("membershipTable")
+      )
+    )
+    timer.checkpoint("roomQuery")
 
     if (!room) {
       return respond({ error: "Room not found" }, 404)
