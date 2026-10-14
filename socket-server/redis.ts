@@ -3,6 +3,7 @@ import Redis from "ioredis"
 import type { TypedServer } from "../lib/socket/types"
 import { logCollaborationEvent, recordRedisError } from "./observability"
 import { RedisPresenceStore } from "./redis-presence"
+import { RedisMessageRateLimiter } from "./message-rate-limit"
 
 const REDIS_CONNECT_TIMEOUT_MS = 5_000
 
@@ -10,6 +11,7 @@ export type RedisAdapterConnection = {
   isReady: () => boolean
   close: () => void
   presence: RedisPresenceStore
+  messageRateLimiter: RedisMessageRateLimiter
 }
 
 async function connectWithTimeout(client: Redis) {
@@ -53,6 +55,7 @@ export async function attachRedisAdapter(
     return {
       isReady: () => publisher.status === "ready" && subscriber.status === "ready",
       presence: new RedisPresenceStore(publisher),
+      messageRateLimiter: new RedisMessageRateLimiter(publisher),
       close: () => {
         publisher.disconnect()
         subscriber.disconnect()

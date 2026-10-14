@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
 import { emitCollaborationMessage } from "@/lib/socket/emitter"
+import { checkCollaborationMessageRateLimit, CollaborationMessageRateLimitUnavailableError } from "@/lib/socket/message-rate-limit"
 
 jest.mock("@/lib/auth", () => ({
   auth: jest.fn(),
@@ -31,11 +32,17 @@ jest.mock("@/lib/socket/emitter", () => ({
   emitCollaborationMessage: jest.fn(),
 }))
 
+jest.mock("@/lib/socket/message-rate-limit", () => ({
+  ...jest.requireActual("@/lib/socket/message-rate-limit"),
+  checkCollaborationMessageRateLimit: jest.fn(),
+}))
+
 const mockedAuth = auth as jest.Mock
 const mockedFindRoom = prisma.collaborationRoom.findFirst as jest.Mock
 const mockedFindMember = prisma.collaborationRoomMember.findUnique as jest.Mock
 const mockedCreateMessage = prisma.collaborationMessage.create as jest.Mock
 const mockedEmitMessage = emitCollaborationMessage as jest.Mock
+const mockedRateLimit = checkCollaborationMessageRateLimit as jest.Mock
 const mockedBuildAccessiblePullRequestWhere =
   buildAccessiblePullRequestWhere as jest.Mock
 
@@ -109,6 +116,7 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
   beforeEach(() => {
     delete process.env.COLLABORATION_PERF_LOGS
     mockedEmitMessage.mockResolvedValue(undefined)
+    mockedRateLimit.mockResolvedValue({ allowed: true, retryAfterMs: 0 })
   })
 
   afterEach(() => {
@@ -163,6 +171,7 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
     const body = await response.json()
 
     expect(response.status).toBe(201)
+    expect(mockedRateLimit).toHaveBeenCalledWith("room-1", "user-2", "client-1")
     expect(response.headers.has("Server-Timing")).toBe(false)
     expect(body.message.id).toBe("message-1")
     expect(mockedEmitMessage).toHaveBeenCalledWith(
@@ -190,6 +199,35 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
         }),
       })
     )
+  })
+
+  it("rejects a limited user before writing or broadcasting", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-2" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindRoom.mockResolvedValue(sampleRoom)
+    mockedFindMember.mockResolvedValue({ id: "member-2", leftAt: null })
+    mockedRateLimit.mockResolvedValue({ allowed: false, retryAfterMs: 1250 })
+
+    const response = await POST(createRequest({ content: "hello", clientMessageId: "client-2" }), createParams())
+
+    expect(response.status).toBe(429)
+    expect(response.headers.get("Retry-After")).toBe("2")
+    expect(mockedCreateMessage).not.toHaveBeenCalled()
+    expect(mockedEmitMessage).not.toHaveBeenCalled()
+  })
+
+  it("fails closed when the rate limiter is unavailable", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-2" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindRoom.mockResolvedValue(sampleRoom)
+    mockedFindMember.mockResolvedValue({ id: "member-2", leftAt: null })
+    mockedRateLimit.mockRejectedValue(new CollaborationMessageRateLimitUnavailableError())
+
+    const response = await POST(createRequest({ content: "hello" }), createParams())
+
+    expect(response.status).toBe(503)
+    expect(mockedCreateMessage).not.toHaveBeenCalled()
+    expect(mockedEmitMessage).not.toHaveBeenCalled()
   })
 
   it("keeps the saved message when socket broadcast fails", async () => {

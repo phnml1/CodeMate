@@ -8,6 +8,7 @@ import {
 } from "@/lib/collaboration/rooms"
 import { prisma } from "@/lib/prisma"
 import { emitCollaborationMessage } from "@/lib/socket/emitter"
+import { checkCollaborationMessageRateLimit, CollaborationMessageRateLimitUnavailableError } from "@/lib/socket/message-rate-limit"
 import {
   createCollaborationServerTimer,
   timeCollaborationAuth,
@@ -118,6 +119,22 @@ export async function POST(request: Request, { params }: RouteContext) {
     timer.checkpoint("validate")
     if (!parsed.success) {
       return respond({ error: "Invalid request body", issues: parsed.error.flatten() }, 400)
+    }
+
+    let rateLimit
+    try {
+      rateLimit = await checkCollaborationMessageRateLimit(room.id, session.user.id, parsed.data.clientMessageId)
+    } catch (error) {
+      if (error instanceof CollaborationMessageRateLimitUnavailableError) {
+        return respond({ error: "Message service temporarily unavailable" }, 503)
+      }
+      throw error
+    }
+    timer.checkpoint("rateLimit")
+    if (!rateLimit.allowed) {
+      const response = respond({ error: "Too many messages" }, 429)
+      response.headers.set("Retry-After", String(Math.ceil(rateLimit.retryAfterMs / 1000)))
+      return response
     }
 
     try {
