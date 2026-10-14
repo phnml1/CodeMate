@@ -4,6 +4,7 @@ import { timingSafeEqual } from "crypto"
 import { Server } from "socket.io"
 import { getCollaborationPresenceSnapshots, leaveCollaborationRoomFromUnload, setupSocketHandlers } from "./handlers"
 import { attachRedisAdapter, type RedisAdapterConnection } from "./redis"
+import { MemoryMessageRateLimiter } from "./message-rate-limit"
 import {
   drainRedisCollaborationConnections,
   getRedisPresenceSnapshots,
@@ -23,6 +24,7 @@ const allowedOrigin = process.env.NEXTJS_URL || "http://localhost:3000"
 const startedAt = new Date().toISOString()
 const presenceScope = getCollaborationPresenceScope()
 let redisAdapter: RedisAdapterConnection | null = null
+const memoryMessageRateLimiter = new MemoryMessageRateLimiter()
 let draining = false
 let reconciliationTimer: NodeJS.Timeout | null = null
 let reconciliationRunning = false
@@ -219,6 +221,44 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
       res.end(JSON.stringify({ presenceScope, presence }))
     } catch (error) {
       logCollaborationEvent("collaboration.internal.leave.failed", {}, "error", error)
+      res.writeHead(error instanceof Error && error.message === "Invalid JSON" ? 400 : 503)
+      res.end()
+    }
+    return
+  }
+
+  if (req.method === "POST" && req.url === "/internal/collaboration/message-rate-limit") {
+    if (!isAuthorizedInternalRequest(req)) {
+      res.writeHead(401)
+      res.end()
+      return
+    }
+    if (req.headers["x-collaboration-scope"] !== presenceScope) {
+      res.writeHead(409)
+      res.end()
+      return
+    }
+    if (!isReady()) {
+      res.writeHead(503)
+      res.end()
+      return
+    }
+    try {
+      const body = await parseBody(req)
+      if (!isObject(body) || typeof body.roomId !== "string" || !body.roomId || body.roomId.length > 128 ||
+          typeof body.userId !== "string" || !body.userId || body.userId.length > 128 ||
+          (body.clientMessageId !== undefined && (typeof body.clientMessageId !== "string" || !body.clientMessageId || body.clientMessageId.length > 120))) {
+        res.writeHead(400)
+        res.end()
+        return
+      }
+      const result = redisAdapter
+        ? await redisAdapter.messageRateLimiter.check(presenceScope, body.roomId, body.userId, body.clientMessageId)
+        : memoryMessageRateLimiter.check(presenceScope, body.roomId, body.userId, body.clientMessageId)
+      res.writeHead(result.allowed ? 200 : 429, { "Content-Type": "application/json" })
+      res.end(JSON.stringify(result))
+    } catch (error) {
+      logCollaborationEvent("collaboration.internal.message_rate_limit.failed", {}, "error", error)
       res.writeHead(error instanceof Error && error.message === "Invalid JSON" ? 400 : 503)
       res.end()
     }
