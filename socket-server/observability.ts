@@ -1,4 +1,5 @@
 import { hostname } from "os"
+import type { ServerResponse } from "http"
 import type { CollaborationAckErrorCode, ServerToClientEventName } from "../lib/socket/types"
 
 type LogLevel = "info" | "warn" | "error"
@@ -75,6 +76,57 @@ export function logCollaborationEvent(
     error: serializeError(error),
   }
   console[level](JSON.stringify(payload))
+}
+
+export function createInternalEmitTimer(res: ServerResponse): {
+  checkpoint(name: string): void
+  setPayload(room: string, event: ServerToClientEventName, messageId?: string): void
+} {
+  if (process.env.COLLABORATION_PERF_LOGS !== "1") {
+    return {
+      checkpoint() {},
+      setPayload() {},
+    }
+  }
+
+  const startedAt = performance.now()
+  let previous = startedAt
+  let roomId: string | undefined
+  let socketEvent: ServerToClientEventName | undefined
+  let messageId: string | undefined
+  let finished = false
+  const phases: Record<string, number> = {}
+  const round = (ms: number) => Math.round(ms * 10) / 10
+
+  const finish = (outcome: string) => {
+    if (finished) return
+    finished = true
+    const now = performance.now()
+    phases.responseFinish = round(now - previous)
+    logCollaborationEvent("collaboration.internal.emit.timing", {
+      roomId,
+      socketEvent,
+      messageId,
+      outcome,
+      totalMs: round(now - startedAt),
+      phases,
+    })
+  }
+  res.once("finish", () => finish(String(res.statusCode)))
+  res.once("close", () => finish("closed"))
+
+  return {
+    checkpoint(name: string) {
+      const now = performance.now()
+      phases[name] = round(now - previous)
+      previous = now
+    },
+    setPayload(room: string, event: ServerToClientEventName, id?: string) {
+      roomId = room.startsWith("collaboration:") ? room.slice("collaboration:".length) : undefined
+      socketEvent = event
+      messageId = event === "collaboration:message" ? id : undefined
+    },
+  }
 }
 
 export function incrementActiveConnections(delta: 1 | -1) {
