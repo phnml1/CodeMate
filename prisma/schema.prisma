@@ -111,7 +111,7 @@ model UserRepository {
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   repositoryId String
   createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  updatedAt    DateTime   @default(now()) @updatedAt
 
   @@unique([userId, repositoryId])
   @@index([userId])
@@ -172,6 +172,7 @@ model Review {
   issueCount      Int          @default(0)
   status          ReviewStatus @default(PENDING)
   stage           ReviewStage  @default(QUEUED)
+  failureReason   String?      @db.Text
 
   // Relations
   pullRequest     PullRequest  @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
@@ -262,7 +263,7 @@ model CollaborationRoom {
 
   endedAt         DateTime?
   createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  updatedAt       DateTime                @default(now()) @updatedAt
 
   @@index([pullRequestId, status])
   @@index([ownerId])
@@ -280,7 +281,7 @@ model CollaborationRoomMember {
 
   joinedAt        DateTime                    @default(now())
   leftAt          DateTime?
-  updatedAt       DateTime                    @updatedAt
+  updatedAt       DateTime                    @default(now()) @updatedAt
 
   @@unique([roomId, userId])
   @@index([userId])
@@ -299,7 +300,7 @@ model CollaborationMessage {
   codeReference   CollaborationCodeReference?
 
   createdAt       DateTime                    @default(now())
-  updatedAt       DateTime                    @updatedAt
+  updatedAt       DateTime                    @default(now()) @updatedAt
 
   @@unique([roomId, authorId, clientMessageId])
   @@index([roomId, createdAt])

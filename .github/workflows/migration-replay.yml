@@ -1,0 +1,51 @@
+name: Migration Replay
+
+on:
+  pull_request:
+    paths:
+      - "prisma/schema.prisma"
+      - "prisma/schema.baseline.prisma"
+      - "prisma/migrations/**"
+      - ".github/workflows/migration-replay.yml"
+  push:
+    branches: [main]
+    paths:
+      - "prisma/schema.prisma"
+      - "prisma/schema.baseline.prisma"
+      - "prisma/migrations/**"
+      - ".github/workflows/migration-replay.yml"
+  workflow_dispatch:
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: codemate_migration_replay
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d codemate_migration_replay"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/codemate_migration_replay
+      DIRECT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/codemate_migration_replay
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Replay migrations on an empty database
+        run: npx prisma migrate deploy
+      - name: Check migration status
+        run: npx prisma migrate status
+      - name: Compare the resulting database with the Prisma schema
+        run: npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
