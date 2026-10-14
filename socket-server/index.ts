@@ -10,7 +10,7 @@ import {
   leaveRedisRoomFromUnload,
   reconcileRedisPresence,
 } from "./redis-handlers"
-import { getSocketMetrics, logCollaborationEvent, recordBroadcast } from "./observability"
+import { createInternalEmitTimer, getSocketMetrics, logCollaborationEvent, recordBroadcast } from "./observability"
 import { getCollaborationPresenceScope } from "../lib/collaboration/presence-scope"
 import type {
   InternalSocketEmitPayload,
@@ -227,12 +227,17 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
 
   // Internal emit endpoint (called by Next.js API routes)
   if (req.method === "POST" && req.url === "/internal/emit") {
-    if (!isAuthorizedInternalRequest(req)) {
+    const timer = createInternalEmitTimer(res)
+    const authorized = isAuthorizedInternalRequest(req)
+    timer.checkpoint("authorize")
+    if (!authorized) {
       res.writeHead(401, { "Content-Type": "application/json" })
       res.end(JSON.stringify({ error: "Unauthorized" }))
       return
     }
-    if (!isReady()) {
+    const ready = isReady()
+    timer.checkpoint("readiness")
+    if (!ready) {
       res.writeHead(503, { "Content-Type": "application/json" })
       res.end(JSON.stringify({ error: "Socket unavailable" }))
       return
@@ -240,16 +245,25 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
 
     try {
       const body = await parseBody(req)
-      if (!isInternalEmitPayload(body)) {
+      timer.checkpoint("parseBody")
+      const valid = isInternalEmitPayload(body)
+      timer.checkpoint("validatePayload")
+      if (!valid) {
         res.writeHead(400, { "Content-Type": "application/json" })
         res.end(JSON.stringify({ error: "Invalid emit payload" }))
         return
       }
 
+      const messageId = body.event === "collaboration:message" && isObject(body.data) && typeof body.data.id === "string"
+        ? body.data.id
+        : undefined
+      timer.setPayload(body.room, body.event, messageId)
       emitInternalPayload(io, body)
+      timer.checkpoint("broadcast")
       res.writeHead(200, { "Content-Type": "application/json" })
       res.end(JSON.stringify({ ok: true }))
     } catch {
+      timer.checkpoint("error")
       res.writeHead(400, { "Content-Type": "application/json" })
       res.end(JSON.stringify({ error: "Bad request" }))
     }

@@ -62,8 +62,9 @@ export async function GET(request: Request, { params }: RouteContext) {
 export async function POST(request: Request, { params }: RouteContext) {
   const timer = createCollaborationServerTimer("collaboration.message.post")
   let roomId: string | undefined
+  let messageId: string | undefined
   const respond = (body: Record<string, unknown>, status: number, outcome = String(status)) => {
-    const serverTiming = timer.finish(outcome, roomId)
+    const serverTiming = timer.finish(outcome, roomId, messageId)
     const response = NextResponse.json(body, { status })
     if (serverTiming) response.headers.set("Server-Timing", serverTiming)
     return response
@@ -139,6 +140,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       timer.checkpoint("dbCreate")
 
       const serializedMessage = serializeCollaborationMessage(message)
+      messageId = serializedMessage.id
       timer.checkpoint("serialize")
       let broadcastFailed = false
       try {

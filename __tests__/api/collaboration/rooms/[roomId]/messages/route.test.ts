@@ -257,6 +257,7 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
       event: "collaboration.message.post",
       outcome: "201",
       roomId: "room-1",
+      messageId: "message-1",
     }))
     expect(JSON.stringify(event)).not.toContain(sampleMessage.content)
   })

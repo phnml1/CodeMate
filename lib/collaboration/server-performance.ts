@@ -36,12 +36,13 @@ export function createCollaborationServerTimer(event: string) {
         details[name] = round((details[name] ?? 0) + performance.now() - startedAt)
       }
     },
-    finish(outcome: string, roomId?: string) {
+    finish(outcome: string, roomId?: string, messageId?: string) {
       if (!enabled) return null
       const totalMs = round(performance.now() - start)
       console.info(JSON.stringify({
         event,
         roomId,
+        messageId,
         outcome,
         totalMs,
         phases,
