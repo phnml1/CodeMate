@@ -22,7 +22,7 @@ import type {
 } from "@/lib/socket/types"
 import type { CollaborationMessage, CollaborationSocketTokenResponse } from "@/types/collaboration"
 
-type CollaborationClientSocket = ClientSocket<
+export type CollaborationClientSocket = ClientSocket<
   ServerToClientEvents,
   ClientToServerEvents
 >
@@ -529,6 +529,8 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
     }).catch(() => sendLeaveBeacon(roomId, socketId))
   }, [disconnectForLeave, sendLeaveBeacon])
 
+  const getSocket = useCallback(() => socketRef.current, [])
+
   useEffect(() => {
     const joinAttempt = joinAttemptRef
     const typingTimers = typingTimersRef.current
@@ -549,6 +551,7 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
     activeRoomId,
     error,
     joinRoom,
+    getSocket,
     leaveOnUnload,
     leaveRoom,
     locations,

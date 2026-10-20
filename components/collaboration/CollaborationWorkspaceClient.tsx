@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import CollaborationMessages from "@/components/collaboration/CollaborationMessages"
 import CollaborationDiffViewer from "@/components/collaboration/CollaborationDiffViewer"
 import CollaborationCodeLink from "@/components/collaboration/CollaborationCodeLink"
+import VoiceControls from "@/components/collaboration/VoiceControls"
 import FileIcon from "@/components/pulls/detail/FileIcon"
 import { PR_FILE_STATUS_BADGE } from "@/constants/pulls"
 import { useCollaborationRoomSocket } from "@/hooks/useCollaborationRoomSocket"
@@ -92,9 +93,11 @@ function connectionLabel(status: string) {
 export default function CollaborationWorkspaceClient({
   room,
   currentUserId,
+  voiceEnabled = false,
 }: {
   room: CollaborationRoom
   currentUserId: string
+  voiceEnabled?: boolean
 }) {
   const router = useRouter()
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("code")
@@ -153,7 +156,7 @@ export default function CollaborationWorkspaceClient({
   useLayoutEffect(() => {
     if (revision && files.length) markCollaborationPerformance("files.commit")
   }, [files, revision])
-  const { activeRoomId, error, joinRoom, leaveOnUnload, leaveRoom, locations, presence, publishLocation, publishTyping, status, stopSharingLocation, typingUsers } =
+  const { activeRoomId, error, getSocket, joinRoom, leaveOnUnload, leaveRoom, locations, presence, publishLocation, publishTyping, status, stopSharingLocation, typingUsers } =
     useCollaborationRoomSocket(handleIncomingMessage)
 
   const leaveForPullRequest = useCallback(() => {
@@ -502,10 +505,10 @@ export default function CollaborationWorkspaceClient({
   }
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="shrink-0 border-b border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-950 sm:px-5">
+    <div className="flex h-dvh w-full min-w-0 max-w-full flex-col overflow-x-clip bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <header className="min-w-0 shrink-0 border-b border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-950 sm:px-5">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <Button type="button" variant="ghost" size="icon-sm" title="PR 상세로 돌아가기" aria-label="PR 상세로 돌아가기" onClick={leaveForPullRequest}>
               <ArrowLeft />
             </Button>
@@ -516,7 +519,8 @@ export default function CollaborationWorkspaceClient({
               </p>
             </div>
           </div>
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-3 gap-y-1">
+            {voiceEnabled && room.status === "ACTIVE" && <VoiceControls roomId={room.id} connected={status === "connected" && activeRoomId === room.id} getSocket={getSocket} />}
             <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${
               connected ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
             }`}>
@@ -530,7 +534,7 @@ export default function CollaborationWorkspaceClient({
           </div>
         </div>
         {participants.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-2 pl-10 text-xs text-slate-600 dark:text-slate-300">
+          <div className="mt-2 flex min-w-0 flex-wrap gap-2 text-xs text-slate-600 dark:text-slate-300 sm:pl-10">
             {participants.map((user) => {
               const location = locations[user.userId]
               const isMe = user.userId === currentUserId
@@ -538,8 +542,8 @@ export default function CollaborationWorkspaceClient({
               return (
                 <div key={user.userId} className="flex min-w-0 max-w-full items-center gap-1.5 border border-slate-200 px-2 py-1 dark:border-slate-700">
                   <span className={`size-1.5 shrink-0 rounded-full ${user.status === "online" ? "bg-emerald-500" : "bg-amber-500"}`} />
-                  <span className="shrink-0 font-medium">{user.userName}{isMe ? " (나)" : ""}</span>
-                  <span className="max-w-40 truncate text-slate-500 dark:text-slate-400" title={location?.filePath}>
+                  <span className="min-w-0 truncate font-medium">{user.userName}{isMe ? " (나)" : ""}</span>
+                  <span className="min-w-0 max-w-40 truncate text-slate-500 dark:text-slate-400" title={location?.filePath}>
                     {location ? `${location.filePath.split("/").at(-1)}${location.line ? `:${location.line}` : ""}${location.headSha !== revision?.headSha ? " (다른 버전)" : ""}` : user.status === "reconnecting" ? "재연결 대기" : "위치 공유 전"}
                   </span>
                   {!isMe && location && (
@@ -606,7 +610,7 @@ export default function CollaborationWorkspaceClient({
         ))}
       </nav>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[240px_minmax(0,1fr)]">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 xl:grid-cols-[240px_minmax(0,1fr)]">
         <aside aria-label="변경 파일" className={`${mobilePanel === "files" ? "flex" : "hidden"} min-h-0 min-w-0 flex-col border-r border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900 xl:flex`}>
           <div className="flex h-11 shrink-0 items-center justify-between border-b border-slate-200 px-4 text-xs font-semibold dark:border-slate-800">
             <span>변경 파일</span><span className="text-slate-500">{files.length}</span>
@@ -644,7 +648,7 @@ export default function CollaborationWorkspaceClient({
         </aside>
 
         <section aria-label="PR 코드" className={`${mobilePanel === "code" ? "flex" : "hidden"} min-h-0 min-w-0 flex-col xl:flex`}>
-          <div className="flex h-11 shrink-0 items-center gap-2 border-b border-slate-200 px-4 text-xs dark:border-slate-800">
+          <div className="flex min-h-11 min-w-0 shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-2 text-xs dark:border-slate-800">
             <Code2 className="size-4 text-slate-500" />
             <span className="min-w-0 truncate font-medium">{selectedFile?.filename ?? "코드"}</span>
             {activeSelection && activeSelection.filePath === selectedFile?.filename && (
@@ -663,7 +667,7 @@ export default function CollaborationWorkspaceClient({
           <div
             ref={codeScrollRef}
             tabIndex={0}
-            className="min-h-0 flex-1 overflow-auto"
+            className="min-h-0 min-w-0 max-w-full flex-1 overflow-auto"
             onScroll={() => {
               if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current)
               scrollTimerRef.current = window.setTimeout(publishVisibleLocation, 120)

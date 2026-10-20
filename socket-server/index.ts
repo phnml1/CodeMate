@@ -20,7 +20,10 @@ import type {
 } from "../lib/socket/types"
 
 const port = parseInt(process.env.PORT || "4000", 10)
-const allowedOrigin = process.env.NEXTJS_URL || "http://localhost:3000"
+const allowedOrigins = (process.env.SOCKET_ALLOWED_ORIGINS ?? process.env.NEXTJS_URL ?? "http://localhost:3000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean)
 const startedAt = new Date().toISOString()
 const presenceScope = getCollaborationPresenceScope()
 let redisAdapter: RedisAdapterConnection | null = null
@@ -317,7 +320,7 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
 const io: TypedServer = new Server(httpServer, {
   transports: ["websocket"],
   cors: {
-    origin: allowedOrigin,
+    origin: allowedOrigins,
     credentials: true,
   },
 })
@@ -326,7 +329,7 @@ async function startSocketServer() {
   redisAdapter = await attachRedisAdapter(io, process.env.REDIS_URL, () => {
     for (const socket of io.sockets.sockets.values()) socket.disconnect(true)
   })
-  setupSocketHandlers(io, redisAdapter?.presence, isReady)
+  setupSocketHandlers(io, redisAdapter?.presence, isReady, redisAdapter?.voiceSeats)
   httpServer.listen(port, () => {
     logCollaborationEvent("socket.server.ready", { port, presenceScope, mode: redisAdapter ? "redis" : "single-instance" })
   })
