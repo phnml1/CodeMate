@@ -42,6 +42,7 @@ export default async function CollaborationRoomPage({
     <CollaborationWorkspaceClient
       room={serializeCollaborationRoom(room)}
       currentUserId={user.id}
+      voiceEnabled={process.env.COLLABORATION_VOICE_ENABLED === "1"}
     />
   )
 }

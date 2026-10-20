@@ -2,6 +2,22 @@ import type { Server, Socket } from "socket.io"
 import type { CommentWithAuthor, Reactions } from "../../types/comment"
 import type { BaseNotification } from "../../types/notification"
 import type { CollaborationMessage } from "../../types/collaboration"
+import type { CollaborationVoiceSignal } from "../collaboration/voice-protocol"
+
+export type CollaborationVoiceParticipant = {
+  socketId: string
+  userId: string
+  userName: string
+}
+
+export type CollaborationVoiceAck =
+  | { ok: true; roomId: string; participants?: CollaborationVoiceParticipant[] }
+  | { ok: false; error: { code: "VOICE_DISABLED" | "VOICE_FULL" | "VOICE_ALREADY_JOINED" | "VOICE_NOT_JOINED" | "VOICE_TARGET_UNAVAILABLE" | "VOICE_INVALID_SIGNAL" | "VOICE_UNAVAILABLE"; message: string } }
+
+export type CollaborationVoiceSignalEvent = CollaborationVoiceSignal & {
+  fromSocketId: string
+  fromUserId: string
+}
 
 export interface ServerToClientEvents {
   "comment:new": (comment: CommentWithAuthor) => void
@@ -22,6 +38,9 @@ export interface ServerToClientEvents {
   "collaboration:location": (location: CollaborationLocation) => void
   "collaboration:location:clear": (data: { roomId: string; userId: string }) => void
   "collaboration:typing": (typing: CollaborationTypingEvent) => void
+  "collaboration:voice:participant-joined": (data: { roomId: string; participant: CollaborationVoiceParticipant }) => void
+  "collaboration:voice:participant-left": (data: { roomId: string; socketId: string }) => void
+  "collaboration:voice:signal": (signal: CollaborationVoiceSignalEvent) => void
 }
 
 export interface ClientToServerEvents {
@@ -55,6 +74,10 @@ export interface ClientToServerEvents {
     data: CollaborationTypingInput,
     ack: (response: CollaborationLocationAck) => void
   ) => void
+  "collaboration:voice:join": (data: { roomId: string }, ack: (response: CollaborationVoiceAck) => void) => void
+  "collaboration:voice:leave": (data: { roomId: string }, ack?: (response: CollaborationVoiceAck) => void) => void
+  "collaboration:voice:heartbeat": (data: { roomId: string }, ack: (response: CollaborationVoiceAck) => void) => void
+  "collaboration:voice:signal": (signal: CollaborationVoiceSignal, ack: (response: CollaborationVoiceAck) => void) => void
 }
 
 export type InterServerEvents = Record<string, never>
@@ -212,7 +235,8 @@ export type ServerToClientPayload<Event extends ServerToClientEventName> =
 type InternalSocketEventName = Exclude<
   ServerToClientEventName,
   "collaboration:location" | "collaboration:location:clear"
-  | "collaboration:typing"
+  | "collaboration:typing" | "collaboration:voice:participant-joined"
+  | "collaboration:voice:participant-left" | "collaboration:voice:signal"
 >
 
 export type InternalSocketEmitPayload = {

@@ -4,6 +4,7 @@ import type { TypedServer } from "../lib/socket/types"
 import { logCollaborationEvent, recordRedisError } from "./observability"
 import { RedisPresenceStore } from "./redis-presence"
 import { RedisMessageRateLimiter } from "./message-rate-limit"
+import { RedisVoiceSeatStore } from "./voice-seats"
 
 const REDIS_CONNECT_TIMEOUT_MS = 5_000
 
@@ -12,6 +13,7 @@ export type RedisAdapterConnection = {
   close: () => void
   presence: RedisPresenceStore
   messageRateLimiter: RedisMessageRateLimiter
+  voiceSeats: RedisVoiceSeatStore
 }
 
 async function connectWithTimeout(client: Redis) {
@@ -56,6 +58,7 @@ export async function attachRedisAdapter(
       isReady: () => publisher.status === "ready" && subscriber.status === "ready",
       presence: new RedisPresenceStore(publisher),
       messageRateLimiter: new RedisMessageRateLimiter(publisher),
+      voiceSeats: new RedisVoiceSeatStore(publisher),
       close: () => {
         publisher.disconnect()
         subscriber.disconnect()

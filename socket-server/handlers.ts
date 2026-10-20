@@ -21,6 +21,8 @@ import { syncCollaborationDisconnect } from "./disconnect-sync"
 import { incrementActiveConnections, logCollaborationEvent } from "./observability"
 import { registerRedisCollaborationRoomHandlers } from "./redis-handlers"
 import type { RedisPresenceStore } from "./redis-presence"
+import { registerVoiceHandlers } from "./voice"
+import type { VoiceSeatStore } from "./voice-seats"
 
 type PresenceEntry = {
   memberId: string
@@ -431,7 +433,8 @@ function registerTypingHandlers(socket: TypedServerSocket) {
 export function setupSocketHandlers(
   io: TypedServer,
   redisPresence?: RedisPresenceStore,
-  canAcceptConnection: () => boolean = () => true
+  canAcceptConnection: () => boolean = () => true,
+  voiceSeats?: VoiceSeatStore
 ) {
   io.on("connection", (socket) => {
     incrementActiveConnections(1)
@@ -459,6 +462,7 @@ export function setupSocketHandlers(
     registerRoomHandlers(socket)
     if (redisPresence) registerRedisCollaborationRoomHandlers(io, socket, redisPresence, canAcceptConnection)
     else registerCollaborationRoomHandlers(io, socket)
+    registerVoiceHandlers(io, socket, canAcceptConnection, voiceSeats)
     registerTypingHandlers(socket)
   })
 }
