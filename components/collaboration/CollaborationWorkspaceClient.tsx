@@ -667,7 +667,7 @@ export default function CollaborationWorkspaceClient({
           <div
             ref={codeScrollRef}
             tabIndex={0}
-            className="min-h-0 min-w-0 max-w-full flex-1 overflow-auto"
+            className="min-h-0 min-w-0 max-w-full flex-1 overflow-auto [container-type:inline-size]"
             onScroll={() => {
               if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current)
               scrollTimerRef.current = window.setTimeout(publishVisibleLocation, 120)

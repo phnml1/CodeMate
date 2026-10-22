@@ -105,8 +105,8 @@ export default function InlineCollaborationThread({
   }
 
   return (
-    <section data-collaboration-thread aria-label={`${anchor.startLine}번 줄 협업방 대화`} className="border-y border-emerald-200 bg-emerald-50/70 px-4 py-3 font-sans dark:border-emerald-900 dark:bg-emerald-950/30">
-      <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
+    <section data-collaboration-thread aria-label={`${anchor.startLine}번 줄 협업방 대화`} className="sticky left-0 box-border w-[100cqw] min-w-0 max-w-[100cqw] overflow-hidden border-y border-emerald-200 bg-emerald-50/70 px-3 py-3 font-sans dark:border-emerald-900 dark:bg-emerald-950/30 sm:px-4">
+      <div className="flex min-w-0 items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
         <MessageSquare className="size-4 text-emerald-700 dark:text-emerald-400" />
         <h3 className="font-semibold">협업방 대화</h3>
         <span className="text-slate-500 dark:text-slate-400">
@@ -118,7 +118,7 @@ export default function InlineCollaborationThread({
         </Button>
       </div>
 
-      <div ref={scrollRef} role="log" aria-label="이 줄의 대화" className="mt-3 max-h-64 space-y-3 overflow-y-auto">
+      <div ref={scrollRef} role="log" aria-label="이 줄의 대화" className="mt-3 min-w-0 max-h-64 space-y-3 overflow-y-auto">
         {threadQuery.hasNextPage && (
           <Button type="button" size="xs" variant="ghost" disabled={threadQuery.isFetchingNextPage} onClick={() => {
             restoreHeightRef.current = scrollRef.current?.scrollHeight ?? null
@@ -163,7 +163,7 @@ export default function InlineCollaborationThread({
 
       {typingNames.length > 0 && <div className="mt-2"><TypingIndicator names={typingNames} /></div>}
 
-      <form onSubmit={(event) => void handleSubmit(event)} className="mt-3 border-t border-emerald-200 pt-3 dark:border-emerald-900">
+      <form onSubmit={(event) => void handleSubmit(event)} className="mt-3 min-w-0 max-w-full border-t border-emerald-200 pt-3 dark:border-emerald-900">
         <label htmlFor={`inline-collaboration-${roomId}-${anchor.side}-${anchor.startLine}`} className="sr-only">이 줄에 메시지 입력</label>
         <Textarea
           ref={inputRef}
@@ -174,7 +174,7 @@ export default function InlineCollaborationThread({
           maxLength={MAX_MESSAGE_LENGTH}
           disabled={!canSend}
           placeholder={canSend ? "이 줄에 메시지 입력" : "방에 연결되면 메시지를 보낼 수 있습니다"}
-          className="min-h-16 resize-y bg-white dark:bg-slate-950"
+          className="box-border min-h-16 min-w-0 max-w-full resize-y bg-white dark:bg-slate-950"
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault()

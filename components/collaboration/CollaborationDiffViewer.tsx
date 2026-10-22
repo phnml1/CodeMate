@@ -126,21 +126,23 @@ export default function CollaborationDiffViewer({
               (inlineThread.side === "RIGHT" && line.newNum === inlineThread.startLine)
             ))
           )
-          const lineNumber = (side: "LEFT" | "RIGHT", number?: number) => (
-            <td className="w-12 border-r border-slate-200 bg-slate-50/60 text-right dark:border-slate-800 dark:bg-slate-900/50">
-              {number !== undefined && (
-                <button
-                  type="button"
-                  data-diff-side={side}
-                  data-diff-line={number}
-                  aria-label={`${filePath} ${side === "LEFT" ? "이전" : "변경"} ${number}번 줄 선택`}
-                  title="줄 선택 · Shift+클릭으로 범위 선택"
-                  onClick={(event) => onLineSelect(side, number, event.shiftKey)}
-                  className={`block w-full px-2 py-0.5 text-right hover:bg-emerald-100 dark:hover:bg-emerald-900/40 ${selection?.side === side && number >= selection.startLine && number <= selection.endLine ? "font-bold text-emerald-700 dark:text-emerald-300" : "text-slate-500 dark:text-slate-400"}`}
-                >
-                  {number}
-                </button>
-              )}
+          const lineNumberButton = (side: "LEFT" | "RIGHT", number: number, className = "") => (
+            <button
+              type="button"
+              data-diff-side={side}
+              data-diff-line={number}
+              aria-label={`${filePath} ${side === "LEFT" ? "이전" : "변경"} ${number}번 줄 선택`}
+              title="줄 선택 · Shift+클릭으로 범위 선택"
+              onClick={(event) => onLineSelect(side, number, event.shiftKey)}
+              className={`block w-full px-1 py-0.5 text-right hover:bg-emerald-100 dark:hover:bg-emerald-900/40 sm:px-2 ${selection?.side === side && number >= selection.startLine && number <= selection.endLine ? "font-bold text-emerald-700 dark:text-emerald-300" : "text-slate-500 dark:text-slate-400"} ${className}`}
+            >
+              {number}
+            </button>
+          )
+          const lineNumber = (side: "LEFT" | "RIGHT", number?: number, mobileFallback?: number) => (
+            <td className={`${side === "LEFT" ? "hidden sm:table-cell" : ""} w-9 border-r border-slate-200 bg-slate-50/60 text-right dark:border-slate-800 dark:bg-slate-900/50 sm:w-12`}>
+              {number !== undefined && lineNumberButton(side, number)}
+              {number === undefined && mobileFallback !== undefined && lineNumberButton("LEFT", mobileFallback, "sm:hidden")}
             </td>
           )
 
@@ -150,14 +152,14 @@ export default function CollaborationDiffViewer({
                 className={`group ${DIFF_ROW_CLASS[line.type]} ${ownSelected ? "bg-emerald-100/80 dark:bg-emerald-900/30" : othersSelected.length ? "bg-sky-100/80 dark:bg-sky-900/30" : ""}`}
               >
                 {lineNumber("LEFT", line.oldNum)}
-                {lineNumber("RIGHT", line.newNum)}
-                <td className="w-8 border-r border-slate-200 px-1 text-center dark:border-slate-800">
+                {lineNumber("RIGHT", line.newNum, line.oldNum)}
+                <td className="w-5 border-r border-slate-200 text-center dark:border-slate-800 sm:w-8 sm:px-1">
                   {viewers.length ? (
                     <span title={`${viewers.map((viewer) => viewer.userName).join(", ")}님이 보고 있습니다`} className="font-bold text-sky-700 dark:text-sky-300">●</span>
                   ) : DIFF_SYMBOL[line.type]}
                 </td>
-                <td className="w-20 border-r border-slate-200 px-1 dark:border-slate-800">
-                  <div className="flex items-center justify-center gap-1">
+                <td className="w-9 border-r border-slate-200 dark:border-slate-800 sm:w-20 sm:px-1">
+                  <div className="flex flex-wrap items-center justify-center gap-0.5 sm:gap-1">
                     {threads.map((thread) => (
                       <button
                         key={thread.side}
@@ -167,7 +169,7 @@ export default function CollaborationDiffViewer({
                         onClick={() => onOpenThread(thread.side, thread.number, thread.number, false, index)}
                         className="inline-flex items-center gap-0.5 rounded-sm px-0.5 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
                       >
-                        <MessageSquare className="size-3.5" /> {thread.count}
+                        <MessageSquare className="size-3.5" /> <span className="hidden sm:inline">{thread.count}</span>
                       </button>
                     ))}
                     {lineTypers.length > 0 && (
@@ -185,7 +187,7 @@ export default function CollaborationDiffViewer({
                     </button>}
                   </div>
                 </td>
-                <td data-code-side={codeLine === undefined ? undefined : codeSide} data-code-line={codeLine} className={`min-w-80 whitespace-pre px-4 py-0.5 ${DIFF_CODE_CLASS[line.type]}`}>
+                <td data-code-side={codeLine === undefined ? undefined : codeSide} data-code-line={codeLine} className={`min-w-40 whitespace-pre px-2 py-0.5 sm:min-w-80 sm:px-4 ${DIFF_CODE_CLASS[line.type]}`}>
                   {textViewer && textRange && highlightEnd > highlightStart ? <>
                     {line.content.slice(0, highlightStart)}
                     <mark title={`${textViewer.userName}님이 선택한 텍스트`} className="bg-sky-300 text-slate-950 dark:bg-sky-500 dark:text-white">
