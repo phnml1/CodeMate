@@ -98,7 +98,7 @@ function PRDiffViewer({
     <div
       ref={wrapperRef}
       id={`diff-${file.filename}`}
-      className={`scroll-mt-36 rounded-2xl overflow-hidden bg-white dark:bg-slate-900 transition-all duration-300 mb-4 ${
+      className={`scroll-mt-36 min-w-0 max-w-full rounded-2xl overflow-hidden bg-white dark:bg-slate-900 transition-all duration-300 mb-4 ${
         isActive
           ? "border border-blue-400 dark:border-blue-500 shadow-md shadow-blue-100 dark:shadow-blue-950/40"
           : "border border-slate-200 dark:border-slate-800 shadow-sm"
@@ -118,7 +118,7 @@ function PRDiffViewer({
         <div
           id={`diff-body-${file.filename}`}
           ref={renderBody ? bodyRef : undefined}
-          className="overflow-x-auto min-w-0 min-h-25"
+          className="min-h-25 min-w-0 max-w-full overflow-x-auto overscroll-x-contain"
         >
           {file.patch === null ? (
             <div className="p-6 text-center text-sm text-slate-400">
