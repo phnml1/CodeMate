@@ -53,6 +53,13 @@ describe("CollaborationDiffViewer", () => {
     expect(html).not.toContain("undefined번 줄에 협업방 메시지 작성")
   })
 
+  it("keeps a selectable old line number in the single mobile number column", () => {
+    const html = render()
+    expect(html.match(/data-diff-side="LEFT" data-diff-line="10"/g)).toHaveLength(2)
+    expect(html).toContain("hidden sm:table-cell")
+    expect(html).toContain("sm:hidden")
+  })
+
   it("expands an inline conversation under its code row", () => {
     expect(render(true)).toContain("inline-thread")
   })

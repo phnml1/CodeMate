@@ -46,10 +46,10 @@ export default function DiffTable({
   const canAddInlineComment = !!(prId && filePath)
 
   return (
-    <table aria-label="파일 변경 내용" className="w-full border-collapse font-mono text-[11px] md:text-xs leading-relaxed table-fixed min-w-full">
+    <table aria-label="파일 변경 내용" className="w-max min-w-full table-auto border-collapse font-mono text-[11px] md:text-xs leading-relaxed">
       <colgroup>
-        <col className="w-10" />
-        <col className="w-10" />
+        <col className="w-0 sm:w-10" />
+        <col className="w-8 sm:w-10" />
         <col className="w-6" />
         <col className="w-6" />
         <col />
@@ -70,11 +70,11 @@ export default function DiffTable({
                 onMouseLeave={() => setHoveredLine(null)}
                 className={`${DIFF_ROW_CLASS[line.type]} hover:brightness-95 dark:hover:brightness-110 transition-all ${topIssue ? ISSUE_ROW_CLASS[topIssue.severity] : ""}`}
               >
-                <td className="px-2 py-0.5 text-right border-r border-slate-200 dark:border-slate-800 select-none opacity-40 text-[10px] bg-slate-50/50 dark:bg-slate-800/30">
-                  {line.oldNum ?? ""}
+                <td className="w-0 p-0 text-right select-none opacity-40 text-[10px] bg-slate-50/50 dark:bg-slate-800/30 sm:w-10 sm:border-r sm:border-slate-200 sm:px-2 sm:py-0.5 dark:sm:border-slate-800">
+                  <span className="hidden sm:inline">{line.oldNum ?? ""}</span>
                 </td>
-                <td className="px-2 py-0.5 text-right border-r border-slate-200 dark:border-slate-800 select-none opacity-40 text-[10px] bg-slate-50/50 dark:bg-slate-800/30">
-                  {line.newNum ?? ""}
+                <td className="px-1 py-0.5 text-right border-r border-slate-200 dark:border-slate-800 select-none opacity-40 text-[10px] bg-slate-50/50 dark:bg-slate-800/30 sm:px-2">
+                  {line.newNum ?? <span className="sm:hidden">{line.oldNum ?? ""}</span>}
                 </td>
                 <td className="px-2 py-0.5 text-center border-r border-slate-200 dark:border-slate-800 select-none opacity-60 font-black">
                   {DIFF_SYMBOL[line.type]}

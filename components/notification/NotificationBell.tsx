@@ -67,7 +67,7 @@ export default function NotificationBell() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-lg shadow-lg border border-slate-200 z-50">
+        <div className="fixed inset-x-3 top-16 z-50 mt-2 max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg sm:absolute sm:top-full sm:right-0 sm:left-auto sm:w-96 sm:max-h-none sm:overflow-visible">
           {isLoading ? (
             <div className="px-4 py-8 text-center text-sm text-slate-400">
               Loading notifications...
