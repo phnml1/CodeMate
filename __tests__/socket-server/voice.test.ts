@@ -42,11 +42,12 @@ async function connect(url: string, userId: string) {
   return client
 }
 
-async function joinRoom(client: ClientSocket, roomId: string, userId: string) {
+async function joinRoom(client: ClientSocket, roomId: string, userId: string, shouldJoin = true) {
   const { token } = createCollaborationRoomSocketToken({ roomId, userId, userName: userId, memberId: `member-${userId}`, capacity: 8 })
   const ack = await client.timeout(3_000).emitWithAck("collaboration:join", { token })
-  expect(ack.ok).toBe(true)
-  joinedRooms.set(client, roomId)
+  expect(ack.ok).toBe(shouldJoin)
+  if (shouldJoin) joinedRooms.set(client, roomId)
+  return ack
 }
 
 async function joinVoice(client: ClientSocket, roomId: string): Promise<CollaborationVoiceAck> {
@@ -76,15 +77,17 @@ afterAll(async () => {
   else process.env.COLLABORATION_VOICE_ENABLED = previousVoice
 })
 
-it("restricts voice to joined members and four unique users", async () => {
+it("restricts voice to joined members and the room to four unique users", async () => {
   const node = await createNode()
   const roomId = `voice-${randomUUID()}`
   const users = await Promise.all(Array.from({ length: 5 }, async (_, index) => {
     const userId = `voice-user-${index}`
-    const client = await connect(node.url, userId)
-    await joinRoom(client, roomId, userId)
-    return client
+    return connect(node.url, userId)
   }))
+  await Promise.all(users.slice(0, 4).map((client, index) => joinRoom(client, roomId, `voice-user-${index}`)))
+  expect(await joinRoom(users[4], roomId, "voice-user-4", false)).toMatchObject({
+    error: { code: "ROOM_FULL" },
+  })
   const outsider = await connect(node.url, "outsider")
   const outsiderAck = await joinVoice(outsider, roomId)
   expect(outsiderAck).toMatchObject({ ok: false, error: { code: "VOICE_NOT_JOINED" } })
@@ -92,16 +95,14 @@ it("restricts voice to joined members and four unique users", async () => {
     .toMatchObject({ ok: false, error: { code: "VOICE_NOT_JOINED" } })
   ;(users[0].emit as (...args: unknown[]) => void)("collaboration:voice:join", null)
 
-  const results = await Promise.all(users.map((client) => joinVoice(client, roomId)))
+  const results = await Promise.all(users.slice(0, 4).map((client) => joinVoice(client, roomId)))
   expect(results.filter((result) => result.ok)).toHaveLength(4)
-  expect(results.filter((result) => !result.ok)).toEqual([
-    expect.objectContaining({ error: expect.objectContaining({ code: "VOICE_FULL" }) }),
-  ])
+  expect(await joinVoice(users[4], roomId)).toMatchObject({ ok: false, error: { code: "VOICE_NOT_JOINED" } })
   const sameUserTab = await connect(node.url, "voice-user-0")
   await joinRoom(sameUserTab, roomId, "voice-user-0")
   expect(await joinVoice(sameUserTab, roomId)).toMatchObject({ ok: false, error: { code: "VOICE_ALREADY_JOINED" } })
   expect((await users[0].timeout(3_000).emitWithAck("collaboration:voice:leave", { roomId })).ok).toBe(true)
-  expect((await joinVoice(users[4], roomId)).ok).toBe(true)
+  expect((await joinVoice(sameUserTab, roomId)).ok).toBe(true)
 })
 
 it("relays signals only between voice participants and reports departures", async () => {
@@ -147,11 +148,11 @@ itWithRedis("shares voice seats and signals across Redis-backed replicas", async
   const roomId = `voice-redis-${randomUUID()}`
   const users = await Promise.all(Array.from({ length: 5 }, async (_, index) => {
     const userId = `redis-user-${index}`
-    const client = await connect(index % 2 ? first.url : second.url, userId)
-    await joinRoom(client, roomId, userId)
-    return client
+    return connect(index % 2 ? first.url : second.url, userId)
   }))
-  const results = await Promise.all(users.map((client) => joinVoice(client, roomId)))
+  await Promise.all(users.slice(0, 4).map((client, index) => joinRoom(client, roomId, `redis-user-${index}`)))
+  expect(await joinRoom(users[4], roomId, "redis-user-4", false)).toMatchObject({ error: { code: "ROOM_FULL" } })
+  const results = await Promise.all(users.slice(0, 4).map((client) => joinVoice(client, roomId)))
   expect(results.filter((result) => result.ok)).toHaveLength(4)
   const received = new Promise((resolve) => users[1].once("collaboration:voice:signal", resolve))
   const ack = await users[0].timeout(3_000).emitWithAck("collaboration:voice:signal", {

@@ -164,8 +164,8 @@ export default function CollaborationDiffViewer({
                       <button
                         key={thread.side}
                         type="button"
-                        title={`${thread.side === "LEFT" ? "이전" : "변경"} ${thread.number}번 줄 협업방 대화 ${thread.count}개`}
-                        aria-label={`${thread.side === "LEFT" ? "이전" : "변경"} ${thread.number}번 줄 협업방 대화 ${thread.count}개 열기`}
+                        title={`${thread.side === "LEFT" ? "이전" : "변경"} ${thread.number}번 줄 리뷰방 대화 ${thread.count}개`}
+                        aria-label={`${thread.side === "LEFT" ? "이전" : "변경"} ${thread.number}번 줄 리뷰방 대화 ${thread.count}개 열기`}
                         onClick={() => onOpenThread(thread.side, thread.number, thread.number, false, index)}
                         className="inline-flex items-center gap-0.5 rounded-sm px-0.5 text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
                       >
@@ -177,8 +177,8 @@ export default function CollaborationDiffViewer({
                     )}
                     {selectedPosition && <button
                       type="button"
-                      title="이 줄에 협업방 메시지 작성"
-                      aria-label={`${selectedPosition.startLine}번 줄에 협업방 메시지 작성`}
+                      title="이 줄에 리뷰방 메시지 작성"
+                      aria-label={`${selectedPosition.startLine}번 줄에 리뷰방 메시지 작성`}
                       disabled={!canSend}
                       onClick={() => onOpenThread(selectedPosition.side, selectedPosition.startLine, selectedPosition.endLine, true, index)}
                       className={`rounded-sm p-0.5 text-emerald-700 hover:bg-emerald-100 focus-visible:opacity-100 disabled:opacity-30 dark:text-emerald-300 dark:hover:bg-emerald-900/40 ${ownSelected || threads.length ? "opacity-100" : "xl:opacity-0 xl:group-hover:opacity-100"}`}
@@ -187,7 +187,7 @@ export default function CollaborationDiffViewer({
                     </button>}
                   </div>
                 </td>
-                <td data-code-side={codeLine === undefined ? undefined : codeSide} data-code-line={codeLine} className={`min-w-40 whitespace-pre px-2 py-0.5 sm:min-w-80 sm:px-4 ${DIFF_CODE_CLASS[line.type]}`}>
+                <td data-code-side={codeLine === undefined ? undefined : codeSide} data-code-line={codeLine} title={othersSelected.length ? `${othersSelected.map((location) => location.userName).join(", ")}님이 선택 중` : undefined} className={`min-w-40 whitespace-pre px-2 py-0.5 sm:min-w-80 sm:px-4 ${DIFF_CODE_CLASS[line.type]} ${ownSelected ? "bg-emerald-100/80 dark:bg-emerald-900/30" : othersSelected.length ? "bg-sky-100/80 dark:bg-sky-900/40" : ""}`}>
                   {textViewer && textRange && highlightEnd > highlightStart ? <>
                     {line.content.slice(0, highlightStart)}
                     <mark title={`${textViewer.userName}님이 선택한 텍스트`} className="bg-sky-300 text-slate-950 dark:bg-sky-500 dark:text-white">

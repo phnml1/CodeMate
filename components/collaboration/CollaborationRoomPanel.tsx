@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { workspacePRFilesQueryOptions } from "@/hooks/usePRFiles"
 import { collaborationMessagesQueryOptions } from "@/hooks/useCollaborationMessages"
 import { markCollaborationPerformance, observeCollaborationLoading } from "@/lib/collaboration/client-performance"
+import { getCollaborationRoomDisplayName } from "@/lib/collaboration/room-name"
 import {
   useCollaborationRooms,
   useCreateCollaborationRoom,
@@ -26,6 +27,10 @@ export default function CollaborationRoomPanel({
   const queryClient = useQueryClient()
   const { data: rooms = [], isPending, isError } = useCollaborationRooms(prId)
   const createRoom = useCreateCollaborationRoom(prId)
+  const ownedRoom = rooms.find((room) => room.ownerId === currentUserId && (
+    (room.occupiedCount ?? room.memberCount) < room.capacity ||
+    room.members.some((member) => member.userId === currentUserId)
+  ))
   const [error, setError] = useState<string | null>(null)
   const [isEntering, setIsEntering] = useState(false)
   const enteringRef = useRef(false)
@@ -52,7 +57,7 @@ export default function CollaborationRoomPanel({
     } catch (nextError) {
       enteringRef.current = false
       setIsEntering(false)
-      setError(nextError instanceof Error ? nextError.message : "협업방에 입장하지 못했습니다.")
+      setError(nextError instanceof Error ? nextError.message : "리뷰방에 입장하지 못했습니다.")
     }
   }
 
@@ -62,39 +67,39 @@ export default function CollaborationRoomPanel({
         <div
           role="status"
           aria-live="polite"
-          aria-label="협업방에 입장하는 중입니다."
+          aria-label="리뷰방에 입장하는 중입니다."
           className="fixed inset-0 z-[100] flex cursor-wait items-center justify-center bg-white/80 dark:bg-black/70"
         >
           <Loader2 aria-hidden="true" className="size-10 animate-spin text-emerald-600 motion-reduce:animate-none dark:text-emerald-400" />
-          <span className="sr-only">협업방에 입장하는 중입니다.</span>
+          <span className="sr-only">리뷰방에 입장하는 중입니다.</span>
         </div>,
         document.body,
       )}
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-2">
           <Radio className="size-4 text-emerald-600" />
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">실시간 협업방</h2>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">실시간 리뷰방</h2>
           <span className="text-xs text-slate-500">{isPending || isError ? "—" : rooms.length}</span>
         </div>
-        <Button type="button" size="sm" disabled={isEntering || createRoom.isPending || isPending || isError} onMouseEnter={prefetchRevisionFiles} onFocus={prefetchRevisionFiles} onClick={() => void openRoom()}>
-          {createRoom.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
-          협업방 시작
+        <Button type="button" size="sm" disabled={isEntering || createRoom.isPending || isPending || isError} onMouseEnter={() => ownedRoom ? prefetchExistingRoom(ownedRoom.id) : prefetchRevisionFiles()} onFocus={() => ownedRoom ? prefetchExistingRoom(ownedRoom.id) : prefetchRevisionFiles()} onClick={() => void openRoom(ownedRoom)}>
+          {createRoom.isPending ? <Loader2 className="animate-spin" /> : ownedRoom ? <ArrowUpRight /> : <Plus />}
+          {ownedRoom ? "내 리뷰방 입장" : "리뷰방 시작"}
         </Button>
       </div>
       <div className="space-y-1 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
         {isPending ? (
-          <p className="text-sm text-slate-500">협업방을 불러오는 중입니다.</p>
+          <p className="text-sm text-slate-500">리뷰방을 불러오는 중입니다.</p>
         ) : isError ? (
-          <p role="alert" className="text-sm text-rose-600">협업방 인원을 확인할 수 없습니다. 연결 복구를 기다리는 중입니다.</p>
+          <p role="alert" className="text-sm text-rose-600">리뷰방 인원을 확인할 수 없습니다. 연결 복구를 기다리는 중입니다.</p>
         ) : rooms.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">아직 열린 협업방이 없습니다.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">아직 열린 리뷰방이 없습니다.</p>
         ) : rooms.map((room) => {
           const full = (room.occupiedCount ?? room.memberCount) >= room.capacity &&
             !room.members.some((member) => member.userId === currentUserId)
           return (
             <div key={room.id} className="flex min-w-0 items-center justify-between gap-3 py-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{room.name}</p>
+                <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{getCollaborationRoomDisplayName(room.name, room.pullRequest.number)}</p>
                 <p className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                   <Users className="size-3" /> {room.memberCount}/{room.capacity}
                   <span className="mx-1">·</span>

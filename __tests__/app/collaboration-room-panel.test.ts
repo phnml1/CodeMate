@@ -52,7 +52,7 @@ jest.mock("@/components/ui/button", () => ({
 
 const room = {
   id: "room-1", name: "리뷰 방", memberCount: 1, capacity: 8,
-  members: [], owner: { name: "방장" },
+  members: [], owner: { name: "방장" }, pullRequest: { number: 7 },
 } as unknown as CollaborationRoom
 
 function render() {
@@ -83,12 +83,17 @@ describe("CollaborationRoomPanel entry overlay", () => {
     else Reflect.deleteProperty(globalThis, "document")
   })
 
+  it("shows an existing default room with the new label", () => {
+    mockRooms = [{ ...room, name: "PR #7 협업방" }]
+    expect(render()).toContain("PR #7 리뷰방")
+  })
+
   it("shows the overlay immediately and keeps it after creation while navigation is pending", async () => {
     let resolveCreation!: (room: CollaborationRoom) => void
     mockCreate.mockReturnValue(new Promise<CollaborationRoom>((resolve) => { resolveCreation = resolve }))
     expect(render()).not.toContain('role="status"')
-    click("협업방 시작")
-    click("협업방 시작")
+    click("리뷰방 시작")
+    click("리뷰방 시작")
     expect(mockCreate).toHaveBeenCalledTimes(1)
     expect(mockPush).not.toHaveBeenCalled()
     expect(render()).toContain('role="status"')
@@ -97,7 +102,7 @@ describe("CollaborationRoomPanel entry overlay", () => {
     await Promise.resolve()
     expect(mockPush).toHaveBeenCalledWith("/collaboration/rooms/room-1")
     expect(render()).toContain('role="status"')
-    expect(mockButtons.get("협업방 시작")!.disabled).toBe(true)
+    expect(mockButtons.get("리뷰방 시작")!.disabled).toBe(true)
   })
 
   it("also covers existing-room navigation without creating a room", () => {
@@ -110,10 +115,18 @@ describe("CollaborationRoomPanel entry overlay", () => {
     expect(render()).toContain("fixed inset-0")
   })
 
+  it("offers entry to an existing room owned by the current user", () => {
+    mockRooms = [{ ...room, ownerId: "user-1" }]
+    expect(render()).toContain("내 리뷰방 입장")
+    click("내 리뷰방 입장")
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockPush).toHaveBeenCalledWith("/collaboration/rooms/room-1")
+  })
+
   it("prefetches only the hovered existing room route and messages without joining", () => {
     render()
     mockButtons.get("입장")!.onMouseEnter!({} as React.MouseEvent<HTMLButtonElement>)
-    mockButtons.get("협업방 시작")!.onFocus!({} as React.FocusEvent<HTMLButtonElement>)
+    mockButtons.get("리뷰방 시작")!.onFocus!({} as React.FocusEvent<HTMLButtonElement>)
 
     expect(mockPrefetchQuery).toHaveBeenCalledTimes(2)
     expect(mockPrefetchQuery.mock.calls[0][0].queryKey).toEqual(["pullRequestFilesWithRevision", "pr-1"])
@@ -129,14 +142,14 @@ describe("CollaborationRoomPanel entry overlay", () => {
   it("removes the overlay on creation failure and permits a retry", async () => {
     mockCreate.mockRejectedValueOnce(new Error("생성 실패"))
     render()
-    click("협업방 시작")
+    click("리뷰방 시작")
     await Promise.resolve()
     const html = render()
     expect(html).not.toContain('role="status"')
     expect(html).toContain("생성 실패")
-    expect(mockButtons.get("협업방 시작")!.disabled).toBe(false)
+    expect(mockButtons.get("리뷰방 시작")!.disabled).toBe(false)
     mockCreate.mockResolvedValueOnce(room)
-    click("협업방 시작")
+    click("리뷰방 시작")
     await Promise.resolve()
     expect(mockPush).toHaveBeenCalledWith("/collaboration/rooms/room-1")
     expect(render()).not.toContain("생성 실패")

@@ -3,6 +3,7 @@ import {
   collaborationRoomInclude,
   ensureCollaborationRoomMember,
   findAccessibleCollaborationRoom,
+  getCollaborationRoomCapacity,
   getActiveMemberCount,
   serializeCollaborationRoom,
 } from "@/lib/collaboration/rooms"
@@ -43,7 +44,7 @@ export async function POST(_request: Request, { params }: RouteContext) {
     })
 
     const memberCount = await getActiveMemberCount(room.id)
-    if ((!existingMember || existingMember.leftAt) && memberCount >= room.capacity) {
+    if ((!existingMember || existingMember.leftAt) && memberCount >= getCollaborationRoomCapacity(room.capacity)) {
       return NextResponse.json({ error: "Room is full" }, { status: 409 })
     }
 

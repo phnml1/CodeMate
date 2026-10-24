@@ -15,7 +15,7 @@ async function fetchCollaborationRooms(pullRequestId: string) {
   const response = await fetch(`/api/collaboration/rooms?${params}`)
 
   if (!response.ok) {
-    throw new Error("협업방 목록을 불러오지 못했습니다.")
+    throw new Error("리뷰방 목록을 불러오지 못했습니다.")
   }
 
   const data = (await response.json()) as CollaborationRoomsResponse
@@ -30,7 +30,7 @@ async function createCollaborationRoom(pullRequestId: string) {
   })
 
   if (!response.ok) {
-    throw new Error("협업방을 만들지 못했습니다.")
+    throw new Error("리뷰방을 만들지 못했습니다.")
   }
 
   const data = (await response.json()) as CollaborationRoomResponse

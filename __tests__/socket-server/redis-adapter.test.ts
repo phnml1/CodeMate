@@ -197,11 +197,11 @@ describeWithRedis("Socket.IO Redis adapter", () => {
     }
 
     const entrants = await Promise.all(
-      Array.from({ length: 9 }, (_, index) =>
+      Array.from({ length: 5 }, (_, index) =>
         enter(index % 2 === 0 ? first : second, `user-${index + 1}`)
       )
     )
-    expect(entrants.filter((entrant) => entrant.response.ok)).toHaveLength(8)
+    expect(entrants.filter((entrant) => entrant.response.ok)).toHaveLength(4)
     expect(entrants.filter((entrant) => !entrant.response.ok)).toHaveLength(1)
     expect(entrants.find((entrant) => !entrant.response.ok)?.response).toMatchObject({
       ok: false,

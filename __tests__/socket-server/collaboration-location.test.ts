@@ -36,13 +36,13 @@ describe("collaboration room location socket events", () => {
     else process.env.SOCKET_INTERNAL_SECRET = previousSecret
   })
 
-  async function connect(userId: string) {
+  async function connect(userId: string, targetRoomId = roomId, capacity = 2) {
     const { token } = createCollaborationRoomSocketToken({
-      roomId,
+      roomId: targetRoomId,
       memberId: `member-${userId}`,
       userId,
       userName: userId,
-      capacity: 2,
+      capacity,
     }, secret)
     const client = createClient(url, {
       auth: { token },
@@ -86,7 +86,7 @@ describe("collaboration room location socket events", () => {
       side: "RIGHT",
       line: 42,
       selection: { side: "RIGHT", startLine: 42, endLine: 44 },
-      textSelection: { side: "RIGHT", startLine: 42, endLine: 42, startOffset: 2, endOffset: 5 },
+      textSelection: { side: "RIGHT", startLine: 42, endLine: 44, startOffset: 2, endOffset: 5 },
       viewport: { top: 0.6, left: 0.25, lineOffset: -12 },
     }
 
@@ -190,5 +190,24 @@ describe("collaboration room location socket events", () => {
       presence: { users: [expect.objectContaining({ userId: "unload-bob" })] },
     })
     await new Promise<void>((resolve) => bob.client.emit("collaboration:leave", { roomId }, () => resolve()))
+  })
+
+  it("rejects a fifth user even with legacy eight-person tokens", async () => {
+    const limitedRoomId = `${roomId}-capacity`
+    const entrants = await Promise.all(
+      Array.from({ length: 5 }, (_, index) => connect(`capacity-${index}`, limitedRoomId, 8))
+    )
+
+    for (const entrant of entrants.slice(0, 4)) {
+      expect(await join(entrant.client, entrant.token)).toMatchObject({ ok: true })
+    }
+    expect(await join(entrants[4].client, entrants[4].token)).toMatchObject({
+      ok: false,
+      error: { code: "ROOM_FULL" },
+    })
+
+    await Promise.all(entrants.slice(0, 4).map(({ client }) =>
+      new Promise<void>((resolve) => client.emit("collaboration:leave", { roomId: limitedRoomId }, () => resolve()))
+    ))
   })
 })

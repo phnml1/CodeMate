@@ -3,6 +3,7 @@ import {
   COLLABORATION_RECONNECT_GRACE_MS,
   verifyCollaborationRoomSocketToken,
 } from "../lib/collaboration/socket-token"
+import { getCollaborationRoomCapacity } from "../lib/collaboration/capacity"
 import { collaborationLocationSchema, collaborationTypingSchema } from "../lib/collaboration/location"
 import type {
   CollaborationAckErrorCode,
@@ -243,7 +244,7 @@ function registerCollaborationRoomHandlers(
     const existingEntry = roomPresence.get(payload.userId)
     const heldSeats = countHeldSeats(roomPresence)
 
-    if (!existingEntry && heldSeats >= payload.capacity) {
+    if (!existingEntry && heldSeats >= getCollaborationRoomCapacity(payload.capacity)) {
       ack(createErrorAck("ROOM_FULL", "Room is full"))
       return
     }

@@ -14,10 +14,11 @@ export default function NotificationBell() {
   const router = useRouter()
   const { unreadCount } = useNotificationSummary()
   const { notifications, isLoading, markAsRead, deleteNotification } = useNotifications(
-    undefined,
-    undefined,
+    "ALL",
+    "unread",
     { enabled: isOpen }
   )
+  const unreadNotifications = notifications.filter((notification) => !notification.isRead)
 
   // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
@@ -74,7 +75,7 @@ export default function NotificationBell() {
             </div>
           ) : (
             <NotificationList
-              notifications={notifications}
+              notifications={unreadNotifications}
               onClickItem={handleClickItem}
               onMarkAllRead={handleMarkAllRead}
               onDelete={handleDelete}

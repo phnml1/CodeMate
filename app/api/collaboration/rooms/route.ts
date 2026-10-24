@@ -4,6 +4,7 @@ import {
   collaborationRoomInclude,
   createCollaborationRoomSchema,
   findAccessiblePullRequest,
+  getCollaborationRoomCapacity,
   serializeCollaborationRoom,
 } from "@/lib/collaboration/rooms"
 import { prisma } from "@/lib/prisma"
@@ -107,15 +108,46 @@ export async function POST(request: Request) {
       )
     }
 
-    const room = await prisma.$transaction(async (tx) => {
+    const presenceScope = getCollaborationPresenceScope()
+    const { room, created } = await prisma.$transaction(async (tx) => {
+      // Serialize starts from the same owner and PR across tabs and server instances.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${pullRequest.id}), hashtext(${`${presenceScope}:${session.user.id}`}))::text`
+
+      if (!parsed.data.name && !parsed.data.capacity) {
+        const ownedRooms = await tx.collaborationRoom.findMany({
+          where: {
+            presenceScope,
+            pullRequestId: pullRequest.id,
+            ownerId: session.user.id,
+            status: "ACTIVE",
+          },
+          include: collaborationRoomInclude,
+          orderBy: { createdAt: "desc" },
+        })
+        if (ownedRooms.length > 0) {
+          const presence = await getCollaborationPresence(ownedRooms.map((ownedRoom) => ownedRoom.id))
+          const now = Date.now()
+          const existingRoom = ownedRooms.find((ownedRoom, index) => {
+            const users = presence.rooms[index].users
+            const canJoin = users.length < getCollaborationRoomCapacity(ownedRoom.capacity) ||
+              users.some((user) => user.userId === session.user.id)
+            return canJoin && (
+              now - ownedRoom.createdAt.getTime() < ROOM_JOIN_GRACE_MS ||
+              users.length > 0
+            )
+          })
+          if (existingRoom) return { room: existingRoom, created: false }
+        }
+      }
+
       const createdRoom = await tx.collaborationRoom.create({
         data: {
-          presenceScope: getCollaborationPresenceScope(),
+          presenceScope,
           pullRequestId: pullRequest.id,
           ownerId: session.user.id,
           name:
             parsed.data.name ??
-            `PR #${pullRequest.number} 협업방`,
+            `PR #${pullRequest.number} 리뷰방`,
           capacity:
             parsed.data.capacity ?? COLLABORATION_ROOM_DEFAULT_CAPACITY,
           members: {
@@ -128,14 +160,17 @@ export async function POST(request: Request) {
         include: collaborationRoomInclude,
       })
 
-      return createdRoom
-    })
+      return { room: createdRoom, created: true }
+    }, { timeout: 10_000 })
 
     return NextResponse.json(
       { room: serializeCollaborationRoom(room) },
-      { status: 201 }
+      { status: created ? 201 : 200 }
     )
-  } catch {
+  } catch (error) {
+    if (error instanceof CollaborationPresenceUnavailableError) {
+      return NextResponse.json({ error: "Collaboration presence unavailable" }, { status: 503 })
+    }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

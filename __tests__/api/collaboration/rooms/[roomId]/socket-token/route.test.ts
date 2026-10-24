@@ -121,6 +121,27 @@ describe("POST /api/collaboration/rooms/[roomId]/socket-token", () => {
     expect(response.headers.has("Server-Timing")).toBe(false)
   })
 
+  it("caps tokens for existing eight-person rooms at four", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-1", name: "Reviewer" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindRoom.mockResolvedValue({ ...sampleRoom, capacity: 8 })
+    mockedFindMember.mockResolvedValue({ id: "member-1", leftAt: null })
+    mockedTransaction.mockImplementation((callback) => callback({
+      collaborationRoomMember: {
+        upsert: jest.fn().mockResolvedValue({
+          id: "member-1",
+          user: { id: "user-1", name: "Reviewer", image: null },
+        }),
+      },
+    }))
+
+    const response = await POST(createRequest(), createParams())
+
+    expect(response.status).toBe(200)
+    const { token } = await response.json()
+    expect(verifyCollaborationRoomSocketToken(token)?.capacity).toBe(4)
+  })
+
   it("reports phase durations without logging the issued token when enabled", async () => {
     process.env.COLLABORATION_PERF_LOGS = "1"
     const log = jest.spyOn(console, "info").mockImplementation(() => {})
