@@ -4,11 +4,13 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent }
 import { Check, Loader2, MessageSquare, RotateCcw, Send, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import CollaborationMessageBody from "@/components/collaboration/CollaborationMessageBody"
 import TypingIndicator from "@/components/comment/TypingIndicator"
 import { useCollaborationTyping } from "@/hooks/useCollaborationTyping"
 import type { CollaborationTypingAnchor } from "@/lib/socket/types"
 import {
   useCollaborationMessages,
+  useCollaborationMessageEditor,
   useCreateCollaborationMessage,
 } from "@/hooks/useCollaborationMessages"
 import type { CollaborationCodeReference, CollaborationMessage } from "@/types/collaboration"
@@ -52,6 +54,7 @@ export default function CollaborationMessages({
   const previousNewestIdRef = useRef<string | undefined>(undefined)
   const restoreHeightRef = useRef<number | null>(null)
   const createMessage = useCreateCollaborationMessage(roomId, currentUserId)
+  const messageEditor = useCollaborationMessageEditor(roomId)
   const typingAnchor = useMemo(() => selectedCodeReference?.baseSha && selectedCodeReference.headSha ? {
     filePath: selectedCodeReference.filePath,
     side: selectedCodeReference.side,
@@ -121,7 +124,7 @@ export default function CollaborationMessages({
       <div
         ref={scrollRef}
         role="log"
-        aria-label="협업방 메시지"
+        aria-label="리뷰방 메시지"
         className={workspace
           ? "mt-3 min-h-0 flex-1 overflow-y-auto px-4 pb-3"
           : "mt-3 h-72 overflow-y-auto px-4 pb-3"}
@@ -174,27 +177,16 @@ export default function CollaborationMessages({
                         minute: "2-digit",
                       }).format(new Date(message.createdAt))}
                     </time>
+                    {!message.deliveryStatus && message.updatedAt !== message.createdAt && <span>(수정됨)</span>}
                   </div>
-                  <div
-                    className={`max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm ${
-                      isMine
-                        ? "bg-emerald-600 text-white"
-                        : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
-                    }`}
-                  >
-                    {message.content}
-                    {message.codeReference && (
-                      <button
-                        type="button"
-                        onClick={() => onOpenCodeReference?.(message.codeReference!, message.id)}
-                        disabled={!onOpenCodeReference}
-                        className="mt-1 block max-w-full truncate text-left text-xs underline underline-offset-2 disabled:no-underline"
-                      >
-                        {message.codeReference.filePath}:{message.codeReference.startLine}
-                        {message.codeReference.endLine !== message.codeReference.startLine && `-${message.codeReference.endLine}`}
-                      </button>
-                    )}
-                  </div>
+                  <CollaborationMessageBody
+                    message={message}
+                    currentUserId={currentUserId}
+                    canManage={canSend}
+                    variant="bubble"
+                    editor={messageEditor}
+                    onOpenCodeReference={onOpenCodeReference}
+                  />
                   {isMine && (message.deliveryStatus === "sending" || message.deliveryStatus === "failed" || message.id === lastOwnMessageId) && (
                     <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400" aria-label={message.deliveryStatus === "sending" ? "전송 중" : message.deliveryStatus === "failed" ? "전송 실패" : "전송 완료"}>
                       {message.deliveryStatus === "sending" ? <><Loader2 className="size-3 animate-spin" /> 전송 중</> : message.deliveryStatus === "failed" ? (

@@ -2,6 +2,8 @@ import { QueryClient, type InfiniteData } from "@tanstack/react-query"
 import {
   appendCollaborationMessage,
   collaborationMessagesQueryKey,
+  deleteCollaborationMessageCache,
+  updateCollaborationMessageCache,
 } from "@/hooks/useCollaborationMessages"
 import { collaborationCodeThreadsQueryKey } from "@/hooks/useCollaborationCodeThreads"
 import type {
@@ -83,4 +85,35 @@ it("replaces an optimistic message with its committed copy by clientMessageId", 
 
   expect(queryClient.getQueryData<InfiniteData<CollaborationMessagesResponse>>(roomKey)?.pages[0].messages).toEqual([committed])
   expect(queryClient.getQueryData<InfiniteData<CollaborationMessagesResponse>>(threadKey)?.pages[0].messages).toEqual([committed])
+})
+
+it("updates a message in both room and code-thread caches", () => {
+  const queryClient = new QueryClient()
+  const roomKey = collaborationMessagesQueryKey(message.roomId)
+  const threadKey = [...collaborationCodeThreadsQueryKey(message.roomId), "src/app.ts", "base", "head", "RIGHT", 42]
+  const initial = { pages: [{ messages: [message], nextCursor: null }], pageParams: [null] }
+  queryClient.setQueryData(roomKey, initial)
+  queryClient.setQueryData(threadKey, initial)
+
+  const updated = { ...message, content: "edited", updatedAt: "2026-09-29T00:01:00.000Z" }
+  updateCollaborationMessageCache(queryClient, updated)
+
+  expect(queryClient.getQueryData<InfiniteData<CollaborationMessagesResponse>>(roomKey)?.pages[0].messages).toEqual([updated])
+  expect(queryClient.getQueryData<InfiniteData<CollaborationMessagesResponse>>(threadKey)?.pages[0].messages).toEqual([updated])
+})
+
+it("removes a deleted message from both caches and refreshes thread markers", () => {
+  const queryClient = new QueryClient()
+  const invalidate = jest.spyOn(queryClient, "invalidateQueries")
+  const roomKey = collaborationMessagesQueryKey(message.roomId)
+  const threadKey = [...collaborationCodeThreadsQueryKey(message.roomId), "src/app.ts", "base", "head", "RIGHT", 42]
+  const initial = { pages: [{ messages: [message], nextCursor: null }], pageParams: [null] }
+  queryClient.setQueryData(roomKey, initial)
+  queryClient.setQueryData(threadKey, initial)
+
+  deleteCollaborationMessageCache(queryClient, message.roomId, message.id)
+
+  expect(queryClient.getQueryData<InfiniteData<CollaborationMessagesResponse>>(roomKey)?.pages[0].messages).toEqual([])
+  expect(queryClient.getQueryData<InfiniteData<CollaborationMessagesResponse>>(threadKey)?.pages[0].messages).toEqual([])
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: collaborationCodeThreadsQueryKey(message.roomId) })
 })

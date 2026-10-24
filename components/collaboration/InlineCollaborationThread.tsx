@@ -4,9 +4,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent }
 import { Check, Loader2, MessageSquare, RotateCcw, Send, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import CollaborationMessageBody from "@/components/collaboration/CollaborationMessageBody"
 import TypingIndicator from "@/components/comment/TypingIndicator"
 import { useCollaborationCodeThread } from "@/hooks/useCollaborationCodeThreads"
-import { useCreateCollaborationMessage } from "@/hooks/useCollaborationMessages"
+import { useCollaborationMessageEditor, useCreateCollaborationMessage } from "@/hooks/useCollaborationMessages"
 import { useCollaborationTyping } from "@/hooks/useCollaborationTyping"
 import type { CollaborationTypingAnchor } from "@/lib/socket/types"
 import type { CollaborationCodeAnchor } from "@/types/collaboration"
@@ -43,6 +44,7 @@ export default function InlineCollaborationThread({
   const restoreHeightRef = useRef<number | null>(null)
   const threadQuery = useCollaborationCodeThread(roomId, anchor)
   const createMessage = useCreateCollaborationMessage(roomId, currentUserId)
+  const messageEditor = useCollaborationMessageEditor(roomId)
   const typingAnchor = useMemo(() => ({
     filePath: anchor.filePath,
     side: anchor.side,
@@ -105,10 +107,10 @@ export default function InlineCollaborationThread({
   }
 
   return (
-    <section data-collaboration-thread aria-label={`${anchor.startLine}번 줄 협업방 대화`} className="sticky left-0 box-border w-[100cqw] min-w-0 max-w-[100cqw] overflow-hidden border-y border-emerald-200 bg-emerald-50/70 px-3 py-3 font-sans dark:border-emerald-900 dark:bg-emerald-950/30 sm:px-4">
+    <section data-collaboration-thread aria-label={`${anchor.startLine}번 줄 리뷰방 대화`} className="sticky left-0 box-border w-[100cqw] min-w-0 max-w-[100cqw] overflow-hidden border-y border-emerald-200 bg-emerald-50/70 px-3 py-3 font-sans dark:border-emerald-900 dark:bg-emerald-950/30 sm:px-4">
       <div className="flex min-w-0 items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
         <MessageSquare className="size-4 text-emerald-700 dark:text-emerald-400" />
-        <h3 className="font-semibold">협업방 대화</h3>
+        <h3 className="font-semibold">리뷰방 대화</h3>
         <span className="text-slate-500 dark:text-slate-400">
           {anchor.side === "LEFT" ? "이전" : "변경"} {anchor.startLine}
           {anchor.endLine !== anchor.startLine && `-${anchor.endLine}`}
@@ -146,8 +148,15 @@ export default function InlineCollaborationThread({
               <time dateTime={message.createdAt}>
                 {new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit" }).format(new Date(message.createdAt))}
               </time>
+              {!message.deliveryStatus && message.updatedAt !== message.createdAt && <span>(수정됨)</span>}
             </div>
-            <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-slate-800 dark:text-slate-100">{message.content}</p>
+            <CollaborationMessageBody
+              message={message}
+              currentUserId={currentUserId}
+              canManage={canSend}
+              variant="inline"
+              editor={messageEditor}
+            />
             {message.authorId === currentUserId && (message.deliveryStatus === "sending" || message.deliveryStatus === "failed" || message.id === lastOwnMessageId) && (
               <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400" aria-label={message.deliveryStatus === "sending" ? "전송 중" : message.deliveryStatus === "failed" ? "전송 실패" : "전송 완료"}>
                 {message.deliveryStatus === "sending" ? <><Loader2 className="size-3 animate-spin" /> 전송 중</> : message.deliveryStatus === "failed" ? (

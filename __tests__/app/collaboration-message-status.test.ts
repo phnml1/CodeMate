@@ -7,6 +7,18 @@ import type { CollaborationMessage } from "@/types/collaboration"
 
 jest.mock("@/hooks/useCollaborationMessages", () => ({
   useCreateCollaborationMessage: () => ({ mutate: jest.fn() }),
+  useCollaborationMessageEditor: () => ({
+    editingMessageId: null,
+    draft: "",
+    setDraft: jest.fn(),
+    error: null,
+    isSaving: false,
+    deletingMessageId: null,
+    begin: jest.fn(),
+    cancel: jest.fn(),
+    save: jest.fn(),
+    remove: jest.fn(),
+  }),
 }))
 jest.mock("@/hooks/useCollaborationTyping", () => ({
   useCollaborationTyping: () => ({ updateTyping: jest.fn(), stopTyping: jest.fn() }),
@@ -41,6 +53,8 @@ it("shows sent only on my latest room message while keeping pending status", () 
   }))
   expect(html.match(/전송됨/g)).toHaveLength(1)
   expect(html.match(/전송 중/g)).toHaveLength(2)
+  expect(html.match(/aria-label="메시지 수정"/g)).toHaveLength(2)
+  expect(html.match(/aria-label="메시지 삭제"/g)).toHaveLength(2)
 })
 
 it("marks the message opened from a code notification in its inline thread", () => {
