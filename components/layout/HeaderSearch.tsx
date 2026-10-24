@@ -37,7 +37,7 @@ const NAV_ITEMS = [
   { label: "대시보드", href: "/dashboard", icon: LayoutDashboard },
   { label: "저장소", href: "/repositories", icon: FolderGit2 },
   { label: "Pull Requests", href: "/pulls", icon: GitPullRequest },
-  { label: "댓글", href: "/comments", icon: MessageSquare },
+  { label: "리뷰", href: "/comments", icon: MessageSquare },
   { label: "알림", href: "/notifications", icon: Bell },
   { label: "통계", href: "/stats", icon: BarChart2 },
   { label: "설정", href: "/settings", icon: Settings },

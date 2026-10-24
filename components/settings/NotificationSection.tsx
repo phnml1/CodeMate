@@ -9,7 +9,7 @@ const settingItems: { key: keyof NotificationSetting; label: string; description
   {
     key: "mentionEnabled",
     label: "멘션 알림",
-    description: "댓글에서 멘션되었을 때 알림을 받습니다.",
+    description: "리뷰에서 멘션되었을 때 알림을 받습니다.",
   },
   {
     key: "newReviewEnabled",
@@ -23,8 +23,8 @@ const settingItems: { key: keyof NotificationSetting; label: string; description
   },
   {
     key: "commentReplyEnabled",
-    label: "댓글 알림",
-    description: "PR에 새 댓글이 달렸을 때 알림을 받습니다.",
+    label: "리뷰 알림",
+    description: "PR에 새 리뷰가 달렸을 때 알림을 받습니다.",
   },
 ]
 

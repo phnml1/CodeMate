@@ -151,7 +151,7 @@ export default function CommentItem({
                     : "text-slate-500"
                 }`}
                 onClick={() => onResolve(comment.id)}
-                aria-label={comment.isResolved ? "댓글 해결 취소" : "댓글 해결 처리"}
+                aria-label={comment.isResolved ? "리뷰 해결 취소" : "리뷰 해결 처리"}
                 title={comment.isResolved ? "resolve 취소" : "resolve"}
               >
                 <CheckCheck size={12} />
@@ -163,7 +163,7 @@ export default function CommentItem({
                     size="sm"
                     className="h-6 px-2 text-xs text-slate-500"
                     onClick={() => setEditing(true)}
-                    aria-label="댓글 수정"
+                    aria-label="리뷰 수정"
                   >
                     <Pencil size={12} />
                   </Button>
@@ -172,7 +172,7 @@ export default function CommentItem({
                     size="sm"
                     className="h-6 px-2 text-xs text-rose-500 hover:text-rose-600"
                     onClick={() => onDelete(comment.id)}
-                    aria-label="댓글 삭제"
+                    aria-label="리뷰 삭제"
                   >
                     <Trash2 size={12} />
                   </Button>

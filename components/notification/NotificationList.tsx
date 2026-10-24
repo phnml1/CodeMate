@@ -26,13 +26,13 @@ const typeConfig: Record<
   },
   COMMENT_REPLY: {
     icon: MessageSquare,
-    label: "댓글",
+    label: "새 리뷰",
     color: "text-green-500",
     bgColor: "bg-green-50",
   },
   NEW_REVIEW: {
     icon: GitPullRequest,
-    label: "리뷰",
+    label: "AI 리뷰",
     color: "text-purple-500",
     bgColor: "bg-purple-50",
   },

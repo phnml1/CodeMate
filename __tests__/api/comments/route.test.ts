@@ -23,6 +23,7 @@ jest.mock("@/lib/repository-access", () => ({
 
 const mockedAuth = auth as jest.Mock
 const mockedTransaction = prisma.$transaction as jest.Mock
+const mockedFindMany = prisma.comment.findMany as jest.Mock
 const mockedBuildAccessibleRepositoryWhere =
   buildAccessibleRepositoryWhere as jest.Mock
 
@@ -83,6 +84,16 @@ describe("GET /api/comments", () => {
     expect(response.status).toBe(200)
     expect(body.comments).toHaveLength(1)
     expect(body.comments[0].id).toBe("comment-1")
+    expect(mockedFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.objectContaining({
+        collaborationMessage: {
+          select: {
+            roomId: true,
+            codeReference: { select: { filePath: true, side: true, startLine: true, endLine: true } },
+          },
+        },
+      }),
+    }))
     expect(body.pagination).toEqual({
       total: 1,
       page: 1,

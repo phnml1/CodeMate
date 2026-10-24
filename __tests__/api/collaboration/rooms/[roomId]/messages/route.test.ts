@@ -196,9 +196,31 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
               headSha: "b".repeat(40),
             }),
           },
+          reviewComment: {
+            create: {
+              pullRequestId: "pr-1",
+              authorId: "user-2",
+              content: "이 줄 같이 볼까요?",
+              mentions: [],
+              reactions: {},
+            },
+          },
         }),
       })
     )
+  })
+
+  it("does not create a PR review for a room-wide chat message", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-2" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindRoom.mockResolvedValue(sampleRoom)
+    mockedFindMember.mockResolvedValue({ id: "member-2", leftAt: null })
+    mockedCreateMessage.mockResolvedValue({ ...sampleMessage, codeReference: null })
+
+    const response = await POST(createRequest({ content: "일반 대화" }), createParams())
+
+    expect(response.status).toBe(201)
+    expect(mockedCreateMessage.mock.calls.at(-1)?.[0].data).not.toHaveProperty("reviewComment")
   })
 
   it("rejects a limited user before writing or broadcasting", async () => {

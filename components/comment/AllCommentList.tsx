@@ -37,7 +37,7 @@ export default function AllCommentList({
   if (isError) {
     return (
       <div className="py-20 text-center text-sm text-slate-400 font-medium">
-        댓글 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
+        리뷰 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
       </div>
     )
   }
@@ -45,8 +45,8 @@ export default function AllCommentList({
   if (comments.length === 0) {
     return (
       <div className="py-20 text-center">
-        <p className="text-sm text-slate-400 font-medium">댓글이 없습니다</p>
-        <p className="text-xs text-slate-300 mt-1">PR 상세 페이지에서 댓글을 작성해보세요.</p>
+        <p className="text-sm text-slate-400 font-medium">리뷰가 없습니다</p>
+        <p className="text-xs text-slate-300 mt-1">PR 상세 페이지에서 리뷰를 작성해보세요.</p>
       </div>
     )
   }

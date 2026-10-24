@@ -88,7 +88,7 @@ export default function DangerZoneSection() {
               <h3 className="text-base font-semibold text-slate-900">계정 삭제</h3>
             </div>
             <p className="text-sm text-slate-600 mb-6">
-              계정을 삭제하면 모든 저장소 연결, PR, 댓글, 리뷰 데이터가 영구적으로 삭제됩니다.
+              계정을 삭제하면 모든 저장소 연결, PR과 리뷰 데이터가 영구적으로 삭제됩니다.
               이 작업은 되돌릴 수 없습니다.
             </p>
             <div className="flex gap-2 justify-end">

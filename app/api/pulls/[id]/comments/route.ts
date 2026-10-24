@@ -63,6 +63,12 @@ export async function GET(
       where: { pullRequestId: id, parentId: null },
       include: {
         author: { select: { id: true, name: true, image: true } },
+        collaborationMessage: {
+          select: {
+            roomId: true,
+            codeReference: { select: { filePath: true, side: true, startLine: true, endLine: true } },
+          },
+        },
         replies: {
           include: {
             author: { select: { id: true, name: true, image: true } },
@@ -153,12 +159,12 @@ export async function POST(
       if (enabledMentionRecipients.length > 0) {
         const mentionMessage = `${
           session.user.name ?? "A teammate"
-        } mentioned you in a comment.`
+        } mentioned you in a review.`
 
         await createNotificationsForUsers({
           userIds: enabledMentionRecipients,
           type: "MENTION",
-          title: "You were mentioned in a comment",
+          title: "You were mentioned in a review",
           message: mentionMessage,
           prId: id,
           commentId: comment.id,
@@ -179,10 +185,10 @@ export async function POST(
       await createNotificationsForUsers({
         userIds: enabledCommentRecipients,
         type: "COMMENT_REPLY",
-        title: "A new comment was added",
+        title: "A new review was added",
         message: `${
           session.user.name ?? "A teammate"
-        } commented on "${pr.title}".`,
+        } reviewed "${pr.title}".`,
         prId: id,
         commentId: comment.id,
       })

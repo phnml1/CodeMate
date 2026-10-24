@@ -4,8 +4,8 @@ import { getConnectedRepositoriesForUser } from "@/lib/dal/repositories"
 import { requireCurrentUser } from "@/lib/dal/session"
 
 export const metadata: Metadata = {
-  title: "코드 리뷰 댓글",
-  description: "AI 코드 리뷰 댓글 및 피드백을 관리하세요",
+  title: "코드 리뷰",
+  description: "PR과 실시간 리뷰방의 코드 리뷰를 확인하세요",
 }
 
 export default async function CommentsPage() {

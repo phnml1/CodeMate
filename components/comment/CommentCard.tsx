@@ -65,7 +65,7 @@ export default function CommentCard({ comment, onClick, animationDelay = 0 }: Co
           {comment.pullRequest.title}
         </p>
 
-        {/* 댓글 내용 */}
+        {/* 리뷰 내용 */}
         <div className="flex items-start gap-2">
           <MessageSquare className="w-4 h-4 text-slate-300 mt-0.5 shrink-0" />
           <p className="text-sm text-slate-700 line-clamp-3 leading-relaxed">
@@ -74,13 +74,18 @@ export default function CommentCard({ comment, onClick, animationDelay = 0 }: Co
         </div>
 
         {/* 인라인 위치 정보 */}
-        {comment.filePath && (
+        {(comment.filePath || comment.collaborationMessage?.codeReference) && (
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <FileCode className="w-3 h-3" />
-            <span className="font-mono truncate">{comment.filePath}</span>
-            {comment.lineNumber && (
-              <span className="text-slate-300">:{comment.lineNumber}</span>
-            )}
+            <span className="min-w-0 flex-1 truncate font-mono">
+              {comment.collaborationMessage?.codeReference?.filePath ?? comment.filePath}
+              {(comment.collaborationMessage?.codeReference?.startLine ?? comment.lineNumber) != null &&
+                `:${comment.collaborationMessage?.codeReference?.startLine ?? comment.lineNumber}`}
+              {comment.collaborationMessage?.codeReference &&
+                comment.collaborationMessage.codeReference.endLine !== comment.collaborationMessage.codeReference.startLine &&
+                `-${comment.collaborationMessage.codeReference.endLine}`}
+            </span>
+            {comment.collaborationMessage && <span className="shrink-0">리뷰방{comment.collaborationMessage.codeReference?.side === "LEFT" && " · 이전 코드"}</span>}
           </div>
         )}
 

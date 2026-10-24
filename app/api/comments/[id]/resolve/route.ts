@@ -6,8 +6,8 @@ import { NextResponse } from "next/server"
  * @swagger
  * /api/comments/{id}/resolve:
  *   patch:
- *     summary: 댓글 resolve 토글
- *     description: 댓글의 resolve 상태를 반전합니다.
+ *     summary: 리뷰 resolve 토글
+ *     description: 리뷰의 resolve 상태를 반전합니다.
  *     tags:
  *       - Comment
  *     parameters:
@@ -22,7 +22,7 @@ import { NextResponse } from "next/server"
  *       401:
  *         description: 인증되지 않은 사용자
  *       404:
- *         description: 댓글을 찾을 수 없음
+ *         description: 리뷰를 찾을 수 없음
  *       500:
  *         description: 서버 내부 오류
  */
@@ -40,7 +40,7 @@ export async function PATCH(
 
     const comment = await prisma.comment.findUnique({ where: { id } })
     if (!comment) {
-      return NextResponse.json({ error: "댓글을 찾을 수 없습니다." }, { status: 404 })
+      return NextResponse.json({ error: "리뷰를 찾을 수 없습니다." }, { status: 404 })
     }
 
     const updated = await prisma.comment.update({

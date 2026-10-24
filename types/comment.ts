@@ -21,6 +21,15 @@ export interface Comment {
   reactions: Reactions
   createdAt: string
   updatedAt: string
+  collaborationMessage?: {
+    roomId: string
+    codeReference: {
+      filePath: string
+      side: "LEFT" | "RIGHT"
+      startLine: number
+      endLine: number
+    } | null
+  } | null
 }
 
 export interface CommentWithAuthor extends Comment {

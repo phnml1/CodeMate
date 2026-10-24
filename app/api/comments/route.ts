@@ -35,6 +35,12 @@ export async function GET(request: Request) {
         where,
         include: {
           author: { select: { id: true, name: true, image: true } },
+          collaborationMessage: {
+            select: {
+              roomId: true,
+              codeReference: { select: { filePath: true, side: true, startLine: true, endLine: true } },
+            },
+          },
           pullRequest: {
             select: {
               id: true,
