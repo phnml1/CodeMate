@@ -36,7 +36,7 @@ test("PR detail reviews expose keyboard and screen reader targets", async ({
     page.getByRole("heading", { level: 1, name: pullRequest.title })
   ).toBeVisible()
 
-  const commentsToggle = page.getByRole("button", { name: "리뷰", exact: true })
+  const commentsToggle = page.getByRole("button", { name: /^리뷰(?:\s+\d+)?$/ })
   await expect(commentsToggle).toHaveAttribute("aria-expanded", "true")
 
   const commentInput = page.getByRole("textbox", { name: "일반 리뷰 입력" })
