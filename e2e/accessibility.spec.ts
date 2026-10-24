@@ -25,7 +25,7 @@ test("global search and page filters expose accessible names", async ({ page }) 
   await expect(page.getByRole("textbox", { name: "저장소 검색" })).toBeVisible()
 })
 
-test("PR detail comments expose keyboard and screen reader targets", async ({
+test("PR detail reviews expose keyboard and screen reader targets", async ({
   page,
 }) => {
   const pullRequest = E2E_PULL_REQUESTS.comment
@@ -36,15 +36,15 @@ test("PR detail comments expose keyboard and screen reader targets", async ({
     page.getByRole("heading", { level: 1, name: pullRequest.title })
   ).toBeVisible()
 
-  const commentsToggle = page.getByRole("button", { name: /Comments/ })
+  const commentsToggle = page.getByRole("button", { name: "리뷰", exact: true })
   await expect(commentsToggle).toHaveAttribute("aria-expanded", "true")
 
-  const commentInput = page.getByRole("textbox", { name: "일반 댓글 입력" })
-  const sendButton = page.getByRole("button", { name: "댓글 전송" })
+  const commentInput = page.getByRole("textbox", { name: "일반 리뷰 입력" })
+  const sendButton = page.getByRole("button", { name: "리뷰 전송" })
 
   await expect(commentInput).toBeVisible()
   await expect(sendButton).toBeDisabled()
 
-  await commentInput.fill("접근성 회귀 테스트 댓글")
+  await commentInput.fill("접근성 회귀 테스트 리뷰")
   await expect(sendButton).toBeEnabled()
 })

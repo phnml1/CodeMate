@@ -114,15 +114,15 @@ test.describe("responsive PR workflows", () => {
         viewport.expectsMobileFilePicker
       )
 
-      const comment = `반응형 ${viewport.name} 댓글 ${testInfo.workerIndex}-${Date.now()}`
+      const comment = `반응형 ${viewport.name} 리뷰 ${testInfo.workerIndex}-${Date.now()}`
       const commentResponse = page.waitForResponse(
         (response) =>
           response.url().endsWith(`/api/pulls/${commentPR.id}/comments`) &&
           response.request().method() === "POST"
       )
 
-      await page.getByLabel("일반 댓글 입력").fill(comment)
-      await page.getByRole("button", { name: "댓글 전송" }).click()
+      await page.getByLabel("일반 리뷰 입력").fill(comment)
+      await page.getByRole("button", { name: "리뷰 전송" }).click()
 
       expect((await commentResponse).status()).toBe(201)
       await expect(page.getByText(comment, { exact: true })).toBeVisible()
