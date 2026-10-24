@@ -43,7 +43,7 @@ export default function InlineCommentForm({
   return (
     <div className="border-y border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-900 dark:bg-blue-950/20">
       <label htmlFor={textareaId} className="sr-only">
-        {filePath} {lineNumber}번 줄 인라인 댓글 입력
+        {filePath} {lineNumber}번 줄 인라인 리뷰 입력
       </label>
       <textarea
         id={textareaId}
@@ -59,7 +59,7 @@ export default function InlineCommentForm({
             handleSubmit()
           }
         }}
-        placeholder="댓글을 입력하세요. Ctrl+Enter로 등록합니다."
+        placeholder="리뷰를 입력하세요. Ctrl+Enter로 등록합니다."
         rows={3}
         className="w-full resize-none rounded-md border border-input bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-slate-900"
       />
@@ -81,7 +81,7 @@ export default function InlineCommentForm({
           disabled={!content.trim() || createComment.isPending}
         >
           {createComment.isPending && <Loader2 size={14} className="animate-spin" />}
-          {createComment.isPending ? "반영 중..." : "댓글 작성"}
+          {createComment.isPending ? "반영 중..." : "리뷰 작성"}
         </Button>
       </div>
     </div>

@@ -149,6 +149,15 @@ export async function POST(request: Request, { params }: RouteContext) {
                 codeReference: {
                   create: parsed.data.codeReference,
                 },
+                reviewComment: {
+                  create: {
+                    pullRequestId: room.pullRequestId,
+                    authorId: session.user.id,
+                    content: parsed.data.content,
+                    mentions: [],
+                    reactions: {},
+                  },
+                },
               }
             : {}),
         },

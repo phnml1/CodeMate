@@ -1,11 +1,12 @@
 import React, { useEffect } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
-import CollaborationWorkspaceClient from "@/components/collaboration/CollaborationWorkspaceClient"
+import CollaborationWorkspaceClient, { findVisibleLocationButton, readCodeCellPosition } from "@/components/collaboration/CollaborationWorkspaceClient"
 import { useWorkspacePRFiles } from "@/hooks/usePRFiles"
 import { useCollaborationRoomSocket } from "@/hooks/useCollaborationRoomSocket"
 import { useCollaborationCodeThreads } from "@/hooks/useCollaborationCodeThreads"
 import { useCollaborationMessages } from "@/hooks/useCollaborationMessages"
 import type { CollaborationRoom } from "@/types/collaboration"
+import type { CollaborationCodeReference } from "@/types/collaboration"
 
 jest.mock("@/hooks/usePRFiles", () => ({ useWorkspacePRFiles: jest.fn() }))
 jest.mock("@/hooks/useCollaborationRoomSocket", () => ({ useCollaborationRoomSocket: jest.fn() }))
@@ -178,5 +179,54 @@ describe("CollaborationWorkspaceClient", () => {
       listeners.get("pagehide")!()
       expect(socket.leaveOnUnload).toHaveBeenCalledTimes(1)
     })
+  })
+})
+
+describe("visible collaboration location", () => {
+  const button = (side: "LEFT" | "RIGHT", line: number, top: number, bottom: number) => ({
+    dataset: { diffSide: side, diffLine: String(line) },
+    getBoundingClientRect: () => ({ top, bottom }),
+  }) as unknown as HTMLButtonElement
+  const pane = (buttons: HTMLButtonElement[]) => ({
+    getBoundingClientRect: () => ({ top: 0, bottom: 100 }),
+    querySelectorAll: (selector: string) => {
+      const side = selector.match(/data-diff-side="(LEFT|RIGHT)"/)?.[1]
+      const line = selector.match(/data-diff-line="(\d+)"/)?.[1]
+      return buttons.filter((item) => item.dataset.diffSide === side && (!line || item.dataset.diffLine === line))
+    },
+  }) as unknown as HTMLDivElement
+  const selection = (startLine: number, endLine = startLine): CollaborationCodeReference => ({
+    filePath: "src/example.ts", baseSha: "base", headSha: "head", side: "RIGHT", startLine, endLine,
+  })
+
+  it("keeps the dot on the clicked visible line instead of the first row", () => {
+    const first = button("RIGHT", 1, 5, 20)
+    const clicked = button("RIGHT", 7, 60, 75)
+    expect(findVisibleLocationButton(pane([first, clicked]), selection(7), null)).toBe(clicked)
+  })
+
+  it("uses the clicked end of a range and falls back to the viewport after scrolling away", () => {
+    const first = button("RIGHT", 1, 5, 20)
+    const end = button("RIGHT", 9, 60, 75)
+    const anchor = { filePath: "src/example.ts", side: "RIGHT" as const, line: 7 }
+    expect(findVisibleLocationButton(pane([first, end]), selection(7, 9), anchor)).toBe(end)
+    const offscreen = button("RIGHT", 9, 120, 135)
+    expect(findVisibleLocationButton(pane([first, offscreen]), selection(7, 9), anchor)).toBe(first)
+  })
+
+  it("uses the visible mobile line number when its desktop copy is hidden", () => {
+    const hidden = button("LEFT", 7, 0, 0)
+    const mobile = button("LEFT", 7, 60, 75)
+    const first = button("RIGHT", 1, 5, 20)
+    expect(findVisibleLocationButton(pane([hidden, mobile, first]), { ...selection(7), side: "LEFT" }, null)).toBe(mobile)
+  })
+
+  it("reads the clicked code cell without treating a click outside code as a line", () => {
+    const cell = { dataset: { codeSide: "RIGHT", codeLine: "7" } } as unknown as HTMLElement
+    const target = { closest: () => cell } as unknown as EventTarget
+    const codePane = { contains: (node: Node) => node === cell } as unknown as HTMLDivElement
+    expect(readCodeCellPosition(codePane, target)).toEqual({ side: "RIGHT", line: 7 })
+    expect(readCodeCellPosition(codePane, null)).toBeNull()
+    expect(readCodeCellPosition({ contains: () => false } as unknown as HTMLDivElement, target)).toBeNull()
   })
 })

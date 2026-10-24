@@ -4,9 +4,9 @@ import { Suspense } from "react"
 import CommentCacheMeasurementClient from "../../../../components/measurements/CommentCacheMeasurementClient"
 
 export const metadata: Metadata = {
-  title: "댓글 캐시 동기화 측정",
+  title: "리뷰 캐시 동기화 측정",
   description:
-    "댓글 캐시 동기화 전략별 API 요청 수, render commit 수, commit duration을 비교하는 개발용 측정 페이지입니다.",
+    "리뷰 캐시 동기화 전략별 API 요청 수, render commit 수, commit duration을 비교하는 개발용 측정 페이지입니다.",
 }
 
 export default function CommentCacheMeasurementPage() {

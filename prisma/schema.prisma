@@ -230,6 +230,9 @@ model Comment {
   author          User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
   authorId        String
 
+  collaborationMessage   CollaborationMessage? @relation(fields: [collaborationMessageId], references: [id], onDelete: Cascade)
+  collaborationMessageId String?               @unique
+
   // 답글 기능 (Self-reference)
   parentId        String?
   parent          Comment?    @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
@@ -250,7 +253,7 @@ model CollaborationRoom {
   id              String                  @id @default(cuid())
   name            String
   status          CollaborationRoomStatus @default(ACTIVE)
-  capacity        Int                     @default(8)
+  capacity        Int                     @default(4)
   presenceScope   String                  @default("production")
 
   pullRequest     PullRequest             @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
@@ -298,6 +301,7 @@ model CollaborationMessage {
   author          User                        @relation(fields: [authorId], references: [id], onDelete: Cascade)
   authorId        String
   codeReference   CollaborationCodeReference?
+  reviewComment   Comment?
 
   createdAt       DateTime                    @default(now())
   updatedAt       DateTime                    @default(now()) @updatedAt

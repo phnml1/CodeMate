@@ -27,7 +27,7 @@ const VALID_EMOJIS: ReactionEmoji[] = ["👍", "❤️", "🎉", "🚀", "👀"]
  *       401:
  *         description: 인증되지 않은 사용자
  *       404:
- *         description: 댓글을 찾을 수 없음
+ *         description: 리뷰를 찾을 수 없음
  *       500:
  *         description: 서버 내부 오류
  */
@@ -45,7 +45,7 @@ export async function POST(
 
     const comment = await prisma.comment.findUnique({ where: { id } })
     if (!comment) {
-      return NextResponse.json({ error: "댓글을 찾을 수 없습니다." }, { status: 404 })
+      return NextResponse.json({ error: "리뷰를 찾을 수 없습니다." }, { status: 404 })
     }
 
     const body = await request.json()

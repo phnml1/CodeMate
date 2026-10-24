@@ -3,6 +3,7 @@ import {
   COLLABORATION_RECONNECT_GRACE_MS,
   verifyCollaborationRoomSocketToken,
 } from "../lib/collaboration/socket-token"
+import { getCollaborationRoomCapacity } from "../lib/collaboration/capacity"
 import { collaborationLocationSchema, collaborationTypingSchema } from "../lib/collaboration/location"
 import type {
   CollaborationAckErrorCode,
@@ -129,7 +130,7 @@ export function registerRedisCollaborationRoomHandlers(
         socketId: socket.id,
         memberId: payload.memberId,
         userName: payload.userName,
-        capacity: payload.capacity,
+        capacity: getCollaborationRoomCapacity(payload.capacity),
       })
       if (!result.ok) {
         emitChanges(io, result)

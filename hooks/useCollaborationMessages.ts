@@ -1,3 +1,4 @@
+import { useState } from "react"
 import {
   infiniteQueryOptions,
   useInfiniteQuery,
@@ -83,6 +84,42 @@ function markMessageFailed(queryClient: QueryClient, pending: CollaborationMessa
       }
     )
   }
+}
+
+function changeCachedMessage(
+  queryClient: QueryClient,
+  roomId: string,
+  messageId: string,
+  replacement?: CollaborationMessage
+) {
+  const roomKey = collaborationMessagesQueryKey(roomId)
+  const threadQueries = queryClient.getQueriesData<InfiniteData<CollaborationMessagesResponse, string | null>>({
+    queryKey: collaborationCodeThreadsQueryKey(roomId),
+  })
+  for (const queryKey of [roomKey, ...threadQueries.filter(([, data]) => Array.isArray(data?.pages)).map(([key]) => key)]) {
+    queryClient.setQueryData<InfiniteData<CollaborationMessagesResponse, string | null>>(queryKey, (current) => {
+      if (!current?.pages) return current
+      return {
+        ...current,
+        pages: current.pages.map((page) => ({
+          ...page,
+          messages: replacement
+            ? page.messages.map((message) => message.id === messageId ? replacement : message)
+            : page.messages.filter((message) => message.id !== messageId),
+        })),
+      }
+    })
+  }
+}
+
+export function updateCollaborationMessageCache(queryClient: QueryClient, message: CollaborationMessage) {
+  changeCachedMessage(queryClient, message.roomId, message.id, message)
+}
+
+export function deleteCollaborationMessageCache(queryClient: QueryClient, roomId: string, messageId: string) {
+  changeCachedMessage(queryClient, roomId, messageId)
+  void queryClient.invalidateQueries({ queryKey: collaborationCodeThreadsQueryKey(roomId) })
+  void queryClient.invalidateQueries({ queryKey: collaborationMessagesQueryKey(roomId) })
 }
 
 async function fetchMessages(roomId: string, cursor: string | null) {
@@ -184,4 +221,87 @@ export function useCreateCollaborationMessage(roomId: string, currentUserId: str
       if (pending) markMessageFailed(queryClient, pending)
     },
   })
+}
+
+export function useUpdateCollaborationMessage(roomId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ messageId, content }: { messageId: string; content: string }) => {
+      const response = await fetch(`/api/collaboration/rooms/${roomId}/messages/${messageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      })
+      if (!response.ok) throw new Error("메시지를 수정하지 못했습니다.")
+      return (await response.json()) as CollaborationMessageResponse
+    },
+    onSuccess: ({ message }) => updateCollaborationMessageCache(queryClient, message),
+  })
+}
+
+export function useDeleteCollaborationMessage(roomId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (messageId: string) => {
+      const response = await fetch(`/api/collaboration/rooms/${roomId}/messages/${messageId}`, {
+        method: "DELETE",
+      })
+      if (!response.ok) throw new Error("메시지를 삭제하지 못했습니다.")
+      return messageId
+    },
+    onSuccess: (messageId) => deleteCollaborationMessageCache(queryClient, roomId, messageId),
+  })
+}
+
+export function useCollaborationMessageEditor(roomId: string) {
+  const updateMessage = useUpdateCollaborationMessage(roomId)
+  const deleteMessage = useDeleteCollaborationMessage(roomId)
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [draft, setDraft] = useState("")
+  const [error, setError] = useState<{ messageId: string; text: string } | null>(null)
+
+  const begin = (message: CollaborationMessage) => {
+    setEditingMessageId(message.id)
+    setDraft(message.content)
+    setError(null)
+  }
+  const cancel = () => {
+    setEditingMessageId(null)
+    setError(null)
+  }
+  const save = async () => {
+    if (!editingMessageId) return
+    const content = draft.trim()
+    if (!content || content.length > 4000) return
+    try {
+      await updateMessage.mutateAsync({ messageId: editingMessageId, content })
+      setEditingMessageId(null)
+      setError(null)
+    } catch (reason) {
+      setError({ messageId: editingMessageId, text: reason instanceof Error ? reason.message : "메시지를 수정하지 못했습니다." })
+    }
+  }
+  const remove = async (messageId: string) => {
+    if (!window.confirm("이 메시지를 삭제할까요?")) return
+    setError(null)
+    try {
+      await deleteMessage.mutateAsync(messageId)
+      if (editingMessageId === messageId) setEditingMessageId(null)
+    } catch (reason) {
+      setError({ messageId, text: reason instanceof Error ? reason.message : "메시지를 삭제하지 못했습니다." })
+    }
+  }
+
+  return {
+    editingMessageId,
+    draft,
+    setDraft,
+    error,
+    isSaving: updateMessage.isPending,
+    deletingMessageId: deleteMessage.isPending ? deleteMessage.variables : null,
+    begin,
+    cancel,
+    save,
+    remove,
+  }
 }

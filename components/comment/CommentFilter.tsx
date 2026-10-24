@@ -54,7 +54,7 @@ export default function CommentFilter({
         ))}
       </div>
 
-      {/* 내 댓글만 토글 */}
+      {/* 내 리뷰만 토글 */}
       <button
         onClick={() => onMyOnlyChange(!myOnly)}
         className={cn(controlStyles.filterButton, "self-start",
@@ -64,7 +64,7 @@ export default function CommentFilter({
         )}
       >
         <User className="w-3 h-3" />
-        내 댓글만
+        내 리뷰만
       </button>
     </div>
   )

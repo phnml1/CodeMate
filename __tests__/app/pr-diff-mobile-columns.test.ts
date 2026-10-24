@@ -2,7 +2,7 @@ import React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import DiffTable from "@/components/pulls/detail/PRDiffViewer/DiffTable"
 
-it("uses one mobile line-number column and lets long code own the scroll width", () => {
+it("uses one mobile line-number column, keeps removed numbers, and scrolls long code", () => {
   const html = renderToStaticMarkup(React.createElement(DiffTable, {
     lines: [
       { type: "added", newNum: 2, content: "new line" },

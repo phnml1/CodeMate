@@ -81,14 +81,14 @@ test("스크롤로 가까워진 파일은 렌더링하고 헤더는 모두 유�
   await expect(diffLine(page, fileNames[2], 1)).toBeVisible()
 })
 
-test("코드 댓글 링크로 들어오면 대상 줄로 이동한다", async ({ page }) => {
+test("코드 리뷰 링크로 들어오면 대상 줄로 이동한다", async ({ page }) => {
   const params = new URLSearchParams({ filePath: fileNames[2], lineNumber: "75" })
   await page.goto(`/pulls/${prId}?${params}`)
 
   await expect(diffLine(page, fileNames[2], 75)).toBeInViewport()
 })
 
-test("같은 PR에서 다른 댓글 링크를 열면 새 줄로 이동한다", async ({ page }) => {
+test("같은 PR에서 다른 리뷰 링크를 열면 새 줄로 이동한다", async ({ page }) => {
   const first = new URLSearchParams({ filePath: fileNames[0], lineNumber: "20" })
   await page.goto(`/pulls/${prId}?${first}`)
   await expect(diffLine(page, fileNames[0], 20)).toBeInViewport()
@@ -124,19 +124,19 @@ test("모바일 파일 선택 후 대상 코드가 열린다", async ({ page }) 
   await expect(diffLine(page, fileNames[2], 1)).toBeVisible()
 })
 
-test("다른 파일을 보고 돌아와도 작성 중인 인라인 댓글이 남는다", async ({ page }) => {
+test("다른 파일을 보고 돌아와도 작성 중인 인라인 리뷰가 남는다", async ({ page }) => {
   await page.goto(`/pulls/${prId}`)
   const firstLine = diffLine(page, fileNames[0], 1)
   await firstLine.hover()
-  await page.getByRole("button", { name: "1번 줄에 인라인 댓글 추가" }).click()
+  await page.getByRole("button", { name: "1번 줄에 인라인 리뷰 추가" }).click()
 
-  const draft = "점진 렌더링 중에도 유지할 댓글 초안"
-  await page.getByLabel(`${fileNames[0]} 1번 줄 인라인 댓글 입력`).fill(draft)
+  const draft = "점진 렌더링 중에도 유지할 리뷰 초안"
+  await page.getByLabel(`${fileNames[0]} 1번 줄 인라인 리뷰 입력`).fill(draft)
   await page.getByRole("button", { name: `${fileNames[2]} 파일로 이동` }).click()
   await expect(fileDiff(page, fileNames[2])).toBeInViewport()
   await page.getByRole("button", { name: `${fileNames[0]} 파일로 이동` }).click()
 
-  await expect(page.getByLabel(`${fileNames[0]} 1번 줄 인라인 댓글 입력`)).toHaveValue(draft)
+  await expect(page.getByLabel(`${fileNames[0]} 1번 줄 인라인 리뷰 입력`)).toHaveValue(draft)
 })
 
 test("PR 목록을 거쳐 돌아온 뒤에도 파일 이동이 동작한다", async ({ page }) => {

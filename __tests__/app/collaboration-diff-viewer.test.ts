@@ -48,9 +48,16 @@ function render(open = false) {
 describe("CollaborationDiffViewer", () => {
   it("shows line-level compose controls and existing conversation counts", () => {
     const html = render()
-    expect(html).toContain("20번 줄 협업방 대화 2개 열기")
-    expect(html).toContain("20번 줄에 협업방 메시지 작성")
-    expect(html).not.toContain("undefined번 줄에 협업방 메시지 작성")
+    expect(html).toContain("20번 줄 리뷰방 대화 2개 열기")
+    expect(html).toContain("20번 줄에 리뷰방 메시지 작성")
+    expect(html).not.toContain("undefined번 줄에 리뷰방 메시지 작성")
+  })
+
+  it("keeps a selectable old line number in the single mobile number column", () => {
+    const html = render()
+    expect(html.match(/data-diff-side="LEFT" data-diff-line="10"/g)).toHaveLength(2)
+    expect(html).toContain("hidden sm:table-cell")
+    expect(html).toContain("sm:hidden")
   })
 
   it("keeps a selectable old line number in the single mobile number column", () => {
@@ -96,5 +103,31 @@ describe("CollaborationDiffViewer", () => {
     expect(html).toContain('data-code-line="20"')
     expect(html).toContain('>a<mark title="상대님이 선택한 텍스트"')
     expect(html).toContain('>fte</mark>')
+  })
+
+  it("highlights every code row in another participant's dragged range", () => {
+    const rangeLines: DiffLine[] = [
+      { type: "added", content: "first line", newNum: 20 },
+      { type: "context", content: "middle line", oldNum: 11, newNum: 21 },
+      { type: "added", content: "last line", newNum: 22 },
+    ]
+    const html = renderToStaticMarkup(React.createElement(CollaborationDiffViewer, {
+      lines: rangeLines,
+      filePath: "src/app.ts",
+      selection: null,
+      sharedLocations: [{
+        roomId: "room-1", userId: "user-2", userName: "상대",
+        filePath: "src/app.ts", baseSha: "a".repeat(40), headSha: "b".repeat(40),
+        side: "RIGHT", line: 22,
+        selection: { side: "RIGHT", startLine: 20, endLine: 22 },
+        textSelection: { side: "RIGHT", startLine: 20, endLine: 22, startOffset: 2, endOffset: 4 },
+        updatedAt: new Date().toISOString(),
+      }],
+      typingUsers: [], publishTyping: jest.fn(), onLineSelect: jest.fn(),
+      roomId: "room-1", currentUserId: "user-1", canSend: true,
+      threadSummaries: [], inlineThread: null, onOpenThread: jest.fn(), onCloseThread: jest.fn(),
+    }))
+    expect(html.match(/data-code-line="(?:20|21|22)"[^>]*bg-sky-100\/80/g)).toHaveLength(3)
+    expect(html.match(/title="상대님이 선택한 텍스트"/g)).toHaveLength(3)
   })
 })

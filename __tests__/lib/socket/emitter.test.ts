@@ -1,4 +1,8 @@
-import { emitCollaborationMessage } from "@/lib/socket/emitter"
+import {
+  emitCollaborationMessage,
+  emitCollaborationMessageDeleted,
+  emitCollaborationMessageUpdated,
+} from "@/lib/socket/emitter"
 import type { CollaborationMessage } from "@/types/collaboration"
 
 const message: CollaborationMessage = {
@@ -52,5 +56,26 @@ describe("emitCollaborationMessage", () => {
         }),
       })
     )
+  })
+
+  it("broadcasts edits and deletions to the same room", async () => {
+    process.env.SOCKET_INTERNAL_SECRET = "test-secret"
+    process.env.SOCKET_SERVER_URL = "http://localhost:4000"
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true })
+    global.fetch = fetchMock
+
+    await emitCollaborationMessageUpdated({ ...message, content: "edited" })
+    await emitCollaborationMessageDeleted(message.roomId, message.id)
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      room: "collaboration:room-1",
+      event: "collaboration:message:updated",
+      data: { ...message, content: "edited" },
+    })
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      room: "collaboration:room-1",
+      event: "collaboration:message:deleted",
+      data: { roomId: "room-1", messageId: "message-1" },
+    })
   })
 })

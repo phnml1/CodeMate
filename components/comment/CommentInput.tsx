@@ -33,8 +33,8 @@ export default function CommentInput({
   onTyping,
   onTypingStop,
   initialValue = "",
-  placeholder = "댓글을 입력하세요... (@로 멘션)",
-  submitLabel = "댓글 작성",
+  placeholder = "리뷰를 입력하세요... (@로 멘션)",
+  submitLabel = "리뷰 작성",
   isLoading = false,
   mentionUsers = [],
 }: CommentInputProps) {

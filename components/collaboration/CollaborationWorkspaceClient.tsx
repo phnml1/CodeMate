@@ -28,6 +28,7 @@ import { useCollaborationCodeThreads } from "@/hooks/useCollaborationCodeThreads
 import { useCollaborationMessages } from "@/hooks/useCollaborationMessages"
 import { useWorkspacePRFiles } from "@/hooks/usePRFiles"
 import { markCollaborationPerformance, measureCollaborationPerformance } from "@/lib/collaboration/client-performance"
+import { getCollaborationRoomDisplayName } from "@/lib/collaboration/room-name"
 import { parsePatch } from "@/lib/diff"
 import type { CollaborationLocation, CollaborationTextSelection, CollaborationViewport } from "@/lib/socket/types"
 import type { CollaborationCodeAnchor, CollaborationCodeReference, CollaborationMessage, CollaborationRoom } from "@/types/collaboration"
@@ -46,6 +47,40 @@ function readViewport(pane: HTMLDivElement | null, lineButton?: HTMLButtonElemen
     left: clamp(pane.scrollLeft / Math.max(1, pane.scrollWidth - pane.clientWidth)),
     ...(lineButton ? { lineOffset: Math.max(-10_000, Math.min(10_000, lineButton.getBoundingClientRect().top - pane.getBoundingClientRect().top)) } : {}),
   }
+}
+
+export function findVisibleLocationButton(
+  pane: HTMLDivElement,
+  selection: CollaborationCodeReference | null,
+  anchor: { filePath: string; side: "LEFT" | "RIGHT"; line: number } | null
+): HTMLButtonElement | null {
+  const bounds = pane.getBoundingClientRect()
+  const isVisible = (button: HTMLButtonElement) => {
+    const rect = button.getBoundingClientRect()
+    return rect.bottom > bounds.top + 2 && rect.top < bounds.bottom
+  }
+  if (selection) {
+    const line = anchor?.filePath === selection.filePath && anchor.side === selection.side &&
+      anchor.line === selection.startLine ? selection.endLine : selection.startLine
+    const selected = [...pane.querySelectorAll<HTMLButtonElement>(
+      `button[data-diff-side="${selection.side}"][data-diff-line="${line}"]`
+    )].find(isVisible)
+    if (selected) return selected
+  }
+  for (const side of ["RIGHT", "LEFT"] as const) {
+    const firstVisible = [...pane.querySelectorAll<HTMLButtonElement>(`button[data-diff-side="${side}"]`)].find(isVisible)
+    if (firstVisible) return firstVisible
+  }
+  return null
+}
+
+export function readCodeCellPosition(pane: HTMLDivElement, target: EventTarget | null) {
+  const element = target as Element | null
+  if (!element || typeof element.closest !== "function") return null
+  const cell = element.closest<HTMLElement>("td[data-code-line]")
+  const line = Number(cell?.dataset.codeLine)
+  if (!cell || !pane.contains(cell) || !Number.isInteger(line) || line <= 0) return null
+  return { side: cell.dataset.codeSide === "LEFT" ? "LEFT" as const : "RIGHT" as const, line }
 }
 
 function readTextSelection(pane: HTMLDivElement): CollaborationTextSelection | null {
@@ -160,7 +195,7 @@ export default function CollaborationWorkspaceClient({
     useCollaborationRoomSocket(handleIncomingMessage)
 
   const leaveForPullRequest = useCallback(() => {
-    if (leavingRef.current || !window.confirm("협업방에서 나가시겠습니까?")) return
+    if (leavingRef.current || !window.confirm("리뷰방에서 나가시겠습니까?")) return
     leavingRef.current = true
     leaveRoom()
     router.replace(`/pulls/${room.pullRequestId}`)
@@ -176,7 +211,7 @@ export default function CollaborationWorkspaceClient({
     pushGuard()
     const onPopState = () => {
       if (leavingRef.current) return
-      if (!window.confirm("협업방에서 나가시겠습니까?")) {
+      if (!window.confirm("리뷰방에서 나가시겠습니까?")) {
         pushGuard()
         return
       }
@@ -270,16 +305,13 @@ export default function CollaborationWorkspaceClient({
     if (!connected || followUserId || !selectedFile || !revision) return
     const pane = codeScrollRef.current
     if (!pane) return
-    const viewportTop = pane.getBoundingClientRect().top
-    const viewportBottom = pane.getBoundingClientRect().bottom
-    const visibleButton = (["RIGHT", "LEFT"] as const).flatMap((side) =>
-      [...pane.querySelectorAll<HTMLButtonElement>(`button[data-diff-side="${side}"]`)]
-        .filter((button) => {
-          const rect = button.getBoundingClientRect()
-          return rect.bottom > viewportTop + 2 && rect.top < viewportBottom
-        })
-        .slice(0, 1)
-    )[0]
+    const visibleButton = findVisibleLocationButton(
+      pane,
+      activeSelection?.filePath === selectedFile.filename ? activeSelection : null,
+      textSelection?.filePath === selectedFile.filename
+        ? { filePath: selectedFile.filename, side: textSelection.side, line: textSelection.startLine }
+        : selectionAnchorRef.current
+    )
     publishLocation({
       filePath: selectedFile.filename,
       baseSha: revision.baseSha,
@@ -288,7 +320,7 @@ export default function CollaborationWorkspaceClient({
       line: visibleButton ? Number(visibleButton.dataset.diffLine) : null,
       selection: activeSelection?.filePath === selectedFile.filename ? activeSelection : null,
       textSelection: textSelection?.filePath === selectedFile.filename ? textSelection : null,
-      viewport: readViewport(pane, visibleButton),
+      viewport: readViewport(pane, visibleButton ?? undefined),
     })
   }, [activeSelection, connected, followUserId, publishLocation, revision, selectedFile, textSelection])
 
@@ -404,7 +436,7 @@ export default function CollaborationWorkspaceClient({
     publishLocation({ filePath: selectedFile.filename, ...revision, side, line, selection: nextSelection, textSelection: null, viewport: readViewport(codeScrollRef.current) })
   }
 
-  const selectCodeText = () => {
+  const selectCodeText = (event?: { target: EventTarget | null; shiftKey: boolean }) => {
     const pane = codeScrollRef.current
     if (!pane || !selectedFile || !revision) return
     const selectedText = readTextSelection(pane)
@@ -414,13 +446,32 @@ export default function CollaborationWorkspaceClient({
         setSelection(null)
         selectionAnchorRef.current = null
       }
+      const position = readCodeCellPosition(pane, event?.target ?? null)
+      if (position) selectLine(position.side, position.line, event?.shiftKey ?? false)
       return
+    }
+    if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current)
+    const nextSelection: CollaborationCodeReference = {
+      filePath: selectedFile.filename,
+      ...revision,
+      side: selectedText.side,
+      startLine: selectedText.startLine,
+      endLine: selectedText.endLine,
     }
     setFollowUserId(null)
     setTextSelection({ ...selectedText, filePath: selectedFile.filename })
-    setSelection({ filePath: selectedFile.filename, ...revision, side: selectedText.side, startLine: selectedText.startLine, endLine: selectedText.endLine })
+    setSelection(nextSelection)
     selectionAnchorRef.current = null
     setNavigationError(null)
+    publishLocation({
+      filePath: selectedFile.filename,
+      ...revision,
+      side: selectedText.side,
+      line: selectedText.endLine,
+      selection: nextSelection,
+      textSelection: selectedText,
+      viewport: readViewport(pane),
+    })
   }
 
   useEffect(() => {
@@ -513,7 +564,7 @@ export default function CollaborationWorkspaceClient({
               <ArrowLeft />
             </Button>
             <div className="min-w-0">
-              <h1 className="truncate text-sm font-semibold sm:text-base">{room.name}</h1>
+              <h1 className="truncate text-sm font-semibold sm:text-base">{getCollaborationRoomDisplayName(room.name, room.pullRequest.number)}</h1>
               <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                 {room.pullRequest.repo.fullName} · #{room.pullRequest.number} {room.pullRequest.title}
               </p>
@@ -589,7 +640,7 @@ export default function CollaborationWorkspaceClient({
         )}
       </header>
 
-      <nav aria-label="협업방 화면" className="grid shrink-0 grid-cols-2 border-b border-slate-200 dark:border-slate-800 xl:hidden">
+      <nav aria-label="리뷰방 화면" className="grid shrink-0 grid-cols-2 border-b border-slate-200 dark:border-slate-800 xl:hidden">
         {([
           ["files", "파일", FileCode2],
           ["code", "코드", Code2],
@@ -673,7 +724,7 @@ export default function CollaborationWorkspaceClient({
               scrollTimerRef.current = window.setTimeout(publishVisibleLocation, 120)
             }}
             onMouseUp={selectCodeText}
-            onKeyUp={selectCodeText}
+            onKeyUp={() => selectCodeText()}
             onWheel={() => { if (followUserId) setFollowUserId(null) }}
             onTouchStart={() => { if (followUserId) setFollowUserId(null) }}
             onKeyDown={(event) => {
@@ -711,7 +762,7 @@ export default function CollaborationWorkspaceClient({
 
       </div>
 
-      <aside id="collaboration-chat-panel" aria-label="협업방 대화" aria-hidden={!chatOpen} className={`${chatOpen ? "flex" : "hidden"} fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-50 h-[560px] max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[380px] flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-950`}>
+      <aside id="collaboration-chat-panel" aria-label="리뷰방 대화" aria-hidden={!chatOpen} className={`${chatOpen ? "flex" : "hidden"} fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-50 h-[560px] max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-[380px] flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-950`}>
         <CollaborationMessages
           roomId={room.id}
           currentUserId={currentUserId}

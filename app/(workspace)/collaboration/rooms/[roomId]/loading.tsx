@@ -2,8 +2,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 export default function CollaborationRoomLoading() {
   return (
-    <div data-collaboration-loading="true" role="status" aria-label="협업방 화면 준비 중" className="flex h-dvh min-h-0 flex-col bg-white dark:bg-slate-950">
-      <span className="sr-only">협업방 화면을 준비하는 중입니다.</span>
+    <div data-collaboration-loading="true" role="status" aria-label="리뷰방 화면 준비 중" className="flex h-dvh min-h-0 flex-col bg-white dark:bg-slate-950">
+      <span className="sr-only">리뷰방 화면을 준비하는 중입니다.</span>
       <header className="flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-3 dark:border-slate-800 sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <Skeleton className="size-8 shrink-0" />

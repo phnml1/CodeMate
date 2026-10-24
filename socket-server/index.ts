@@ -64,6 +64,8 @@ const serverToClientEvents = new Set<ServerToClientEventName>([
   "notification:new",
   "collaboration:presence",
   "collaboration:message",
+  "collaboration:message:updated",
+  "collaboration:message:deleted",
 ])
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -134,6 +136,12 @@ function emitInternalPayload(io: TypedServer, body: InternalSocketEmitPayload) {
       break
     case "collaboration:message":
       io.to(body.room).emit("collaboration:message", body.data)
+      break
+    case "collaboration:message:updated":
+      io.to(body.room).emit("collaboration:message:updated", body.data)
+      break
+    case "collaboration:message:deleted":
+      io.to(body.room).emit("collaboration:message:deleted", body.data)
       break
   }
   recordBroadcast(body.event, roomId, startedAt, true)

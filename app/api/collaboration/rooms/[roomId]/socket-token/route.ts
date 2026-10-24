@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import {
   ensureCollaborationRoomMember,
   findAccessibleCollaborationRoom,
+  getCollaborationRoomCapacity,
   getActiveMemberCount,
 } from "@/lib/collaboration/rooms"
 import {
@@ -72,7 +73,7 @@ export async function POST(_request: Request, { params }: RouteContext) {
 
     const memberCount = await getActiveMemberCount(room.id)
     timer.checkpoint("presence")
-    if ((!existingMember || existingMember.leftAt) && memberCount >= room.capacity) {
+    if ((!existingMember || existingMember.leftAt) && memberCount >= getCollaborationRoomCapacity(room.capacity)) {
       return respond({ error: "Room is full" }, 409)
     }
 
@@ -92,7 +93,7 @@ export async function POST(_request: Request, { params }: RouteContext) {
       memberId: member.id,
       userId: session.user.id,
       userName,
-      capacity: room.capacity,
+      capacity: getCollaborationRoomCapacity(room.capacity),
     })
     timer.checkpoint("sign")
 

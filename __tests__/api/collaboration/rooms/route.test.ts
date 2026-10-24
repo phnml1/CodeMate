@@ -91,6 +91,7 @@ describe("POST /api/collaboration/rooms", () => {
 
   it("creates a room with an owner membership for an accessible PR", async () => {
     const createRoom = jest.fn().mockResolvedValue(sampleRoom)
+    const lockRoomCreation = jest.fn()
 
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
     mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
@@ -105,6 +106,7 @@ describe("POST /api/collaboration/rooms", () => {
     })
     mockedTransaction.mockImplementation((callback) =>
       callback({
+        $queryRaw: lockRoomCreation,
         collaborationRoom: {
           create: createRoom,
         },
@@ -112,19 +114,23 @@ describe("POST /api/collaboration/rooms", () => {
     )
 
     const response = await POST(
-      createRequest({ pullRequestId: "pr-1", capacity: 8 })
+      createRequest({ pullRequestId: "pr-1", capacity: 4 })
     )
     const body = await response.json()
 
     expect(response.status).toBe(201)
     expect(body.room.id).toBe("room-1")
     expect(body.room.memberCount).toBe(1)
+    expect(body.room.capacity).toBe(4)
+    expect(lockRoomCreation).toHaveBeenCalledTimes(1)
     expect(createRoom).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           pullRequestId: "pr-1",
+          name: "PR #7 리뷰방",
           presenceScope: "local",
           ownerId: "user-1",
+          capacity: 4,
           members: {
             create: {
               userId: "user-1",
@@ -134,6 +140,160 @@ describe("POST /api/collaboration/rooms", () => {
         }),
       })
     )
+  })
+
+  it("rejects a room capacity above four", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+
+    const response = await POST(createRequest({ pullRequestId: "pr-1", capacity: 5 }))
+
+    expect(response.status).toBe(400)
+    expect(mockedTransaction).not.toHaveBeenCalled()
+  })
+
+  it("reuses one room when two tabs start it at the same time", async () => {
+    const recentRoom = { ...sampleRoom, createdAt: new Date() }
+    let created = false
+    let creations = 0
+    let previous = Promise.resolve()
+
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindPullRequest.mockResolvedValue(sampleRoom.pullRequest)
+    mockedPresence.mockResolvedValue({ rooms: [{ roomId: "room-1", users: [] }] })
+    mockedTransaction.mockImplementation(async (callback) => {
+      const waitForPrevious = previous
+      let release!: () => void
+      previous = new Promise<void>((resolve) => { release = resolve })
+      await waitForPrevious
+      try {
+        return await callback({
+          $queryRaw: jest.fn(),
+          collaborationRoom: {
+            findMany: jest.fn().mockImplementation(() => created ? [recentRoom] : []),
+            create: jest.fn().mockImplementation(() => {
+              created = true
+              creations += 1
+              return recentRoom
+            }),
+          },
+        })
+      } finally {
+        release()
+      }
+    })
+
+    const responses = await Promise.all([
+      POST(createRequest({ pullRequestId: "pr-1" })),
+      POST(createRequest({ pullRequestId: "pr-1" })),
+    ])
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 201])
+    expect(await Promise.all(responses.map((response) => response.json())))
+      .toEqual([expect.objectContaining({ room: expect.objectContaining({ id: "room-1" }) }),
+        expect.objectContaining({ room: expect.objectContaining({ id: "room-1" }) })])
+    expect(creations).toBe(1)
+  })
+
+  it("creates a new room instead of reopening an abandoned one", async () => {
+    const newRoom = { ...sampleRoom, id: "room-2", createdAt: new Date() }
+    const createRoom = jest.fn().mockResolvedValue(newRoom)
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindPullRequest.mockResolvedValue(sampleRoom.pullRequest)
+    mockedPresence.mockResolvedValue({ rooms: [{ roomId: "room-1", users: [] }] })
+    mockedTransaction.mockImplementation((callback) => callback({
+      $queryRaw: jest.fn(),
+      collaborationRoom: { findMany: jest.fn().mockResolvedValue([sampleRoom]), create: createRoom },
+    }))
+
+    const response = await POST(createRequest({ pullRequestId: "pr-1" }))
+
+    expect(response.status).toBe(201)
+    expect((await response.json()).room.id).toBe("room-2")
+    expect(createRoom).toHaveBeenCalledTimes(1)
+    expect(createRoom).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ capacity: 4 }),
+    }))
+  })
+
+  it("reuses an older room while someone is online", async () => {
+    const createRoom = jest.fn()
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindPullRequest.mockResolvedValue(sampleRoom.pullRequest)
+    mockedPresence.mockResolvedValue({ rooms: [{ roomId: "room-1", users: [
+      { userId: "user-2", status: "online" },
+    ] }] })
+    mockedTransaction.mockImplementation((callback) => callback({
+      $queryRaw: jest.fn(),
+      collaborationRoom: { findMany: jest.fn().mockResolvedValue([sampleRoom]), create: createRoom },
+    }))
+
+    const response = await POST(createRequest({ pullRequestId: "pr-1" }))
+
+    expect(response.status).toBe(200)
+    expect((await response.json()).room.id).toBe("room-1")
+    expect(createRoom).not.toHaveBeenCalled()
+  })
+
+  it("reuses a room during the reconnect grace period", async () => {
+    const createRoom = jest.fn()
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindPullRequest.mockResolvedValue(sampleRoom.pullRequest)
+    mockedPresence.mockResolvedValue({ rooms: [{ roomId: "room-1", users: [
+      { userId: "user-1", status: "reconnecting" },
+    ] }] })
+    mockedTransaction.mockImplementation((callback) => callback({
+      $queryRaw: jest.fn(),
+      collaborationRoom: { findMany: jest.fn().mockResolvedValue([sampleRoom]), create: createRoom },
+    }))
+
+    const response = await POST(createRequest({ pullRequestId: "pr-1" }))
+
+    expect(response.status).toBe(200)
+    expect((await response.json()).room.id).toBe("room-1")
+    expect(createRoom).not.toHaveBeenCalled()
+  })
+
+  it("does not return a full room when its owner has no seat", async () => {
+    const fullRoom = { ...sampleRoom, capacity: 2, createdAt: new Date() }
+    const createRoom = jest.fn().mockResolvedValue({ ...sampleRoom, id: "room-2" })
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindPullRequest.mockResolvedValue(sampleRoom.pullRequest)
+    mockedPresence.mockResolvedValue({ rooms: [{ roomId: "room-1", users: [
+      { userId: "user-2", status: "online" },
+      { userId: "user-3", status: "online" },
+    ] }] })
+    mockedTransaction.mockImplementation((callback) => callback({
+      $queryRaw: jest.fn(),
+      collaborationRoom: { findMany: jest.fn().mockResolvedValue([fullRoom]), create: createRoom },
+    }))
+
+    const response = await POST(createRequest({ pullRequestId: "pr-1" }))
+
+    expect(response.status).toBe(201)
+    expect((await response.json()).room.id).toBe("room-2")
+    expect(createRoom).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not create a second room when presence cannot be checked", async () => {
+    const createRoom = jest.fn()
+    mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindPullRequest.mockResolvedValue(sampleRoom.pullRequest)
+    mockedPresence.mockRejectedValue(new CollaborationPresenceUnavailableError())
+    mockedTransaction.mockImplementation((callback) => callback({
+      $queryRaw: jest.fn(),
+      collaborationRoom: { findMany: jest.fn().mockResolvedValue([sampleRoom]), create: createRoom },
+    }))
+
+    const response = await POST(createRequest({ pullRequestId: "pr-1" }))
+
+    expect(response.status).toBe(503)
+    expect(createRoom).not.toHaveBeenCalled()
   })
 
   it("returns 404 when the PR is not accessible", async () => {
@@ -177,7 +337,7 @@ describe("GET /api/collaboration/rooms", () => {
     }))
   })
 
-  it("shows 1/8 when one of two recorded members has left", async () => {
+  it("shows 1/4 for an existing eight-person room when one member has left", async () => {
     mockedFindRooms.mockResolvedValue([{
       ...sampleRoom,
       members: [sampleRoom.members[0], {
@@ -193,6 +353,7 @@ describe("GET /api/collaboration/rooms", () => {
     const { rooms } = await response.json()
     expect(rooms).toHaveLength(1)
     expect(rooms[0].memberCount).toBe(1)
+    expect(rooms[0].capacity).toBe(4)
     expect(rooms[0].occupiedCount).toBe(1)
     expect(rooms[0].members.map((member: { userId: string }) => member.userId)).toEqual(["user-1"])
   })

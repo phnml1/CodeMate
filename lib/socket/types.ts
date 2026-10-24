@@ -35,6 +35,8 @@ export interface ServerToClientEvents {
   "notification:new": (notification: BaseNotification) => void
   "collaboration:presence": (presence: CollaborationPresenceSnapshot) => void
   "collaboration:message": (message: CollaborationMessage) => void
+  "collaboration:message:updated": (message: CollaborationMessage) => void
+  "collaboration:message:deleted": (data: { roomId: string; messageId: string }) => void
   "collaboration:location": (location: CollaborationLocation) => void
   "collaboration:location:clear": (data: { roomId: string; userId: string }) => void
   "collaboration:typing": (typing: CollaborationTypingEvent) => void

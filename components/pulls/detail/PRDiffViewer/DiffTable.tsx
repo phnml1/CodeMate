@@ -93,9 +93,9 @@ export default function DiffTable({
                   ) : canAddInlineComment && (isHovered || isFormOpen) ? (
                     <button
                       type="button"
-                      aria-label={`${line.newNum}번 줄에 인라인 댓글 추가`}
+                      aria-label={`${line.newNum}번 줄에 인라인 리뷰 추가`}
                       aria-expanded={isFormOpen}
-                      title="댓글 추가"
+                      title="리뷰 추가"
                       onClick={() => {
                         setOpenFormLine(isFormOpen ? null : line.newNum!)
                         onComposerOpenChange?.(!isFormOpen)

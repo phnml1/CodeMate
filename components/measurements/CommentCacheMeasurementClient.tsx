@@ -28,9 +28,9 @@ const MeasuredCommentListProbe = memo(function MeasuredCommentListProbe({
 }) {
   return (
     <div className="mt-4 grid gap-3 md:grid-cols-3">
-      <MetricCard label="현재 댓글 수" value={commentCount} />
+      <MetricCard label="현재 리뷰 수" value={commentCount} />
       <MetricCard label="조회 상태" value={isFetching ? "fetching" : "idle"} />
-      <MetricCard label="최근 댓글 ID" value={latestIds || "-"} />
+      <MetricCard label="최근 리뷰 ID" value={latestIds || "-"} />
     </div>
   )
 })
@@ -82,7 +82,7 @@ export default function CommentCacheMeasurementClient() {
               Measurement
             </p>
             <h1 className="mt-3 text-2xl font-bold text-slate-950 dark:text-slate-50">
-              댓글 캐시 동기화 측정
+              리뷰 캐시 동기화 측정
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">
               이 페이지는 `setQueryData`와 `invalidate/refetch`의 캐시 동기화 전략만
@@ -157,7 +157,7 @@ export default function CommentCacheMeasurementClient() {
 
       {commentsQuery.isError ? (
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          댓글을 불러오지 못했습니다. 현재 계정에서 접근 가능한 PR ID인지 확인해 주세요.
+          리뷰를 불러오지 못했습니다. 현재 계정에서 접근 가능한 PR ID인지 확인해 주세요.
         </div>
       ) : null}
 
@@ -168,7 +168,7 @@ export default function CommentCacheMeasurementClient() {
               Render probe
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              React Profiler를 댓글 리스트 probe 서브트리에만 연결해 주변 UI 변화 잡음을 줄였습니다.
+              React Profiler를 리뷰 리스트 probe 서브트리에만 연결해 주변 UI 변화 잡음을 줄였습니다.
             </p>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">
@@ -212,7 +212,7 @@ export default function CommentCacheMeasurementClient() {
             invalidate 후 refetch
           </span>
           <span className="mt-2 block text-sm leading-6 text-slate-600">
-            활성 댓글 query를 invalidate해서 네트워크 재요청 기반 갱신 흐름을 측정합니다.
+            활성 리뷰 query를 invalidate해서 네트워크 재요청 기반 갱신 흐름을 측정합니다.
           </span>
         </button>
       </section>

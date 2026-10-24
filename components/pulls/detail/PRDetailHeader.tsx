@@ -35,7 +35,7 @@ export default function PRDetailHeader({
         /* ── Compact mode ── */
         <div className="flex items-center gap-2 min-w-0">
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push("/pulls")}
             aria-label="PR 목록으로 돌아가기"
             className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors shrink-0"
           >
@@ -71,7 +71,7 @@ export default function PRDetailHeader({
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <button
-                onClick={() => router.back()}
+                onClick={() => router.push("/pulls")}
                 aria-label="PR 목록으로 돌아가기"
                 className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
               >

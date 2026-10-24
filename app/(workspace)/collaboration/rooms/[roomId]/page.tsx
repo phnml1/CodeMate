@@ -11,7 +11,7 @@ import {
   serializeCollaborationRoom,
 } from "@/lib/collaboration/rooms"
 
-export const metadata: Metadata = { title: "협업방" }
+export const metadata: Metadata = { title: "리뷰방" }
 
 export default async function CollaborationRoomPage({
   params,

@@ -19,6 +19,15 @@ type VoiceSession = {
   heartbeat: number | null
 }
 
+function closePeer(peer: Peer) {
+  const { connection } = peer
+  connection.ontrack = null
+  connection.onicecandidate = null
+  connection.onconnectionstatechange = null
+  for (const receiver of connection.getReceivers()) receiver.track?.stop()
+  connection.close()
+}
+
 function voiceError(error: unknown) {
   if (error instanceof DOMException && error.name === "NotAllowedError") return "마이크 권한이 거부됐습니다. 브라우저 권한을 확인해 주세요."
   if (error instanceof DOMException && error.name === "NotFoundError") return "사용할 수 있는 마이크가 없습니다."
@@ -48,7 +57,8 @@ export function useCollaborationVoice(roomId: string, connected: boolean, getSoc
       if (notifyServer && session.socket.connected) {
         session.socket.emit("collaboration:voice:leave", { roomId })
       }
-      for (const peer of session.peers.values()) peer.connection.close()
+      for (const peer of session.peers.values()) closePeer(peer)
+      session.peers.clear()
       for (const track of session.stream.getTracks()) track.stop()
     }
     setParticipants([])
@@ -113,10 +123,12 @@ export function useCollaborationVoice(roomId: string, connected: boolean, getSoc
         }
         connection.ontrack = ({ streams: remoteStreams, track }) => {
           const remote = remoteStreams[0] ?? new MediaStream([track])
-          if (generation === generationRef.current) setStreams((current) => ({ ...current, [socketId]: remote }))
+          if (generation === generationRef.current && peers.get(socketId) === peer) {
+            setStreams((current) => ({ ...current, [socketId]: remote }))
+          }
         }
         connection.onconnectionstatechange = () => {
-          if (generation === generationRef.current) {
+          if (generation === generationRef.current && peers.get(socketId) === peer) {
             setConnectionStates((current) => ({ ...current, [socketId]: connection.connectionState }))
           }
         }
@@ -145,8 +157,9 @@ export function useCollaborationVoice(roomId: string, connected: boolean, getSoc
         })
       }
       const onLeft: VoiceSession["onLeft"] = ({ roomId: incomingRoomId, socketId }) => {
-        if (incomingRoomId !== roomId) return
-        peers.get(socketId)?.connection.close()
+        if (incomingRoomId !== roomId || generation !== generationRef.current) return
+        const peer = peers.get(socketId)
+        if (peer) closePeer(peer)
         peers.delete(socketId)
         setParticipants((current) => current.filter((item) => item.socketId !== socketId))
         setStreams((current) => { const next = { ...current }; delete next[socketId]; return next })

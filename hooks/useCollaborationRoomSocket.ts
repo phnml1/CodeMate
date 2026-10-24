@@ -6,6 +6,8 @@ import { useQueryClient } from "@tanstack/react-query"
 import {
   appendCollaborationMessage,
   collaborationMessagesQueryKey,
+  deleteCollaborationMessageCache,
+  updateCollaborationMessageCache,
 } from "@/hooks/useCollaborationMessages"
 import { collaborationCodeThreadsQueryKey } from "@/hooks/useCollaborationCodeThreads"
 import { markCollaborationPerformance } from "@/lib/collaboration/client-performance"
@@ -59,15 +61,15 @@ async function fetchRoomSocketToken(roomId: string) {
 
     if (!response.ok) {
       if (response.status === 503) {
-        throw new CollaborationSocketUnavailableError("협업방 연결을 확인할 수 없습니다. 재연결 중입니다.")
+        throw new CollaborationSocketUnavailableError("리뷰방 연결을 확인할 수 없습니다. 재연결 중입니다.")
       }
       const body = (await response.json().catch(() => null)) as
         | { error?: string }
         | null
       throw new Error(
         body?.error === "Room is full"
-          ? "협업방 정원이 찼습니다."
-          : body?.error ?? "협업방 연결 토큰을 발급받지 못했습니다."
+          ? "리뷰방 정원이 찼습니다."
+          : body?.error ?? "리뷰방 연결 토큰을 발급받지 못했습니다."
       )
     }
     return (await response.json()) as CollaborationSocketTokenResponse
@@ -224,9 +226,9 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
           if (!response.ok) {
             const nextError =
               response.error.code === "ROOM_FULL"
-                ? "협업방 정원이 찼습니다."
+                ? "리뷰방 정원이 찼습니다."
                 : response.error.code === "SERVICE_UNAVAILABLE"
-                ? "협업방 연결을 확인할 수 없습니다. 재연결 중입니다."
+                ? "리뷰방 연결을 확인할 수 없습니다. 재연결 중입니다."
                 : response.error.message
             const retry = response.error.code === "SERVICE_UNAVAILABLE"
             roomIdRef.current = retry ? roomId : null
@@ -279,7 +281,7 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
         tokenResponse = await fetchRoomSocketToken(roomId)
       } catch (nextError) {
         if (!isCurrent()) return
-        setError(nextError instanceof Error ? nextError.message : "협업방에 연결하지 못했습니다.")
+        setError(nextError instanceof Error ? nextError.message : "리뷰방에 연결하지 못했습니다.")
         if (nextError instanceof CollaborationSocketUnavailableError || nextError instanceof TypeError) {
           scheduleReconnect(roomId, UNAVAILABLE_RETRY_DELAY_MS)
         } else {
@@ -331,6 +333,18 @@ export function useCollaborationRoomSocket(onMessage?: (message: CollaborationMe
               appendCollaborationMessage(queryClient, message)
               clearTypingUser(message.authorId)
               onMessageRef.current?.(message)
+            }
+          })
+
+          socket.on("collaboration:message:updated", (message) => {
+            if (message.roomId === roomIdRef.current) {
+              updateCollaborationMessageCache(queryClient, message)
+            }
+          })
+
+          socket.on("collaboration:message:deleted", ({ roomId, messageId }) => {
+            if (roomId === roomIdRef.current) {
+              deleteCollaborationMessageCache(queryClient, roomId, messageId)
             }
           })
 

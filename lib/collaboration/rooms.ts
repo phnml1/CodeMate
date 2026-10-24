@@ -3,10 +3,10 @@ import { prisma } from "@/lib/prisma"
 import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
 import { getCollaborationPresence } from "@/lib/socket/presence"
 import { getCollaborationPresenceScope } from "@/lib/collaboration/presence-scope"
+import { COLLABORATION_ROOM_MAX_CAPACITY, getCollaborationRoomCapacity } from "@/lib/collaboration/capacity"
 import { z } from "zod"
 
-export const COLLABORATION_ROOM_DEFAULT_CAPACITY = 8
-export const COLLABORATION_ROOM_MAX_CAPACITY = 20
+export { COLLABORATION_ROOM_DEFAULT_CAPACITY, COLLABORATION_ROOM_MAX_CAPACITY, getCollaborationRoomCapacity } from "@/lib/collaboration/capacity"
 export const COLLABORATION_MESSAGE_MAX_LENGTH = 4000
 
 const codeReferenceSchema = z
@@ -52,6 +52,10 @@ export const createCollaborationMessageSchema = z.object({
   content: z.string().trim().min(1).max(COLLABORATION_MESSAGE_MAX_LENGTH),
   clientMessageId: z.string().trim().min(1).max(120).optional(),
   codeReference: codeReferenceSchema.optional(),
+})
+
+export const updateCollaborationMessageSchema = z.object({
+  content: z.string().trim().min(1).max(COLLABORATION_MESSAGE_MAX_LENGTH),
 })
 
 export type CreateCollaborationRoomInput = z.infer<
@@ -101,7 +105,7 @@ export function serializeCollaborationRoom(room: CollaborationRoomWithRelations)
     id: room.id,
     name: room.name,
     status: room.status,
-    capacity: room.capacity,
+    capacity: getCollaborationRoomCapacity(room.capacity),
     pullRequestId: room.pullRequestId,
     ownerId: room.ownerId,
     owner: room.owner,

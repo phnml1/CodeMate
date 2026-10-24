@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import {
   ChevronDown,
+  FileCode,
   Loader2,
   MessageSquare,
   Send,
@@ -127,6 +128,17 @@ function ChatBubble({
           >
             {renderContent(comment.content, isOwn)}
 
+            {comment.collaborationMessage?.codeReference && (
+              <div className={cn("mt-2 flex min-w-0 items-center gap-1 text-[11px]", isOwn ? "text-white/80" : "text-slate-500 dark:text-slate-300")}>
+                <FileCode size={12} className="shrink-0" />
+                <span className="min-w-0 truncate">
+                  리뷰방 · {comment.collaborationMessage.codeReference.filePath}:{comment.collaborationMessage.codeReference.startLine}
+                  {comment.collaborationMessage.codeReference.endLine !== comment.collaborationMessage.codeReference.startLine && `-${comment.collaborationMessage.codeReference.endLine}`}
+                  {comment.collaborationMessage.codeReference.side === "LEFT" && " (이전 코드)"}
+                </span>
+              </div>
+            )}
+
             {isPendingComment && (
               <div
                 className={cn(
@@ -158,8 +170,8 @@ function ChatBubble({
               className="mb-1 shrink-0 text-slate-300 opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
               onClick={() => deleteComment.mutate(comment.id)}
               disabled={deleteComment.isPending}
-              aria-label="댓글 삭제"
-              title="Delete comment"
+              aria-label="리뷰 삭제"
+              title="리뷰 삭제"
             >
               <Trash2 size={12} />
             </button>
@@ -333,7 +345,7 @@ export default function CommentList({
         <div className="flex items-center gap-2">
           <MessageSquare size={15} className="text-blue-500" />
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Comments
+            리뷰
           </span>
           {generalComments.length > 0 && (
             <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-600 dark:bg-blue-900/40 dark:text-blue-400">
@@ -359,12 +371,12 @@ export default function CommentList({
           >
             {isLoading ? (
               <div className="flex h-40 items-center justify-center text-sm text-slate-400">
-                Loading comments...
+                리뷰를 불러오는 중...
               </div>
             ) : generalComments.length === 0 ? (
               <div className="flex h-40 flex-col items-center justify-center gap-2 text-slate-400">
                 <MessageSquare size={30} className="opacity-20" />
-                <span className="text-sm">Start the conversation</span>
+                <span className="text-sm">아직 리뷰가 없습니다</span>
               </div>
             ) : (
               generalComments.map((comment, index) => {
@@ -392,7 +404,7 @@ export default function CommentList({
           <div className="border-t border-slate-200 bg-white px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
             <div className="flex items-end gap-2">
               <label htmlFor={commentsInputId} className="sr-only">
-                일반 댓글 입력
+                일반 리뷰 입력
               </label>
               <textarea
                 id={commentsInputId}
@@ -403,7 +415,7 @@ export default function CommentList({
                   e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
                 }}
                 onKeyDown={handleKeyDown}
-                placeholder="Write a comment. Enter to send, Shift+Enter for newline"
+                placeholder="리뷰를 입력하세요"
                 rows={1}
                 className="flex-1 resize-none overflow-hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 style={{ lineHeight: "1.5", minHeight: 38 }}
@@ -412,9 +424,9 @@ export default function CommentList({
                 type="button"
                 onClick={handleSend}
                 disabled={!input.trim() || createComment.isPending}
-                aria-label="댓글 전송"
+                aria-label="리뷰 전송"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white shadow-sm transition-colors hover:bg-blue-600 active:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-                title="Send comment"
+                title="리뷰 전송"
               >
                 {createComment.isPending ? (
                   <Loader2 size={15} className="animate-spin" />
@@ -427,7 +439,7 @@ export default function CommentList({
             {createComment.isPending && (
               <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                 <Loader2 size={12} className="animate-spin" />
-                Saving comment...
+                리뷰 저장 중...
               </div>
             )}
           </div>
