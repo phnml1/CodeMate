@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react"
-import { Check, Loader2, MessageSquare, RotateCcw, Send, X } from "lucide-react"
+import { Loader2, MessageSquare, Send, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import CollaborationMessageBody from "@/components/collaboration/CollaborationMessageBody"
+import CollaborationMessageBody, { CollaborationMessageActions } from "@/components/collaboration/CollaborationMessageBody"
 import TypingIndicator from "@/components/comment/TypingIndicator"
 import { useCollaborationCodeThread } from "@/hooks/useCollaborationCodeThreads"
 import { useCollaborationMessageEditor, useCreateCollaborationMessage } from "@/hooks/useCollaborationMessages"
@@ -141,14 +141,15 @@ export default function InlineCollaborationThread({
           <p className="text-xs text-slate-500 dark:text-slate-400">아직 이 줄의 대화가 없습니다.</p>
         ) : messages.map((message) => (
           <div key={message.id} ref={message.id === targetMessageId ? targetMessageRef : message.id === newestMessageId ? newestMessageRef : undefined} data-collaboration-message-id={message.id} className={`text-xs ${message.id === targetMessageId ? "border-l-2 border-emerald-600 bg-emerald-100/70 pl-2 dark:bg-emerald-900/40" : ""}`}>
-            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-              <span className="font-semibold text-slate-700 dark:text-slate-200">
+            <div className="flex min-w-0 items-center gap-2 text-slate-500 dark:text-slate-400">
+              <span className="min-w-0 truncate font-semibold text-slate-700 dark:text-slate-200">
                 {message.author.name ?? "알 수 없는 사용자"}{message.authorId === currentUserId && message.author.name !== "나" ? " (나)" : ""}
               </span>
-              <time dateTime={message.createdAt}>
+              <time className="shrink-0" dateTime={message.createdAt}>
                 {new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit" }).format(new Date(message.createdAt))}
               </time>
               {!message.deliveryStatus && message.updatedAt !== message.createdAt && <span>(수정됨)</span>}
+              <CollaborationMessageActions message={message} currentUserId={currentUserId} canManage={canSend} editor={messageEditor} />
             </div>
             <CollaborationMessageBody
               message={message}
@@ -156,16 +157,9 @@ export default function InlineCollaborationThread({
               canManage={canSend}
               variant="inline"
               editor={messageEditor}
+              showDeliveryStatus={message.authorId === currentUserId && (message.deliveryStatus === "sending" || message.deliveryStatus === "failed" || message.id === lastOwnMessageId)}
+              onRetry={() => createMessage.mutate({ content: message.content, codeReference: message.codeReference ?? undefined, clientMessageId: message.clientMessageId! })}
             />
-            {message.authorId === currentUserId && (message.deliveryStatus === "sending" || message.deliveryStatus === "failed" || message.id === lastOwnMessageId) && (
-              <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400" aria-label={message.deliveryStatus === "sending" ? "전송 중" : message.deliveryStatus === "failed" ? "전송 실패" : "전송 완료"}>
-                {message.deliveryStatus === "sending" ? <><Loader2 className="size-3 animate-spin" /> 전송 중</> : message.deliveryStatus === "failed" ? (
-                  <button type="button" disabled={!canSend} onClick={() => createMessage.mutate({ content: message.content, codeReference: message.codeReference ?? undefined, clientMessageId: message.clientMessageId! })} className="flex items-center gap-1 text-rose-600 hover:underline disabled:opacity-50">
-                    <RotateCcw className="size-3" /> 전송 실패 · 재시도
-                  </button>
-                ) : <><Check className="size-3" /> 전송됨</>}
-              </div>
-            )}
           </div>
         ))}
       </div>

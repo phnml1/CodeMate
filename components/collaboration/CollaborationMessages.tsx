@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react"
-import { Check, Loader2, MessageSquare, RotateCcw, Send, X } from "lucide-react"
+import { Loader2, MessageSquare, Send, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import CollaborationMessageBody from "@/components/collaboration/CollaborationMessageBody"
+import CollaborationMessageBody, { CollaborationMessageActions } from "@/components/collaboration/CollaborationMessageBody"
 import TypingIndicator from "@/components/comment/TypingIndicator"
 import { useCollaborationTyping } from "@/hooks/useCollaborationTyping"
 import type { CollaborationTypingAnchor } from "@/lib/socket/types"
@@ -169,15 +169,16 @@ export default function CollaborationMessages({
                   key={message.id}
                   className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}
                 >
-                  <div className="mb-1 flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                    <span>{message.author.name ?? "알 수 없는 사용자"}</span>
-                    <time dateTime={message.createdAt}>
+                  <div className="mb-1 flex max-w-full min-w-0 items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span className="min-w-0 truncate">{message.author.name ?? "알 수 없는 사용자"}</span>
+                    <time className="shrink-0" dateTime={message.createdAt}>
                       {new Intl.DateTimeFormat("ko-KR", {
                         hour: "2-digit",
                         minute: "2-digit",
                       }).format(new Date(message.createdAt))}
                     </time>
                     {!message.deliveryStatus && message.updatedAt !== message.createdAt && <span>(수정됨)</span>}
+                    <CollaborationMessageActions message={message} currentUserId={currentUserId} canManage={canSend} editor={messageEditor} />
                   </div>
                   <CollaborationMessageBody
                     message={message}
@@ -186,16 +187,9 @@ export default function CollaborationMessages({
                     variant="bubble"
                     editor={messageEditor}
                     onOpenCodeReference={onOpenCodeReference}
+                    showDeliveryStatus={isMine && (message.deliveryStatus === "sending" || message.deliveryStatus === "failed" || message.id === lastOwnMessageId)}
+                    onRetry={() => createMessage.mutate({ content: message.content, codeReference: message.codeReference ?? undefined, clientMessageId: message.clientMessageId! })}
                   />
-                  {isMine && (message.deliveryStatus === "sending" || message.deliveryStatus === "failed" || message.id === lastOwnMessageId) && (
-                    <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400" aria-label={message.deliveryStatus === "sending" ? "전송 중" : message.deliveryStatus === "failed" ? "전송 실패" : "전송 완료"}>
-                      {message.deliveryStatus === "sending" ? <><Loader2 className="size-3 animate-spin" /> 전송 중</> : message.deliveryStatus === "failed" ? (
-                        <button type="button" disabled={!canSend} onClick={() => createMessage.mutate({ content: message.content, codeReference: message.codeReference ?? undefined, clientMessageId: message.clientMessageId! })} className="flex items-center gap-1 text-rose-600 hover:underline disabled:opacity-50">
-                          <RotateCcw className="size-3" /> 전송 실패 · 재시도
-                        </button>
-                      ) : <><Check className="size-3" /> 전송됨</>}
-                    </div>
-                  )}
                 </div>
               )
             })}
