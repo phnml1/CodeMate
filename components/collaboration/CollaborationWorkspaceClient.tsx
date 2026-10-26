@@ -703,7 +703,7 @@ export default function CollaborationWorkspaceClient({
             <Code2 className="size-4 text-slate-500" />
             <span className="min-w-0 truncate font-medium">{selectedFile?.filename ?? "코드"}</span>
             {activeSelection && activeSelection.filePath === selectedFile?.filename && (
-              <span className="shrink-0 text-emerald-700 dark:text-emerald-300">
+              <span className="shrink-0 text-violet-700 dark:text-violet-300">
                 {activeSelection.side === "LEFT" ? "이전" : "변경"} {activeSelection.startLine}
                 {activeSelection.endLine !== activeSelection.startLine && `-${activeSelection.endLine}`}
               </span>
@@ -718,7 +718,7 @@ export default function CollaborationWorkspaceClient({
           <div
             ref={codeScrollRef}
             tabIndex={0}
-            className="min-h-0 min-w-0 max-w-full flex-1 overflow-auto [container-type:inline-size]"
+            className="min-h-0 min-w-0 max-w-full flex-1 overflow-auto selection:bg-violet-300/80 dark:selection:bg-violet-600/70 [container-type:inline-size]"
             onScroll={() => {
               if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current)
               scrollTimerRef.current = window.setTimeout(publishVisibleLocation, 120)

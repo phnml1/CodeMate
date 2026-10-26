@@ -16,11 +16,11 @@ const lines: DiffLine[] = [
   { type: "context", content: "\\ No newline at end of file" },
 ]
 
-function render(open = false) {
+function render(open = false, selection: { side: "LEFT" | "RIGHT"; startLine: number; endLine: number } | null = null) {
   return renderToStaticMarkup(React.createElement(CollaborationDiffViewer, {
     lines,
     filePath: "src/app.ts",
-    selection: null,
+    selection,
     sharedLocations: [],
     typingUsers: [],
     publishTyping: jest.fn(),
@@ -46,6 +46,13 @@ function render(open = false) {
 }
 
 describe("CollaborationDiffViewer", () => {
+  it("distinguishes the local selection from added diff lines", () => {
+    const html = render(false, { side: "RIGHT", startLine: 20, endLine: 20 })
+    expect(html).toMatch(/data-diff-line="20"[^>]*text-violet-700/)
+    expect(html).toMatch(/data-code-line="20"[^>]*bg-violet-200\/80/)
+    expect(html).not.toMatch(/data-code-line="20"[^>]*bg-emerald-100\/80/)
+  })
+
   it("shows line-level compose controls and existing conversation counts", () => {
     const html = render()
     expect(html).toContain("20번 줄 리뷰방 대화 2개 열기")
@@ -129,5 +136,36 @@ describe("CollaborationDiffViewer", () => {
     }))
     expect(html.match(/data-code-line="(?:20|21|22)"[^>]*bg-sky-100\/80/g)).toHaveLength(3)
     expect(html.match(/title="상대님이 선택한 텍스트"/g)).toHaveLength(3)
+  })
+
+  it("shows three distinct, non-interactive peer labels and overlapping text selections", () => {
+    const sharedLocations = [
+      { userId: "user-2", userName: "Mina", endOffset: 4 },
+      { userId: "user-3", userName: "Joon", endOffset: 5 },
+      { userId: "user-4", userName: "Alex", endOffset: null },
+    ].map(({ userId, userName, endOffset }) => ({
+      roomId: "room-1", userId, userName, filePath: "src/app.ts",
+      baseSha: "a".repeat(40), headSha: "b".repeat(40),
+      side: "RIGHT" as const, line: 20,
+      selection: endOffset === null ? null : { side: "RIGHT" as const, startLine: 20, endLine: 20 },
+      textSelection: endOffset === null ? null : { side: "RIGHT" as const, startLine: 20, endLine: 20, startOffset: endOffset === 4 ? 1 : 2, endOffset },
+      updatedAt: new Date().toISOString(),
+    }))
+    const html = renderToStaticMarkup(React.createElement(CollaborationDiffViewer, {
+      lines, filePath: "src/app.ts", selection: null, sharedLocations,
+      typingUsers: [], publishTyping: jest.fn(), onLineSelect: jest.fn(),
+      roomId: "room-1", currentUserId: "user-1", canSend: true,
+      threadSummaries: [], inlineThread: null, onOpenThread: jest.fn(), onCloseThread: jest.fn(),
+    }))
+
+    expect(html.match(/data-remote-location-labels/g)).toHaveLength(1)
+    expect(html).toContain("pointer-events-none")
+    expect(html).toContain("Mina")
+    expect(html).toContain("Joon")
+    expect(html).toContain("Alex")
+    expect(html).toContain('title="Mina, Joon님이 선택한 텍스트"')
+    expect(html).toContain("linear-gradient(to bottom")
+    const codeCell = html.match(/<td data-code-side="RIGHT" data-code-line="20"[^>]*>(.*?)<\/td>/)?.[1]
+    expect(codeCell?.replace(/<[^>]+>/g, "")).toBe("after")
   })
 })
