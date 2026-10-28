@@ -17,7 +17,7 @@ export async function PATCH(request: Request) {
       isRead: false,
       ...(ids ? { id: { in: ids } } : {}),
     },
-    data: { isRead: true },
+    data: { isRead: true, readAt: new Date() },
   })
 
   return Response.json({ success: true })

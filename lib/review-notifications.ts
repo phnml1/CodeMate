@@ -58,6 +58,7 @@ export async function upsertReviewNotifications(params: {
             title: content.title,
             message: content.message,
             isRead: false,
+            readAt: null,
             createdAt: new Date(),
           },
           select: notificationCompatSelect,
