@@ -5,6 +5,7 @@ import { Headphones, Loader2, Mic, MicOff, PhoneOff, Settings2, Volume2, VolumeX
 import { Popover } from "radix-ui"
 import { Button } from "@/components/ui/button"
 import { useCollaborationVoice } from "@/hooks/useCollaborationVoice"
+import { useRemoteSpeaking } from "@/hooks/useRemoteSpeaking"
 import type { CollaborationClientSocket } from "@/hooks/useCollaborationRoomSocket"
 
 const DEFAULT_PLAYBACK_VOLUME = 0.5
@@ -102,8 +103,18 @@ export function MicrophoneLevel({ stream, muted }: { stream: MediaStream; muted:
   </div>
 }
 
-function processingLabel(value: boolean | null, supported: boolean | null) {
-  return supported === false ? "지원 안 함" : value === true ? "적용됨" : value === false ? "미적용" : "확인 불가"
+export function VoiceParticipantBadge({ userName, speaking, failed = false }: { userName: string; speaking: boolean; failed?: boolean }) {
+  return <span
+    data-speaking={speaking ? "true" : "false"}
+    aria-label={`${userName}${speaking ? " 말하는 중" : ""}${failed ? " 연결 실패" : ""}`}
+    title={`${userName}${speaking ? " 말하는 중" : ""}${failed ? " 연결 실패" : ""}`}
+    className={`inline-flex max-w-28 min-w-0 items-center gap-1 rounded-full border px-1.5 py-0.5 ${speaking
+      ? "border-emerald-500 bg-emerald-50 font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+      : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"}`}
+  >
+    <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${speaking ? "bg-emerald-500 ring-2 ring-emerald-300 dark:ring-emerald-700" : "bg-slate-400 dark:bg-slate-500"}`} />
+    <span className="truncate">{userName}</span>
+  </span>
 }
 
 export default function VoiceControls({ roomId, connected, getSocket }: {
@@ -112,6 +123,7 @@ export default function VoiceControls({ roomId, connected, getSocket }: {
   getSocket: () => CollaborationClientSocket | null
 }) {
   const voice = useCollaborationVoice(roomId, connected, getSocket)
+  const speaking = useRemoteSpeaking(voice.streams, voice.phase === "connected")
   const [playback, setPlayback] = useState<Record<string, PlaybackSetting>>({})
   const [outputDevice, setOutputDevice] = useState<MediaDeviceInfo | null>(null)
   const [outputError, setOutputError] = useState<string | null>(null)
@@ -186,8 +198,6 @@ export default function VoiceControls({ roomId, connected, getSocket }: {
                   {voice.input.switching && <span className="inline-flex items-center gap-1 text-xs"><Loader2 className="size-3 animate-spin" /> 마이크 변경 중</span>}
                   {voice.input.error && <p role="alert" className="text-xs text-rose-600">{voice.input.error}</p>}
                   {voice.input.stream && <MicrophoneLevel stream={voice.input.stream} muted={voice.muted} />}
-                  <p className="text-xs text-muted-foreground">에코 제거 요청 · {processingLabel(voice.input.echoCancellation, voice.input.echoCancellationSupported)}</p>
-                  <p className="text-xs text-muted-foreground">소음 억제 요청 · {processingLabel(voice.input.noiseSuppression, voice.input.noiseSuppressionSupported)}</p>
                   <div className="flex min-w-0 items-center justify-between gap-2 text-xs">
                     <span className="min-w-0 truncate" title={outputDevice?.label}>출력: {outputDevice?.label || "시스템 기본"}</span>
                     {canSelectOutput && <Button type="button" variant="outline" size="xs" onClick={() => void selectOutput()}>출력 선택</Button>}
@@ -201,7 +211,7 @@ export default function VoiceControls({ roomId, connected, getSocket }: {
                     const setting = playback[participant.socketId] ?? { volume: DEFAULT_PLAYBACK_VOLUME, muted: false }
                     return <div key={participant.socketId} className="min-w-0">
                       <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate text-xs" title={participant.userName}>{participant.userName}</span>
+                        <VoiceParticipantBadge userName={participant.userName} speaking={!!speaking[participant.socketId]} failed={voice.connectionStates[participant.socketId] === "failed"} />
                         <Button type="button" variant="ghost" size="icon-xs" title={`${participant.userName} ${setting.muted ? "재생 켜기" : "재생 음소거"}`} aria-label={`${participant.userName} ${setting.muted ? "재생 켜기" : "재생 음소거"}`} aria-pressed={setting.muted} onClick={() => updatePlayback(participant.socketId, { muted: !setting.muted })}>
                           {setting.muted ? <VolumeX /> : <Volume2 />}
                         </Button>
@@ -217,8 +227,8 @@ export default function VoiceControls({ roomId, connected, getSocket }: {
             </Popover.Portal>
           </Popover.Root>
           <Button type="button" variant="ghost" size="icon-xs" title="음성 대화 나가기" aria-label="음성 대화 나가기" onClick={() => { voice.stop(); setPlayback({}); setOutputDevice(null); setOutputError(null) }}><PhoneOff /></Button>
-          <span className="max-w-48 truncate text-slate-500 dark:text-slate-400" title={voice.participants.map((peer) => peer.userName).join(", ")}>
-            {voice.participants.map((peer) => `${peer.userName}${voice.connectionStates[peer.socketId] === "failed" ? " (연결 실패)" : ""}`).join(", ")}
+          <span aria-label="음성 참여자" className="flex min-w-0 max-w-48 flex-wrap gap-1">
+            {voice.participants.map((peer) => <VoiceParticipantBadge key={peer.socketId} userName={peer.userName} speaking={!!speaking[peer.socketId]} failed={voice.connectionStates[peer.socketId] === "failed"} />)}
           </span>
         </>
       ) : (

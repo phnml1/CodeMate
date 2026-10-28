@@ -12,17 +12,11 @@ type VoiceInput = {
   stream: MediaStream | null
   devices: MediaDeviceInfo[]
   deviceId: string
-  echoCancellation: boolean | null
-  noiseSuppression: boolean | null
-  echoCancellationSupported: boolean | null
-  noiseSuppressionSupported: boolean | null
   switching: boolean
   error: string | null
 }
 const EMPTY_INPUT: VoiceInput = {
-  stream: null, devices: [], deviceId: "", echoCancellation: null,
-  noiseSuppression: null, echoCancellationSupported: null,
-  noiseSuppressionSupported: null, switching: false, error: null,
+  stream: null, devices: [], deviceId: "", switching: false, error: null,
 }
 type VoiceSession = {
   socket: CollaborationClientSocket
@@ -50,16 +44,11 @@ function voiceError(error: unknown) {
   return error instanceof Error ? error.message : "음성 연결에 실패했습니다."
 }
 
-function captureSettings(stream: MediaStream): Pick<VoiceInput, "stream" | "deviceId" | "echoCancellation" | "noiseSuppression" | "echoCancellationSupported" | "noiseSuppressionSupported"> {
+function captureSettings(stream: MediaStream): Pick<VoiceInput, "stream" | "deviceId"> {
   const settings = stream.getAudioTracks()[0]?.getSettings?.()
-  const supported = navigator.mediaDevices?.getSupportedConstraints?.()
   return {
     stream,
     deviceId: settings?.deviceId ?? "",
-    echoCancellation: typeof settings?.echoCancellation === "boolean" ? settings.echoCancellation : null,
-    noiseSuppression: typeof settings?.noiseSuppression === "boolean" ? settings.noiseSuppression : null,
-    echoCancellationSupported: supported ? !!supported.echoCancellation : null,
-    noiseSuppressionSupported: supported ? !!supported.noiseSuppression : null,
   }
 }
 

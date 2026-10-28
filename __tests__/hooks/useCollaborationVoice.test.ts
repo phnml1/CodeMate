@@ -138,7 +138,7 @@ describe("voice peer cleanup", () => {
     expect(nextTrack.stop).not.toHaveBeenCalled()
     expect(localTrack.onended).toBeNull()
     const inputUpdates = stateSetters[6].mock.calls.map(([value]) => typeof value === "function" ? value({ devices: [] }) : value)
-    expect(inputUpdates).toContainEqual(expect.objectContaining({ deviceId: "new-mic", echoCancellation: true, noiseSuppression: true }))
+    expect(inputUpdates).toContainEqual(expect.objectContaining({ deviceId: "new-mic" }))
     voice.stop()
     expect(nextTrack.stop).toHaveBeenCalledTimes(1)
   })

@@ -20,7 +20,9 @@ The audio settings panel lists available microphones after permission is granted
 
 Output selection is offered only where `selectAudioOutput()` and `HTMLMediaElement.setSinkId()` are available; otherwise playback follows the system default. The selected output is kept in memory for the current call only. If it disappears or switching fails, playback returns to the default output.
 
-The settings panel shows a local-only microphone level meter and the requested echo-cancellation/noise-suppression state reported by `getSupportedConstraints()` and `getSettings()`. Unsupported and unreported values are not displayed as enabled. Audio samples and level history are not transmitted or persisted.
+The settings panel shows a local-only microphone level meter. Echo cancellation and noise suppression remain requested in microphone capture constraints, but their status is not shown in the UI. Audio samples and level history are not transmitted or persisted.
+
+When remote audio activity crosses a threshold, the corresponding participant name is highlighted in the voice bar and audio settings. A short release delay prevents flicker between words. Analysis uses one local `AudioContext` for the current remote streams and never connects those sources to an audio output. Detection stops and its resources are released when streams change or voice ends. This indicates received audio activity rather than proving that the participant is speaking.
 
 ## Remaining manual validation
 
@@ -37,7 +39,7 @@ Before broad rollout, configure a reachable TURN service and matching secret, th
 1. Join the same collaboration room from two different accounts in separate browsers.
 2. Click **음성 참여** in both. Confirm permission, audio playback, mute/unmute, and **음성 대화 나가기**.
 3. Repeat with three and four people. A fifth voice participant should see the four-person limit while text chat remains usable.
-4. Open audio settings. Confirm that the input meter reacts locally, and compare the reported echo-cancellation/noise-suppression state with the selected microphone. Switch microphones while muted and unmuted; the old device indicator should turn off without ending the call.
+4. Open audio settings. Confirm that the input meter reacts locally. Switch microphones while muted and unmuted; the old device indicator should turn off without ending the call. Speak from each remote account and confirm that only its name is highlighted, including while the settings panel is closed.
 5. Where output selection is supported, choose a different speaker or headset and verify that remote audio moves there. Disconnect that device and confirm playback returns to the system default. On unsupported browsers, confirm the default output is shown.
 6. Deny or revoke microphone permission, change routes, close a tab, and interrupt the Socket connection. Confirm the microphone indicator turns off and text chat continues.
 7. Repeat from two different networks with TURN configured, including a forced-relay ICE test before production rollout.
