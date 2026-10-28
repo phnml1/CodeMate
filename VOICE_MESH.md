@@ -12,16 +12,21 @@ For coturn relay, set `COLLABORATION_TURN_URLS` (comma-separated `turn:` or `tur
 
 Microphone access requires HTTPS or localhost. Only joined members of an active room can fetch ICE settings, and only sockets joined to that room can join voice or send signaling. A user can occupy one voice seat across tabs. Four concurrent seats are enforced through Redis when `REDIS_URL` is configured. A killed Socket process can hold a stale voice seat for up to 45 seconds.
 
-## Playback controls
+## Audio controls
 
 Each remote participant has independent playback volume (50% by default) and playback mute, separate from local microphone mute. On peer leave or voice exit, received tracks and peer connections are closed and audio elements are paused and detached. Automated cleanup tests cover these paths; real-device feedback and playback checks remain manual.
 
-## Next steps (not implemented)
+The audio settings panel lists available microphones after permission is granted. Switching acquires a new track, replaces the outgoing track on each peer, preserves mute, and stops the previous track only after success. A failed replacement rolls back or ends the voice session if rollback fails. Device removal or permission revocation ends the call when the active track stops.
 
-1. Add microphone selection with `enumerateDevices()` and `getUserMedia({ audio: { deviceId } })`. Replace the outgoing audio track on each peer, preserve the current mute state, and stop the old track only after a successful switch. Handle device removal and permission changes.
-2. Offer speaker/output selection only where `selectAudioOutput()` and `HTMLMediaElement.setSinkId()` are supported and permitted. Otherwise show the system-default output and direct the user to the operating-system or browser audio controls; mobile browsers may not expose output routing.
-3. Show a local-only microphone input-level meter and the requested versus actual echo-cancellation/noise-suppression settings using `getSupportedConstraints()` and the acquired track's `getSettings()`. Label unsupported or unreported settings as unknown, not disabled. Do not transmit or persist audio samples or level history.
-4. Reproduce feedback with two nearby devices, then repeat with one microphone muted, with headphones, and on separate networks. If feedback remains with headphones, inspect the number of remote tracks/audio elements and input gain before changing capture constraints. Recheck cleanup on device changes, disconnect, room end, and route exit.
+Output selection is offered only where `selectAudioOutput()` and `HTMLMediaElement.setSinkId()` are available; otherwise playback follows the system default. The selected output is kept in memory for the current call only. If it disappears or switching fails, playback returns to the default output.
+
+The settings panel shows a local-only microphone level meter. Echo cancellation and noise suppression remain requested in microphone capture constraints, but their status is not shown in the UI. Audio samples and level history are not transmitted or persisted.
+
+When remote audio activity crosses a threshold, the corresponding participant name is highlighted in the voice bar and audio settings. A short release delay prevents flicker between words. Analysis uses one local `AudioContext` for the current remote streams and never connects those sources to an audio output. Detection stops and its resources are released when streams change or voice ends. This indicates received audio activity rather than proving that the participant is speaking.
+
+## Remaining manual validation
+
+Reproduce feedback with two nearby devices, then repeat with one microphone muted, with headphones, and on separate networks. If feedback remains with headphones, inspect the number of remote tracks/audio elements and input gain before changing capture constraints. Recheck cleanup on device changes, disconnect, room end, and route exit on real browsers. Automatic voice rejoin is not implemented.
 
 ## TURN decision and validation
 
@@ -34,7 +39,9 @@ Before broad rollout, configure a reachable TURN service and matching secret, th
 1. Join the same collaboration room from two different accounts in separate browsers.
 2. Click **음성 참여** in both. Confirm permission, audio playback, mute/unmute, and **음성 대화 나가기**.
 3. Repeat with three and four people. A fifth voice participant should see the four-person limit while text chat remains usable.
-4. Deny or revoke microphone permission, change routes, close a tab, and interrupt the Socket connection. Confirm the microphone indicator turns off and text chat continues.
-5. Repeat from two different networks with TURN configured, including a forced-relay ICE test before production rollout.
+4. Open audio settings. Confirm that the input meter reacts locally. Switch microphones while muted and unmuted; the old device indicator should turn off without ending the call. Speak from each remote account and confirm that only its name is highlighted, including while the settings panel is closed.
+5. Where output selection is supported, choose a different speaker or headset and verify that remote audio moves there. Disconnect that device and confirm playback returns to the system default. On unsupported browsers, confirm the default output is shown.
+6. Deny or revoke microphone permission, change routes, close a tab, and interrupt the Socket connection. Confirm the microphone indicator turns off and text chat continues.
+7. Repeat from two different networks with TURN configured, including a forced-relay ICE test before production rollout.
 
-This experiment does not provide device selection or automatic voice rejoin. The room and voice call are limited to four people; use an SFU before increasing that limit.
+This experiment does not provide automatic voice rejoin. The room and voice call are limited to four people; use an SFU before increasing that limit.

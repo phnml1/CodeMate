@@ -8,6 +8,16 @@ import type { CollaborationVoiceParticipant, CollaborationVoiceSignalEvent } fro
 
 type VoicePhase = "idle" | "requesting" | "joining" | "connected" | "error"
 type Peer = { connection: RTCPeerConnection; queuedCandidates: RTCIceCandidateInit[] }
+type VoiceInput = {
+  stream: MediaStream | null
+  devices: MediaDeviceInfo[]
+  deviceId: string
+  switching: boolean
+  error: string | null
+}
+const EMPTY_INPUT: VoiceInput = {
+  stream: null, devices: [], deviceId: "", switching: false, error: null,
+}
 type VoiceSession = {
   socket: CollaborationClientSocket
   stream: MediaStream
@@ -34,6 +44,18 @@ function voiceError(error: unknown) {
   return error instanceof Error ? error.message : "음성 연결에 실패했습니다."
 }
 
+function captureSettings(stream: MediaStream): Pick<VoiceInput, "stream" | "deviceId"> {
+  const settings = stream.getAudioTracks()[0]?.getSettings?.()
+  return {
+    stream,
+    deviceId: settings?.deviceId ?? "",
+  }
+}
+
+function microphoneConstraints(deviceId?: string): MediaStreamConstraints {
+  return { audio: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}), echoCancellation: true, noiseSuppression: true }, video: false }
+}
+
 export function useCollaborationVoice(roomId: string, connected: boolean, getSocket: () => CollaborationClientSocket | null) {
   const [phase, setPhase] = useState<VoicePhase>("idle")
   const [error, setError] = useState<string | null>(null)
@@ -41,8 +63,22 @@ export function useCollaborationVoice(roomId: string, connected: boolean, getSoc
   const [participants, setParticipants] = useState<CollaborationVoiceParticipant[]>([])
   const [streams, setStreams] = useState<Record<string, MediaStream>>({})
   const [connectionStates, setConnectionStates] = useState<Record<string, RTCPeerConnectionState>>({})
+  const [input, setInput] = useState<VoiceInput>(EMPTY_INPUT)
   const sessionRef = useRef<VoiceSession | null>(null)
   const generationRef = useRef(0)
+  const mutedRef = useRef(false)
+  const switchingRef = useRef(false)
+
+  const refreshDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return
+    const generation = generationRef.current
+    try {
+      const devices = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "audioinput" && device.deviceId)
+      if (generation === generationRef.current && sessionRef.current) setInput((current) => ({ ...current, devices }))
+    } catch {
+      if (generation === generationRef.current && sessionRef.current) setInput((current) => ({ ...current, devices: [] }))
+    }
+  }, [])
 
   const stop = useCallback((notifyServer = true, nextError?: string) => {
     generationRef.current++
@@ -65,6 +101,8 @@ export function useCollaborationVoice(roomId: string, connected: boolean, getSoc
     setStreams({})
     setConnectionStates({})
     setMuted(false)
+    mutedRef.current = false
+    setInput(EMPTY_INPUT)
     setError(nextError ?? null)
     setPhase(nextError ? "error" : "idle")
   }, [roomId])
@@ -87,7 +125,7 @@ export function useCollaborationVoice(roomId: string, connected: boolean, getSoc
       if (!Array.isArray(config.iceServers)) throw new Error("음성 연결 설정이 올바르지 않습니다.")
       if (generation !== generationRef.current || !socket.connected) return
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("이 브라우저에서는 마이크를 사용할 수 없습니다.")
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false })
+      stream = await navigator.mediaDevices.getUserMedia(microphoneConstraints())
       if (generation !== generationRef.current || !socket.connected) {
         stream.getTracks().forEach((track) => track.stop())
         return
@@ -109,7 +147,8 @@ export function useCollaborationVoice(roomId: string, connected: boolean, getSoc
         const connection = new RTCPeerConnection({ iceServers: config.iceServers })
         const peer: Peer = { connection, queuedCandidates: [] }
         peers.set(socketId, peer)
-        for (const track of stream!.getAudioTracks()) connection.addTrack(track, stream!)
+        const activeStream = sessionRef.current?.stream ?? stream!
+        for (const track of activeStream.getAudioTracks()) connection.addTrack(track, activeStream)
         connection.onicecandidate = ({ candidate }) => {
           if (candidate && generation === generationRef.current) {
             const ice = candidate.toJSON()
@@ -197,6 +236,8 @@ export function useCollaborationVoice(roomId: string, connected: boolean, getSoc
       socket.on("collaboration:voice:signal", onSignal)
       socket.on("disconnect", onDisconnect)
       sessionRef.current = { socket, stream, peers, onJoined, onLeft, onSignal, onDisconnect, heartbeat: null }
+      setInput({ ...EMPTY_INPUT, ...captureSettings(stream) })
+      void refreshDevices()
       const ack = await socket.timeout(5_000).emitWithAck("collaboration:voice:join", { roomId })
       if (generation !== generationRef.current) return
       if (!ack.ok) {
@@ -236,15 +277,72 @@ export function useCollaborationVoice(roomId: string, connected: boolean, getSoc
         setPhase("error")
       }
     }
-  }, [connected, getSocket, roomId, stop])
+  }, [connected, getSocket, refreshDevices, roomId, stop])
+
+  const switchMicrophone = useCallback(async (deviceId: string) => {
+    const session = sessionRef.current
+    if (!session || switchingRef.current) return
+    switchingRef.current = true
+    setInput((current) => ({ ...current, switching: true, error: null }))
+    let nextStream: MediaStream | null = null
+    try {
+      nextStream = await navigator.mediaDevices.getUserMedia(microphoneConstraints(deviceId || undefined))
+      const nextTrack = nextStream.getAudioTracks()[0]
+      if (!nextTrack) throw new Error("새 마이크에서 오디오를 가져오지 못했습니다.")
+      if (sessionRef.current !== session) return
+      nextTrack.enabled = !mutedRef.current
+      const previousTrack = session.stream.getAudioTracks()[0]
+      const replaced: RTCRtpSender[] = []
+      try {
+        for (const peer of session.peers.values()) {
+          const sender = peer.connection.getSenders().find((item) => item.track?.kind === "audio")
+          if (!sender) continue
+          await sender.replaceTrack(nextTrack)
+          replaced.push(sender)
+          if (sessionRef.current !== session) return
+        }
+      } catch (error) {
+        const rollback = await Promise.allSettled(replaced.map((sender) => sender.replaceTrack(previousTrack)))
+        if (rollback.some((result) => result.status === "rejected")) {
+          stop(true, "마이크 전환을 복구하지 못해 음성 대화를 종료했습니다.")
+          return
+        }
+        throw error
+      }
+      if (sessionRef.current !== session) return
+      previousTrack.onended = null
+      session.stream = nextStream
+      nextTrack.onended = () => {
+        if (sessionRef.current === session) stop(true, "마이크 연결이 종료됐습니다.")
+      }
+      const nextSettings = captureSettings(nextStream)
+      setInput((current) => ({ ...current, ...nextSettings, switching: false, error: null }))
+      previousTrack.stop()
+      nextStream = null
+      void refreshDevices()
+    } catch (error) {
+      if (sessionRef.current === session) setInput((current) => ({ ...current, switching: false, error: voiceError(error) }))
+    } finally {
+      nextStream?.getTracks().forEach((track) => track.stop())
+      switchingRef.current = false
+    }
+  }, [refreshDevices, stop])
 
   const toggleMute = useCallback(() => {
     const session = sessionRef.current
     if (!session) return
-    const nextMuted = !muted
+    const nextMuted = !mutedRef.current
     for (const track of session.stream.getAudioTracks()) track.enabled = !nextMuted
+    mutedRef.current = nextMuted
     setMuted(nextMuted)
-  }, [muted])
+  }, [])
+
+  useEffect(() => {
+    const mediaDevices = navigator.mediaDevices
+    if (!mediaDevices?.addEventListener) return
+    mediaDevices.addEventListener("devicechange", refreshDevices)
+    return () => mediaDevices.removeEventListener("devicechange", refreshDevices)
+  }, [refreshDevices])
 
   useEffect(() => {
     if (!connected && sessionRef.current) stop(false, "실시간 연결이 끊겨 음성 대화가 종료됐습니다.")
@@ -258,5 +356,5 @@ export function useCollaborationVoice(roomId: string, connected: boolean, getSoc
     }
   }, [stop])
 
-  return { phase, error, muted, participants, streams, connectionStates, start, stop, toggleMute }
+  return { phase, error, muted, participants, streams, connectionStates, input, start, stop, toggleMute, switchMicrophone, refreshDevices }
 }
