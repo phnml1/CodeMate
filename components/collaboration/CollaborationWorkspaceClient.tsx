@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
   Bell,
+  Bot,
   Code2,
   Eye,
   EyeOff,
@@ -21,25 +22,31 @@ import { Button } from "@/components/ui/button"
 import CollaborationMessages from "@/components/collaboration/CollaborationMessages"
 import CollaborationDiffViewer from "@/components/collaboration/CollaborationDiffViewer"
 import CollaborationCodeLink from "@/components/collaboration/CollaborationCodeLink"
+import CollaborationAIReviewPanel from "@/components/collaboration/CollaborationAIReviewPanel"
 import VoiceControls from "@/components/collaboration/VoiceControls"
+import IssueModalHost from "@/components/pulls/detail/IssueModalHost"
 import FileIcon from "@/components/pulls/detail/FileIcon"
 import { PR_FILE_STATUS_BADGE } from "@/constants/pulls"
 import { useCollaborationRoomSocket } from "@/hooks/useCollaborationRoomSocket"
 import { useCollaborationCodeThreads } from "@/hooks/useCollaborationCodeThreads"
 import { useCollaborationMessages } from "@/hooks/useCollaborationMessages"
 import { useWorkspacePRFiles } from "@/hooks/usePRFiles"
+import { useReviewQuery } from "@/hooks/useReview"
 import { markCollaborationPerformance, measureCollaborationPerformance } from "@/lib/collaboration/client-performance"
 import { assignParticipantColors } from "@/lib/collaboration/participant-colors"
 import { getCollaborationRoomDisplayName } from "@/lib/collaboration/room-name"
 import { parsePatch } from "@/lib/diff"
+import { getIndexedReviewIssues, groupIssuesByFile } from "@/lib/pr-detail/reviewUtils"
 import type { CollaborationLocation, CollaborationTextSelection, CollaborationViewport } from "@/lib/socket/types"
-import type { CollaborationCodeAnchor, CollaborationCodeReference, CollaborationMessage, CollaborationRoom } from "@/types/collaboration"
+import type { CollaborationCodeAnchor, CollaborationCodeReference, CollaborationMessage, CollaborationReviewReference, CollaborationRoom } from "@/types/collaboration"
 import type { PRFile } from "@/types/pulls"
+import type { ReviewIssue } from "@/types/review"
 
-type MobilePanel = "files" | "code"
+type MobilePanel = "files" | "code" | "review"
 type CodePosition = Pick<CollaborationLocation, "filePath" | "side" | "line"> &
   Partial<Pick<CollaborationLocation, "baseSha" | "headSha" | "viewport">>
 const EMPTY_FILES: PRFile[] = []
+const EMPTY_REVIEW_ISSUES: ReviewIssue[] = []
 
 function readViewport(pane: HTMLDivElement | null, lineButton?: HTMLButtonElement): CollaborationViewport | undefined {
   if (!pane) return undefined
@@ -148,6 +155,8 @@ export default function CollaborationWorkspaceClient({
   const [followUserId, setFollowUserId] = useState<string | null>(null)
   const [pendingJump, setPendingJump] = useState<CodePosition | null>(null)
   const [navigationError, setNavigationError] = useState<string | null>(null)
+  const [reviewFocus, setReviewFocus] = useState<CollaborationReviewReference | null>(null)
+  const [selectedReviewIssue, setSelectedReviewIssue] = useState<ReviewIssue | null>(null)
   const [inlineThread, setInlineThread] = useState<(CollaborationCodeAnchor & { focusComposer: boolean; displayIndex: number | null; targetMessageId: string | null }) | null>(null)
   const codeScrollRef = useRef<HTMLDivElement>(null)
   const scrollTimerRef = useRef<number | null>(null)
@@ -179,7 +188,8 @@ export default function CollaborationWorkspaceClient({
       reference.filePath === inlineThread.filePath && reference.side === inlineThread.side &&
       reference.startLine === inlineThread.startLine && reference.endLine === inlineThread.endLine &&
       reference.baseSha === inlineThread.baseSha && reference.headSha === inlineThread.headSha
-    if (document.visibilityState === "visible" && (chatOpenRef.current || visibleInlineThread)) return
+    const visibleReviewThread = mobilePanel === "review" && Boolean(message.reviewReference)
+    if (document.visibilityState === "visible" && (chatOpenRef.current || visibleInlineThread || visibleReviewThread)) return
     setUnreadChatCount((current) => current + 1)
     setChatMessageNotice(message)
     if (message.codeReference) {
@@ -188,8 +198,18 @@ export default function CollaborationWorkspaceClient({
   }, [currentUserId, inlineThread, mobilePanel, room.id])
   const { data: fileData, isPending: filesPending, isError: filesError } =
     useWorkspacePRFiles(room.pullRequestId)
+  const { data: review } = useReviewQuery(room.pullRequestId, {
+    refetchInterval: (query) => {
+      const reviewStatus = query.state.data?.status
+      return reviewStatus === "PENDING" || reviewStatus === "IN_PROGRESS" ? 3_000 : 15_000
+    },
+  })
   const files = fileData?.files ?? EMPTY_FILES
   const revision = fileData?.revision
+  const reviewIssuesByFile = useMemo(
+    () => groupIssuesByFile(getIndexedReviewIssues(review)),
+    [review]
+  )
   useLayoutEffect(() => {
     if (revision && files.length) markCollaborationPerformance("files.commit")
   }, [files, revision])
@@ -539,6 +559,39 @@ export default function CollaborationWorkspaceClient({
     }
   }
 
+  const openReviewReference = (reference: CollaborationReviewReference) => {
+    setReviewFocus(reference)
+    setMobilePanel("review")
+    closeChat()
+  }
+
+  const openReviewIssueCode = (issue: ReviewIssue) => {
+    if (issue.lineNumber == null) return
+    if (!moveToLocation({
+      filePath: issue.filePath,
+      side: "RIGHT",
+      line: issue.lineNumber,
+      baseSha: revision?.baseSha,
+      headSha: revision?.headSha,
+    })) return
+    setReviewFocus(null)
+    setFollowUserId(null)
+    setTextSelection(null)
+    setInlineThread(null)
+    selectionAnchorRef.current = {
+      filePath: issue.filePath,
+      side: "RIGHT",
+      line: issue.lineNumber,
+    }
+    setSelection({
+      filePath: issue.filePath,
+      side: "RIGHT",
+      startLine: issue.lineNumber,
+      endLine: issue.lineNumber,
+      ...(revision ?? {}),
+    })
+  }
+
   const openInlineThread = (
     side: "LEFT" | "RIGHT",
     startLine: number,
@@ -577,6 +630,26 @@ export default function CollaborationWorkspaceClient({
             </div>
           </div>
           <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-3 gap-y-1">
+            <div className="hidden items-center rounded-md border border-slate-200 p-0.5 dark:border-slate-700 xl:flex">
+              <Button
+                type="button"
+                size="xs"
+                variant={mobilePanel === "review" ? "ghost" : "secondary"}
+                aria-pressed={mobilePanel !== "review"}
+                onClick={() => setMobilePanel("code")}
+              >
+                <Code2 /> 코드
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant={mobilePanel === "review" ? "secondary" : "ghost"}
+                aria-pressed={mobilePanel === "review"}
+                onClick={() => { setReviewFocus(null); setMobilePanel("review") }}
+              >
+                <Bot /> AI 리뷰
+              </Button>
+            </div>
             {voiceEnabled && room.status === "ACTIVE" && <VoiceControls roomId={room.id} connected={status === "connected" && activeRoomId === room.id} getSocket={getSocket} />}
             <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${
               connected ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
@@ -646,16 +719,17 @@ export default function CollaborationWorkspaceClient({
         )}
       </header>
 
-      <nav aria-label="리뷰방 화면" className="grid shrink-0 grid-cols-2 border-b border-slate-200 dark:border-slate-800 xl:hidden">
+      <nav aria-label="리뷰방 화면" className="grid shrink-0 grid-cols-3 border-b border-slate-200 dark:border-slate-800 xl:hidden">
         {([
           ["files", "파일", FileCode2],
           ["code", "코드", Code2],
+          ["review", "AI 리뷰", Bot],
         ] as const).map(([panel, label, Icon]) => (
           <button
             key={panel}
             type="button"
             aria-current={mobilePanel === panel ? "page" : undefined}
-            onClick={() => setMobilePanel(panel)}
+            onClick={() => { if (panel === "review") setReviewFocus(null); setMobilePanel(panel) }}
             className={`flex h-11 items-center justify-center gap-1.5 border-b-2 text-sm font-medium ${
               mobilePanel === panel
                 ? "border-emerald-600 text-emerald-700 dark:text-emerald-400"
@@ -704,7 +778,7 @@ export default function CollaborationWorkspaceClient({
           </div>
         </aside>
 
-        <section aria-label="PR 코드" className={`${mobilePanel === "code" ? "flex" : "hidden"} min-h-0 min-w-0 flex-col xl:flex`}>
+        <section aria-label="PR 코드" className={`${mobilePanel === "code" ? "flex" : "hidden"} min-h-0 min-w-0 flex-col ${mobilePanel === "review" ? "xl:hidden" : "xl:flex"}`}>
           <div className="flex min-h-11 min-w-0 shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-2 text-xs dark:border-slate-800">
             <Code2 className="size-4 text-slate-500" />
             <span className="min-w-0 truncate font-medium">{selectedFile?.filename ?? "코드"}</span>
@@ -763,10 +837,27 @@ export default function CollaborationWorkspaceClient({
                 inlineThread={inlineThread?.filePath === selectedFile.filename ? inlineThread : null}
                 onOpenThread={openInlineThread}
                 onCloseThread={() => setInlineThread(null)}
+                issues={reviewIssuesByFile.get(selectedFile.filename) ?? EMPTY_REVIEW_ISSUES}
+                onIssueClick={setSelectedReviewIssue}
               />
             )}
           </div>
         </section>
+
+        {mobilePanel === "review" && (
+          <section aria-label="AI 리뷰" className="flex min-h-0 min-w-0 flex-col">
+            <CollaborationAIReviewPanel
+              key={`${reviewFocus?.reviewId ?? "latest"}:${reviewFocus?.issueIndex ?? "overall"}`}
+              roomId={room.id}
+              prId={room.pullRequestId}
+              currentUserId={currentUserId}
+              canSend={connected && room.status === "ACTIVE"}
+              realtimeConnected={connected}
+              focusReference={reviewFocus}
+              onOpenIssue={openReviewIssueCode}
+            />
+          </section>
+        )}
 
       </div>
 
@@ -781,6 +872,7 @@ export default function CollaborationWorkspaceClient({
           selectedCodeReference={activeSelection}
           onClearSelection={() => { setSelection(null); selectionAnchorRef.current = null }}
           onOpenCodeReference={openCodeReference}
+          onOpenReviewReference={openReviewReference}
           publishTyping={publishTyping}
           typingNames={Object.values(typingUsers).filter((user) => !user.anchor).map((user) => user.userName)}
           messages={messages}
@@ -807,6 +899,10 @@ export default function CollaborationWorkspaceClient({
           {unreadChatCount > 0 && <span className="absolute -right-1 -top-1 flex size-6 items-center justify-center rounded-full border-2 border-white bg-rose-600 text-[10px] font-bold text-white dark:border-slate-950">{unreadChatCount > 99 ? "99+" : unreadChatCount}</span>}
         </Button>
       )}
+      <IssueModalHost
+        issue={selectedReviewIssue}
+        onClose={() => setSelectedReviewIssue(null)}
+      />
     </div>
   )
 }

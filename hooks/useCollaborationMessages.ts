@@ -10,9 +10,12 @@ import {
 import type {
   CollaborationMessage,
   CollaborationCodeReference,
+  CollaborationReviewReference,
   CollaborationMessageResponse,
   CollaborationMessagesResponse,
+  CollaborationReviewMessagesResponse,
 } from "@/types/collaboration"
+import { collaborationReviewMessagesQueryKey } from "@/hooks/useCollaborationReviewThreads"
 import { collaborationCodeThreadQueryKey, collaborationCodeThreadsQueryKey } from "@/hooks/useCollaborationCodeThreads"
 
 const MESSAGE_POLL_INTERVAL_MS = 4_000
@@ -24,6 +27,7 @@ export const collaborationMessagesQueryKey = (roomId: string) =>
 export interface CreateCollaborationMessageInput {
   content: string
   codeReference?: CollaborationCodeReference
+  reviewReference?: CollaborationReviewReference
   clientMessageId: string
 }
 
@@ -84,6 +88,51 @@ function markMessageFailed(queryClient: QueryClient, pending: CollaborationMessa
       }
     )
   }
+  changeCachedReviewMessage(queryClient, pending.roomId, pending.id, {
+    ...pending,
+    deliveryStatus: "failed",
+  })
+}
+
+function upsertReviewMessage(queryClient: QueryClient, message: CollaborationMessage) {
+  const reference = message.reviewReference
+  if (!reference) return
+  queryClient.setQueryData<CollaborationReviewMessagesResponse>(
+    collaborationReviewMessagesQueryKey(message.roomId, reference.reviewId),
+    (current) => {
+      if (!current) return { messages: [message] }
+      const matches = (item: CollaborationMessage) =>
+        item.id === message.id || Boolean(
+          message.clientMessageId && item.authorId === message.authorId &&
+          item.clientMessageId === message.clientMessageId
+        )
+      const found = current.messages.some(matches)
+      return {
+        messages: found
+          ? current.messages.map((item) => matches(item) ? message : item)
+          : [...current.messages, message],
+      }
+    }
+  )
+}
+
+function changeCachedReviewMessage(
+  queryClient: QueryClient,
+  roomId: string,
+  messageId: string,
+  replacement?: CollaborationMessage
+) {
+  const queries = queryClient.getQueriesData<CollaborationReviewMessagesResponse>({
+    queryKey: collaborationReviewMessagesQueryKey(roomId),
+  })
+  for (const [queryKey, data] of queries) {
+    if (!data?.messages) continue
+    queryClient.setQueryData<CollaborationReviewMessagesResponse>(queryKey, {
+      messages: replacement
+        ? data.messages.map((message) => message.id === messageId ? replacement : message)
+        : data.messages.filter((message) => message.id !== messageId),
+    })
+  }
 }
 
 function changeCachedMessage(
@@ -114,10 +163,12 @@ function changeCachedMessage(
 
 export function updateCollaborationMessageCache(queryClient: QueryClient, message: CollaborationMessage) {
   changeCachedMessage(queryClient, message.roomId, message.id, message)
+  changeCachedReviewMessage(queryClient, message.roomId, message.id, message)
 }
 
 export function deleteCollaborationMessageCache(queryClient: QueryClient, roomId: string, messageId: string) {
   changeCachedMessage(queryClient, roomId, messageId)
+  changeCachedReviewMessage(queryClient, roomId, messageId)
   void queryClient.invalidateQueries({ queryKey: collaborationCodeThreadsQueryKey(roomId) })
   void queryClient.invalidateQueries({ queryKey: collaborationMessagesQueryKey(roomId) })
 }
@@ -158,6 +209,7 @@ export function appendCollaborationMessage(
       queryKey: collaborationCodeThreadsQueryKey(message.roomId),
     })
   }
+  upsertReviewMessage(queryClient, message)
 }
 
 export function useCollaborationMessages(
@@ -179,13 +231,13 @@ export function useCreateCollaborationMessage(roomId: string, currentUserId: str
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ content, codeReference, clientMessageId }: CreateCollaborationMessageInput) => {
+    mutationFn: async ({ content, codeReference, reviewReference, clientMessageId }: CreateCollaborationMessageInput) => {
       const response = await fetch(
         `/api/collaboration/rooms/${roomId}/messages`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content, codeReference, clientMessageId }),
+          body: JSON.stringify({ content, codeReference, reviewReference, clientMessageId }),
         }
       )
       if (!response.ok) {
@@ -194,7 +246,7 @@ export function useCreateCollaborationMessage(roomId: string, currentUserId: str
 
       return (await response.json()) as CollaborationMessageResponse
     },
-    onMutate: async ({ content, codeReference, clientMessageId }) => {
+    onMutate: async ({ content, codeReference, reviewReference, clientMessageId }) => {
       const pending: CollaborationMessage = {
         id: `pending:${clientMessageId}`,
         roomId,
@@ -203,6 +255,7 @@ export function useCreateCollaborationMessage(roomId: string, currentUserId: str
         content,
         clientMessageId,
         codeReference: codeReference ?? null,
+        reviewReference: reviewReference ?? null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         deliveryStatus: "sending",
@@ -212,6 +265,7 @@ export function useCreateCollaborationMessage(roomId: string, currentUserId: str
       if (threadKey) await queryClient.cancelQueries({ queryKey: threadKey })
       upsertMessage(queryClient, collaborationMessagesQueryKey(roomId), pending)
       if (threadKey) upsertMessage(queryClient, threadKey, pending)
+      upsertReviewMessage(queryClient, pending)
       return pending
     },
     onSuccess: ({ message }) => {

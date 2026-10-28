@@ -184,6 +184,46 @@ export async function getRepositoryPrimaryUser(
   return membership?.user ?? null
 }
 
+export async function getRepositoryGithubUsers(
+  repositoryId: string,
+  preferredUserId?: string
+): Promise<RepositoryUser[]> {
+  await ensureRepositoryMembershipTable()
+
+  const memberships = await prisma.userRepository.findMany({
+    where: {
+      repositoryId,
+      user: {
+        githubToken: {
+          not: null,
+        },
+      },
+    },
+    select: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+          githubToken: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  })
+
+  const users = memberships.map((membership) => membership.user)
+  if (!preferredUserId) return users
+
+  return [...users].sort((left, right) => {
+    if (left.id === preferredUserId) return -1
+    if (right.id === preferredUserId) return 1
+    return 0
+  })
+}
+
 export async function connectRepositoryToUser(
   userId: string,
   repositoryId: string

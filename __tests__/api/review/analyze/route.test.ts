@@ -100,7 +100,7 @@ describe("POST /api/review/analyze", () => {
 
     await mockedAfter.mock.calls[0][0]()
 
-    expect(mockedAnalyze).toHaveBeenCalledWith("pr-1")
+    expect(mockedAnalyze).toHaveBeenCalledWith("pr-1", "user-1")
     expect(invalidateDashboardForUsers).toHaveBeenCalledWith(["user-1"])
     expect(mockedGetRepositoryMemberIds).toHaveBeenCalledWith("repo-1")
     expect(mockedUpsertReviewNotifications).toHaveBeenCalledWith({

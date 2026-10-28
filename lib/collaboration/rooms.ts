@@ -26,6 +26,11 @@ const codeReferenceSchema = z
     path: ["endLine"],
   })
 
+const reviewReferenceSchema = z.object({
+  reviewId: z.string().trim().min(1),
+  issueIndex: z.number().int().nonnegative().nullable().optional(),
+})
+
 export const createCollaborationRoomSchema = z.object({
   pullRequestId: z.string().trim().min(1),
   name: z.string().trim().min(1).max(120).optional(),
@@ -48,11 +53,16 @@ export const updateCollaborationRoomSchema = z.object({
   status: z.enum(["ACTIVE", "ENDED"]).optional(),
 })
 
-export const createCollaborationMessageSchema = z.object({
-  content: z.string().trim().min(1).max(COLLABORATION_MESSAGE_MAX_LENGTH),
-  clientMessageId: z.string().trim().min(1).max(120).optional(),
-  codeReference: codeReferenceSchema.optional(),
-})
+export const createCollaborationMessageSchema = z
+  .object({
+    content: z.string().trim().min(1).max(COLLABORATION_MESSAGE_MAX_LENGTH),
+    clientMessageId: z.string().trim().min(1).max(120).optional(),
+    codeReference: codeReferenceSchema.optional(),
+    reviewReference: reviewReferenceSchema.optional(),
+  })
+  .refine((value) => !(value.codeReference && value.reviewReference), {
+    message: "A message can reference either code or an AI review, not both",
+  })
 
 export const updateCollaborationMessageSchema = z.object({
   content: z.string().trim().min(1).max(COLLABORATION_MESSAGE_MAX_LENGTH),
@@ -90,6 +100,7 @@ export const collaborationRoomInclude = {
 export const collaborationMessageInclude = {
   author: { select: { id: true, name: true, image: true } },
   codeReference: true,
+  reviewReference: true,
 } satisfies Prisma.CollaborationMessageInclude
 
 type CollaborationRoomWithRelations = Prisma.CollaborationRoomGetPayload<{
@@ -137,6 +148,12 @@ export function serializeCollaborationMessage(
     content: message.content,
     clientMessageId: message.clientMessageId,
     codeReference: message.codeReference,
+    reviewReference: message.reviewReference
+      ? {
+          reviewId: message.reviewReference.reviewId,
+          issueIndex: message.reviewReference.issueIndex,
+        }
+      : null,
     createdAt: message.createdAt.toISOString(),
     updatedAt: message.updatedAt.toISOString(),
   }

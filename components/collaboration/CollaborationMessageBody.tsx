@@ -5,7 +5,7 @@ import { Check, Loader2, Pencil, RotateCcw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import type { useCollaborationMessageEditor } from "@/hooks/useCollaborationMessages"
-import type { CollaborationCodeReference, CollaborationMessage } from "@/types/collaboration"
+import type { CollaborationCodeReference, CollaborationMessage, CollaborationReviewReference } from "@/types/collaboration"
 
 type MessageEditor = ReturnType<typeof useCollaborationMessageEditor>
 
@@ -40,6 +40,7 @@ export default function CollaborationMessageBody({
   variant,
   editor,
   onOpenCodeReference,
+  onOpenReviewReference,
   showDeliveryStatus = false,
   onRetry,
 }: {
@@ -49,6 +50,7 @@ export default function CollaborationMessageBody({
   variant: "bubble" | "inline"
   editor: MessageEditor
   onOpenCodeReference?: (reference: CollaborationCodeReference, messageId: string) => void
+  onOpenReviewReference?: (reference: CollaborationReviewReference) => void
   showDeliveryStatus?: boolean
   onRetry?: () => void
 }) {
@@ -110,6 +112,18 @@ export default function CollaborationMessageBody({
           >
             {message.codeReference.filePath}:{message.codeReference.startLine}
             {message.codeReference.endLine !== message.codeReference.startLine && `-${message.codeReference.endLine}`}
+          </button>
+        )}
+        {message.reviewReference && (
+          <button
+            type="button"
+            onClick={() => onOpenReviewReference?.(message.reviewReference!)}
+            disabled={!onOpenReviewReference}
+            className="mt-1 block max-w-full truncate text-left text-xs underline underline-offset-2 disabled:no-underline"
+          >
+            {message.reviewReference.issueIndex == null
+              ? "AI 리뷰 전체 코멘트"
+              : `AI 리뷰 이슈 ${message.reviewReference.issueIndex + 1}`}
           </button>
         )}
         {deliveryStatus && <div className="mt-1 flex justify-end">{deliveryStatus}</div>}

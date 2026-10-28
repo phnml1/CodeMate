@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import CollaborationDiffViewer from "@/components/collaboration/CollaborationDiffViewer"
 import { assignParticipantColors } from "@/lib/collaboration/participant-colors"
 import type { DiffLine } from "@/lib/diff"
+import type { ReviewIssue } from "@/types/review"
 
 jest.mock("@/components/collaboration/InlineCollaborationThread", () =>
   function InlineThreadMock() {
@@ -17,7 +18,11 @@ const lines: DiffLine[] = [
   { type: "context", content: "\\ No newline at end of file" },
 ]
 
-function render(open = false, selection: { side: "LEFT" | "RIGHT"; startLine: number; endLine: number } | null = null) {
+function render(
+  open = false,
+  selection: { side: "LEFT" | "RIGHT"; startLine: number; endLine: number } | null = null,
+  issues: ReviewIssue[] = []
+) {
   return renderToStaticMarkup(React.createElement(CollaborationDiffViewer, {
     lines,
     filePath: "src/app.ts",
@@ -44,6 +49,8 @@ function render(open = false, selection: { side: "LEFT" | "RIGHT"; startLine: nu
     } : null,
     onOpenThread: jest.fn(),
     onCloseThread: jest.fn(),
+    issues,
+    onIssueClick: jest.fn(),
   }))
 }
 
@@ -79,6 +86,26 @@ describe("CollaborationDiffViewer", () => {
 
   it("expands an inline conversation under its code row", () => {
     expect(render(true)).toContain("inline-thread")
+  })
+
+  it("renders AI review issues directly below their changed code line", () => {
+    const html = render(false, null, [{
+      originalIndex: 0,
+      filePath: "src/app.ts",
+      lineNumber: 20,
+      severity: "HIGH",
+      category: "BUG",
+      title: "널 검사 누락",
+      description: "값이 없을 때 예외가 발생할 수 있습니다.",
+      suggestion: "사용 전에 값을 검사하세요.",
+    }])
+
+    expect(html).toContain("널 검사 누락")
+    expect(html).toContain("값이 없을 때 예외가 발생할 수 있습니다.")
+    expect(html).toContain("널 검사 누락 이슈 자세히 보기")
+    expect(html.indexOf('data-code-line="20"')).toBeLessThan(
+      html.indexOf("값이 없을 때 예외가 발생할 수 있습니다.")
+    )
   })
 
   it("marks the exact text selected by another participant", () => {

@@ -6,7 +6,10 @@ import InlineCollaborationThread from "@/components/collaboration/InlineCollabor
 import { markCollaborationPerformance } from "@/lib/collaboration/client-performance"
 import type { ParticipantColor } from "@/lib/collaboration/participant-colors"
 import { DIFF_CODE_CLASS, DIFF_ROW_CLASS, DIFF_SYMBOL } from "@/constants/diff"
+import { ISSUE_INLINE_CLASS, ISSUE_ROW_CLASS } from "@/constants/review"
 import type { DiffLine } from "@/lib/diff"
+import { groupIssuesByLine } from "@/lib/pr-detail/reviewUtils"
+import { ISSUE_ICON } from "@/lib/review-ui"
 import type {
   CollaborationCodeSelection,
   CollaborationLocation,
@@ -14,6 +17,7 @@ import type {
   CollaborationTypingEvent,
 } from "@/lib/socket/types"
 import type { CollaborationCodeAnchor, CollaborationCodeThreadSummary } from "@/types/collaboration"
+import type { ReviewIssue } from "@/types/review"
 
 type SharedLocation = CollaborationLocation & { userName: string }
 type ColoredLocation = SharedLocation & { accent: ParticipantColor }
@@ -34,6 +38,8 @@ interface CollaborationDiffViewerProps {
   inlineThread: (CollaborationCodeAnchor & { focusComposer: boolean; displayIndex: number | null; targetMessageId: string | null }) | null
   onOpenThread: (side: "LEFT" | "RIGHT", startLine: number, endLine: number, focusComposer: boolean, displayIndex: number) => void
   onCloseThread: () => void
+  issues?: ReviewIssue[]
+  onIssueClick?: (issue: ReviewIssue) => void
 }
 
 function includesLine(selection: CollaborationCodeSelection | null, line: DiffLine) {
@@ -104,6 +110,8 @@ export default function CollaborationDiffViewer({
   inlineThread,
   onOpenThread,
   onCloseThread,
+  issues = [],
+  onIssueClick,
 }: CollaborationDiffViewerProps) {
   useLayoutEffect(() => {
     markCollaborationPerformance("diff.commit")
@@ -128,6 +136,7 @@ export default function CollaborationDiffViewer({
         : []),
     [participantColors, sharedLocations]
   )
+  const issuesByLine = useMemo(() => groupIssuesByLine(issues), [issues])
 
   return (
     <table aria-label={`${filePath} 변경 내용`} className="w-full min-w-max border-collapse font-mono text-xs leading-relaxed">
@@ -155,6 +164,10 @@ export default function CollaborationDiffViewer({
           )
           const codeSide = line.newNum !== undefined ? "RIGHT" : "LEFT"
           const codeLine = codeSide === "RIGHT" ? line.newNum : line.oldNum
+          const lineIssues = line.newNum !== undefined
+            ? issuesByLine.get(line.newNum) ?? []
+            : []
+          const topIssue = lineIssues[0]
           const textEnds = viewers.flatMap((viewer) =>
             viewer.textSelection?.side === codeSide && viewer.textSelection.endLine === codeLine
               ? [viewer.textSelection.endOffset]
@@ -209,7 +222,10 @@ export default function CollaborationDiffViewer({
 
           return (
             <Fragment key={index}>
-              <tr className={`group ${DIFF_ROW_CLASS[line.type]}`} style={{ backgroundImage: selectionBackground(selectedColors) }}>
+              <tr
+                className={`group ${DIFF_ROW_CLASS[line.type]} ${topIssue ? ISSUE_ROW_CLASS[topIssue.severity] : ""}`}
+                style={{ backgroundImage: selectionBackground(selectedColors) }}
+              >
                 {lineNumber("LEFT", line.oldNum)}
                 {lineNumber("RIGHT", line.newNum, line.oldNum)}
                 <td className="w-5 border-r border-slate-200 text-center dark:border-slate-800 sm:w-8 sm:px-1">
@@ -221,6 +237,17 @@ export default function CollaborationDiffViewer({
                 </td>
                 <td className="w-9 border-r border-slate-200 dark:border-slate-800 sm:w-20 sm:px-1">
                   <div className="relative flex flex-wrap items-center justify-center gap-0.5 sm:gap-1">
+                    {topIssue && (
+                      <button
+                        type="button"
+                        aria-label={`${topIssue.title} 이슈 자세히 보기`}
+                        title={`${topIssue.title} — 자세히 보기`}
+                        onClick={() => onIssueClick?.(topIssue)}
+                        className="cursor-pointer transition-transform hover:scale-125"
+                      >
+                        {ISSUE_ICON[topIssue.severity]}
+                      </button>
+                    )}
                     {threads.map((thread) => (
                       <button
                         key={thread.side}
@@ -266,6 +293,20 @@ export default function CollaborationDiffViewer({
                   {renderCodeWithSelections(line.content, codeSide, codeLine, peers)}
                 </td>
               </tr>
+              {lineIssues.map((issue) => (
+                <tr key={`ai-issue-${issue.originalIndex}`}>
+                  <td colSpan={5} className="px-4 py-0">
+                    <button
+                      type="button"
+                      onClick={() => onIssueClick?.(issue)}
+                      className={`mx-1 my-0.5 w-full cursor-pointer rounded-lg border-l-2 px-3 py-1.5 text-left font-sans text-[11px] leading-relaxed transition-all hover:brightness-95 dark:hover:brightness-125 ${ISSUE_INLINE_CLASS[issue.severity]}`}
+                    >
+                      <span className="font-semibold">{issue.title}</span>
+                      <span className="opacity-75"> — {issue.description}</span>
+                    </button>
+                  </td>
+                </tr>
+              ))}
               {threadIsOpen && (
                 <tr>
                   <td colSpan={5} className="p-0">
