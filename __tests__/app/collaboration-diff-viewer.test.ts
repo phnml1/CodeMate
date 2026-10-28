@@ -1,6 +1,7 @@
 import React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import CollaborationDiffViewer from "@/components/collaboration/CollaborationDiffViewer"
+import { assignParticipantColors } from "@/lib/collaboration/participant-colors"
 import type { DiffLine } from "@/lib/diff"
 
 jest.mock("@/components/collaboration/InlineCollaborationThread", () =>
@@ -22,6 +23,7 @@ function render(open = false, selection: { side: "LEFT" | "RIGHT"; startLine: nu
     filePath: "src/app.ts",
     selection,
     sharedLocations: [],
+    participantColors: assignParticipantColors(["user-1"]),
     typingUsers: [],
     publishTyping: jest.fn(),
     onLineSelect: jest.fn(),
@@ -48,9 +50,10 @@ function render(open = false, selection: { side: "LEFT" | "RIGHT"; startLine: nu
 describe("CollaborationDiffViewer", () => {
   it("distinguishes the local selection from added diff lines", () => {
     const html = render(false, { side: "RIGHT", startLine: 20, endLine: 20 })
-    expect(html).toMatch(/data-diff-line="20"[^>]*text-violet-700/)
-    expect(html).toMatch(/data-code-line="20"[^>]*bg-violet-200\/80/)
-    expect(html).not.toMatch(/data-code-line="20"[^>]*bg-emerald-100\/80/)
+    const ownColor = assignParticipantColors(["user-1"])["user-1"]
+    expect(html).toContain(`color:${ownColor.solid}`)
+    expect(html).toContain(`box-shadow:inset 3px 0 ${ownColor.solid}`)
+    expect(html).toContain(`background-image:linear-gradient(${ownColor.fill}, ${ownColor.fill})`)
   })
 
   it("shows line-level compose controls and existing conversation counts", () => {
@@ -96,6 +99,7 @@ describe("CollaborationDiffViewer", () => {
         textSelection: { side: "RIGHT", startLine: 20, endLine: 20, startOffset: 1, endOffset: 4 },
         updatedAt: new Date().toISOString(),
       }],
+      participantColors: assignParticipantColors(["user-1", "user-2"]),
       typingUsers: [],
       publishTyping: jest.fn(),
       onLineSelect: jest.fn(),
@@ -130,11 +134,13 @@ describe("CollaborationDiffViewer", () => {
         textSelection: { side: "RIGHT", startLine: 20, endLine: 22, startOffset: 2, endOffset: 4 },
         updatedAt: new Date().toISOString(),
       }],
+      participantColors: assignParticipantColors(["user-1", "user-2"]),
       typingUsers: [], publishTyping: jest.fn(), onLineSelect: jest.fn(),
       roomId: "room-1", currentUserId: "user-1", canSend: true,
       threadSummaries: [], inlineThread: null, onOpenThread: jest.fn(), onCloseThread: jest.fn(),
     }))
-    expect(html.match(/data-code-line="(?:20|21|22)"[^>]*bg-sky-100\/80/g)).toHaveLength(3)
+    const remoteFill = assignParticipantColors(["user-1", "user-2"])["user-2"].fill
+    expect(html.match(new RegExp(`data-code-line="(?:20|21|22)"[^>]*background-image:linear-gradient\\(${remoteFill.replace(/[()]/g, "\\$&")}`, "g"))).toHaveLength(3)
     expect(html.match(/title="상대님이 선택한 텍스트"/g)).toHaveLength(3)
   })
 
@@ -153,6 +159,7 @@ describe("CollaborationDiffViewer", () => {
     }))
     const html = renderToStaticMarkup(React.createElement(CollaborationDiffViewer, {
       lines, filePath: "src/app.ts", selection: null, sharedLocations,
+      participantColors: assignParticipantColors(["user-1", "user-2", "user-3", "user-4"]),
       typingUsers: [], publishTyping: jest.fn(), onLineSelect: jest.fn(),
       roomId: "room-1", currentUserId: "user-1", canSend: true,
       threadSummaries: [], inlineThread: null, onOpenThread: jest.fn(), onCloseThread: jest.fn(),
@@ -165,6 +172,9 @@ describe("CollaborationDiffViewer", () => {
     expect(html).toContain("Alex")
     expect(html).toContain('title="Mina, Joon님이 선택한 텍스트"')
     expect(html).toContain("linear-gradient(to bottom")
+    for (const user of sharedLocations) {
+      expect(html).toContain(`background-color:${assignParticipantColors(["user-1", "user-2", "user-3", "user-4"])[user.userId].solid}`)
+    }
     const codeCell = html.match(/<td data-code-side="RIGHT" data-code-line="20"[^>]*>(.*?)<\/td>/)?.[1]
     expect(codeCell?.replace(/<[^>]+>/g, "")).toBe("after")
   })

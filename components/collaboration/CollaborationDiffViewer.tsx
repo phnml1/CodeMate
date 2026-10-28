@@ -4,6 +4,7 @@ import { Fragment, useLayoutEffect, useMemo } from "react"
 import { MessageSquare, MessageSquarePlus } from "lucide-react"
 import InlineCollaborationThread from "@/components/collaboration/InlineCollaborationThread"
 import { markCollaborationPerformance } from "@/lib/collaboration/client-performance"
+import type { ParticipantColor } from "@/lib/collaboration/participant-colors"
 import { DIFF_CODE_CLASS, DIFF_ROW_CLASS, DIFF_SYMBOL } from "@/constants/diff"
 import type { DiffLine } from "@/lib/diff"
 import type {
@@ -15,18 +16,14 @@ import type {
 import type { CollaborationCodeAnchor, CollaborationCodeThreadSummary } from "@/types/collaboration"
 
 type SharedLocation = CollaborationLocation & { userName: string }
-const REMOTE_ACCENTS = [
-  { dot: "bg-sky-600", label: "text-sky-800 dark:text-sky-200", mark: "bg-sky-200/80 dark:bg-sky-700/60", fill: "rgba(14, 165, 233, 0.38)" },
-  { dot: "bg-amber-600", label: "text-amber-800 dark:text-amber-200", mark: "bg-amber-200/80 dark:bg-amber-700/60", fill: "rgba(245, 158, 11, 0.38)" },
-  { dot: "bg-rose-600", label: "text-rose-800 dark:text-rose-200", mark: "bg-rose-200/80 dark:bg-rose-700/60", fill: "rgba(244, 63, 94, 0.38)" },
-] as const
-type ColoredLocation = SharedLocation & { accent: (typeof REMOTE_ACCENTS)[number] }
+type ColoredLocation = SharedLocation & { accent: ParticipantColor }
 
 interface CollaborationDiffViewerProps {
   lines: DiffLine[]
   filePath: string
   selection: CollaborationCodeSelection | null
   sharedLocations: SharedLocation[]
+  participantColors: Record<string, ParticipantColor>
   typingUsers: CollaborationTypingEvent[]
   publishTyping: (anchor: CollaborationTypingAnchor | null, isTyping: boolean) => void
   onLineSelect: (side: "LEFT" | "RIGHT", line: number, extend: boolean) => void
@@ -43,6 +40,15 @@ function includesLine(selection: CollaborationCodeSelection | null, line: DiffLi
   if (!selection) return false
   const number = selection.side === "LEFT" ? line.oldNum : line.newNum
   return number !== undefined && number >= selection.startLine && number <= selection.endLine
+}
+
+function selectionBackground(colors: ParticipantColor[], fill: "fill" | "textFill" = "fill") {
+  if (!colors.length) return undefined
+  if (colors.length === 1) return `linear-gradient(${colors[0][fill]}, ${colors[0][fill]})`
+  return `linear-gradient(to bottom, ${colors.flatMap((color, index) => [
+    `${color[fill]} ${index / colors.length * 100}%`,
+    `${color[fill]} ${(index + 1) / colors.length * 100}%`,
+  ]).join(", ")})`
 }
 
 function renderCodeWithSelections(
@@ -69,18 +75,12 @@ function renderCodeWithSelections(
     const text = content.slice(start, end)
     if (!owners.length) return <Fragment key={start}>{text}</Fragment>
 
-    const stripe = owners.length > 1
-      ? { backgroundImage: `linear-gradient(to bottom, ${owners.flatMap((owner, ownerIndex) => [
-        `${owner.accent.fill} ${ownerIndex / owners.length * 100}%`,
-        `${owner.accent.fill} ${(ownerIndex + 1) / owners.length * 100}%`,
-      ]).join(", ")})` }
-      : undefined
     return (
       <mark
         key={start}
         title={`${owners.map((owner) => owner.userName).join(", ")}님이 선택한 텍스트`}
-        className={`text-inherit ${owners.length === 1 ? owners[0].accent.mark : "bg-transparent"}`}
-        style={stripe}
+        className="bg-transparent text-inherit"
+        style={{ backgroundImage: selectionBackground(owners.map((owner) => owner.accent), "textFill") }}
       >
         {text}
       </mark>
@@ -93,6 +93,7 @@ export default function CollaborationDiffViewer({
   filePath,
   selection,
   sharedLocations,
+  participantColors,
   typingUsers,
   publishTyping,
   onLineSelect,
@@ -122,8 +123,10 @@ export default function CollaborationDiffViewer({
   const peers = useMemo(
     () => [...sharedLocations]
       .sort((a, b) => a.userId.localeCompare(b.userId))
-      .map((location, index) => ({ ...location, accent: REMOTE_ACCENTS[index % REMOTE_ACCENTS.length] })),
-    [sharedLocations]
+      .flatMap((location) => participantColors[location.userId]
+        ? [{ ...location, accent: participantColors[location.userId] }]
+        : []),
+    [participantColors, sharedLocations]
   )
 
   return (
@@ -142,6 +145,10 @@ export default function CollaborationDiffViewer({
           const othersSelected = peers.filter((location) =>
             includesLine(location.selection, line)
           )
+          const selectedColors = [
+            ...(ownSelected && participantColors[currentUserId] ? [participantColors[currentUserId]] : []),
+            ...othersSelected.map((location) => location.accent),
+          ]
           const viewers = peers.filter((location) =>
             location.line !== null &&
             (location.side === "LEFT" ? line.oldNum : line.newNum) === location.line
@@ -187,7 +194,8 @@ export default function CollaborationDiffViewer({
               aria-label={`${filePath} ${side === "LEFT" ? "이전" : "변경"} ${number}번 줄 선택`}
               title="줄 선택 · Shift+클릭으로 범위 선택"
               onClick={(event) => onLineSelect(side, number, event.shiftKey)}
-              className={`block w-full px-1 py-0.5 text-right hover:bg-violet-100 dark:hover:bg-violet-900/40 sm:px-2 ${selection?.side === side && number >= selection.startLine && number <= selection.endLine ? "font-bold text-violet-700 dark:text-violet-300" : "text-slate-500 dark:text-slate-400"} ${className}`}
+              className={`block w-full px-1 py-0.5 text-right hover:bg-slate-100 dark:hover:bg-slate-800 sm:px-2 ${selection?.side === side && number >= selection.startLine && number <= selection.endLine ? "font-bold" : "text-slate-500 dark:text-slate-400"} ${className}`}
+              style={selection?.side === side && number >= selection.startLine && number <= selection.endLine ? { color: participantColors[currentUserId]?.solid } : undefined}
             >
               {number}
             </button>
@@ -201,15 +209,13 @@ export default function CollaborationDiffViewer({
 
           return (
             <Fragment key={index}>
-              <tr
-                className={`group ${DIFF_ROW_CLASS[line.type]} ${ownSelected ? "bg-violet-200/80 dark:bg-violet-800/40" : othersSelected.length ? "bg-sky-100/80 dark:bg-sky-900/30" : ""}`}
-              >
+              <tr className={`group ${DIFF_ROW_CLASS[line.type]}`} style={{ backgroundImage: selectionBackground(selectedColors) }}>
                 {lineNumber("LEFT", line.oldNum)}
                 {lineNumber("RIGHT", line.newNum, line.oldNum)}
                 <td className="w-5 border-r border-slate-200 text-center dark:border-slate-800 sm:w-8 sm:px-1">
                   {viewers.length ? (
                     <span title={`${viewers.map((viewer) => viewer.userName).join(", ")}님이 보고 있습니다`} className="inline-flex items-center justify-center gap-px">
-                      {viewers.map((viewer) => <span key={viewer.userId} className={`size-1.5 rounded-full ${viewer.accent.dot}`} />)}
+                      {viewers.map((viewer) => <span key={viewer.userId} className="size-1.5 rounded-full" style={{ backgroundColor: viewer.accent.solid }} />)}
                     </span>
                   ) : DIFF_SYMBOL[line.type]}
                 </td>
@@ -244,12 +250,11 @@ export default function CollaborationDiffViewer({
                       <span
                         data-remote-location-labels
                         title={`${viewers.map((viewer) => viewer.userName).join(", ")}님이 보고 있습니다`}
-                        className="pointer-events-none absolute top-0 z-20 flex max-w-[min(16rem,45cqw)] -translate-y-full flex-wrap gap-x-2 gap-y-0.5 rounded-sm border border-slate-200 bg-white/95 px-1.5 py-0.5 font-sans text-[10px] leading-4 shadow-sm select-none before:absolute before:-bottom-1 before:left-2 before:size-2 before:rotate-45 before:border-r before:border-b before:border-slate-200 before:bg-white dark:border-slate-700 dark:bg-slate-950/95 dark:before:border-slate-700 dark:before:bg-slate-950"
+                        className="pointer-events-none absolute top-0 z-20 flex max-w-[min(16rem,45cqw)] -translate-y-full flex-wrap gap-0.5 rounded-sm border border-slate-200 bg-white/95 p-0.5 font-sans text-[10px] leading-4 shadow-sm select-none dark:border-slate-700 dark:bg-slate-950/95"
                         style={{ left: `calc(100% + 0.5rem + min(${labelOffset}ch, 25cqw))` }}
                       >
                         {viewers.map((viewer) => (
-                          <span key={viewer.userId} className={`inline-flex min-w-0 max-w-24 items-center gap-1 ${viewer.accent.label}`}>
-                            <span className={`size-1.5 shrink-0 rounded-full ${viewer.accent.dot}`} />
+                          <span key={viewer.userId} className="inline-flex min-w-0 max-w-24 items-center rounded-sm px-1.5 font-medium text-white" style={{ backgroundColor: viewer.accent.solid }}>
                             <span className="truncate">{viewer.userName}</span>
                           </span>
                         ))}
@@ -257,7 +262,7 @@ export default function CollaborationDiffViewer({
                     )}
                   </div>
                 </td>
-                <td data-code-side={codeLine === undefined ? undefined : codeSide} data-code-line={codeLine} title={othersSelected.length ? `${othersSelected.map((location) => location.userName).join(", ")}님이 선택 중` : undefined} className={`min-w-40 whitespace-pre px-2 py-0.5 sm:min-w-80 sm:px-4 ${DIFF_CODE_CLASS[line.type]} ${ownSelected ? "bg-violet-200/80 dark:bg-violet-800/40" : othersSelected.length ? "bg-sky-100/80 dark:bg-sky-900/40" : ""}`}>
+                <td data-code-side={codeLine === undefined ? undefined : codeSide} data-code-line={codeLine} title={othersSelected.length ? `${othersSelected.map((location) => location.userName).join(", ")}님이 선택 중` : undefined} className={`min-w-40 whitespace-pre px-2 py-0.5 sm:min-w-80 sm:px-4 ${DIFF_CODE_CLASS[line.type]}`} style={{ backgroundImage: selectionBackground(selectedColors), boxShadow: selectedColors.length === 1 ? `inset 3px 0 ${selectedColors[0].solid}` : undefined }}>
                   {renderCodeWithSelections(line.content, codeSide, codeLine, peers)}
                 </td>
               </tr>

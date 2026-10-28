@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import type { CSSProperties } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
@@ -28,6 +29,7 @@ import { useCollaborationCodeThreads } from "@/hooks/useCollaborationCodeThreads
 import { useCollaborationMessages } from "@/hooks/useCollaborationMessages"
 import { useWorkspacePRFiles } from "@/hooks/usePRFiles"
 import { markCollaborationPerformance, measureCollaborationPerformance } from "@/lib/collaboration/client-performance"
+import { assignParticipantColors } from "@/lib/collaboration/participant-colors"
 import { getCollaborationRoomDisplayName } from "@/lib/collaboration/room-name"
 import { parsePatch } from "@/lib/diff"
 import type { CollaborationLocation, CollaborationTextSelection, CollaborationViewport } from "@/lib/socket/types"
@@ -262,6 +264,10 @@ export default function CollaborationWorkspaceClient({
     if (connected) markCollaborationPerformance("connected.commit")
   }, [connected])
   const participants = connected ? presence?.users ?? [] : []
+  const participantColors = useMemo(
+    () => assignParticipantColors([currentUserId, ...(connected ? presence?.users ?? [] : []).map((user) => user.userId)]),
+    [connected, currentUserId, presence?.users]
+  )
   const onlineParticipantCount = participants.filter((user) => user.status === "online").length
   const messagesQuery = useCollaborationMessages(room.id, connected)
   const messages = useMemo(
@@ -591,7 +597,7 @@ export default function CollaborationWorkspaceClient({
               const isMe = user.userId === currentUserId
               const following = followUserId === user.userId
               return (
-                <div key={user.userId} className="flex min-w-0 max-w-full items-center gap-1.5 border border-slate-200 px-2 py-1 dark:border-slate-700">
+                <div key={user.userId} className="flex min-w-0 max-w-full items-center gap-1.5 border border-l-4 border-slate-200 px-2 py-1 dark:border-slate-700" style={{ borderLeftColor: participantColors[user.userId]?.solid }}>
                   <span className={`size-1.5 shrink-0 rounded-full ${user.status === "online" ? "bg-emerald-500" : "bg-amber-500"}`} />
                   <span className="min-w-0 truncate font-medium">{user.userName}{isMe ? " (나)" : ""}</span>
                   <span className="min-w-0 max-w-40 truncate text-slate-500 dark:text-slate-400" title={location?.filePath}>
@@ -718,7 +724,8 @@ export default function CollaborationWorkspaceClient({
           <div
             ref={codeScrollRef}
             tabIndex={0}
-            className="min-h-0 min-w-0 max-w-full flex-1 overflow-auto selection:bg-violet-300/80 dark:selection:bg-violet-600/70 [container-type:inline-size]"
+            className="min-h-0 min-w-0 max-w-full flex-1 overflow-auto selection:bg-[var(--participant-selection)] [container-type:inline-size]"
+            style={{ "--participant-selection": participantColors[currentUserId]?.textFill } as CSSProperties}
             onScroll={() => {
               if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current)
               scrollTimerRef.current = window.setTimeout(publishVisibleLocation, 120)
@@ -745,6 +752,7 @@ export default function CollaborationWorkspaceClient({
                 filePath={selectedFile.filename}
                 selection={activeSelection?.filePath === selectedFile.filename ? activeSelection : null}
                 sharedLocations={sharedLocations}
+                participantColors={participantColors}
                 typingUsers={activeTypingUsers}
                 publishTyping={publishTyping}
                 onLineSelect={selectLine}
