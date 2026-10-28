@@ -121,6 +121,27 @@ export async function POST(request: Request, { params }: RouteContext) {
       return respond({ error: "Invalid request body", issues: parsed.error.flatten() }, 400)
     }
 
+    if (parsed.data.reviewReference) {
+      const review = await prisma.review.findFirst({
+        where: {
+          id: parsed.data.reviewReference.reviewId,
+          pullRequestId: room.pullRequestId,
+        },
+        select: { aiSuggestions: true },
+      })
+      if (!review) {
+        return respond({ error: "Review not found" }, 404)
+      }
+
+      const issueIndex = parsed.data.reviewReference.issueIndex
+      if (issueIndex != null) {
+        const suggestions = review.aiSuggestions as { issues?: unknown[] } | null
+        if (!Array.isArray(suggestions?.issues) || !suggestions.issues[issueIndex]) {
+          return respond({ error: "Review issue not found" }, 404)
+        }
+      }
+    }
+
     let rateLimit
     try {
       rateLimit = await checkCollaborationMessageRateLimit(room.id, session.user.id, parsed.data.clientMessageId)
@@ -149,6 +170,20 @@ export async function POST(request: Request, { params }: RouteContext) {
                 codeReference: {
                   create: parsed.data.codeReference,
                 },
+              }
+            : {}),
+          ...(parsed.data.reviewReference
+            ? {
+                reviewReference: {
+                  create: {
+                    reviewId: parsed.data.reviewReference.reviewId,
+                    issueIndex: parsed.data.reviewReference.issueIndex ?? null,
+                  },
+                },
+              }
+            : {}),
+          ...(parsed.data.codeReference || parsed.data.reviewReference
+            ? {
                 reviewComment: {
                   create: {
                     pullRequestId: room.pullRequestId,

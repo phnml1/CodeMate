@@ -4,7 +4,7 @@ import { getAnthropicClient, CLAUDE_MODEL } from "@/lib/ai/claude";
 import { parseAIReviewResponse } from "@/lib/ai/parsers";
 import { SYSTEM_PROMPT, buildUserPrompt } from "@/lib/ai/prompts";
 import { prisma } from "@/lib/prisma";
-import { getRepositoryPrimaryUser } from "@/lib/repository-access";
+import { getRepositoryGithubUsers } from "@/lib/repository-access";
 import { calculateScore } from "@/lib/scoring";
 import type { ReviewStage } from "@/types/review";
 
@@ -12,6 +12,27 @@ export type AnalyzeReviewResult =
   | { status: "COMPLETED" }
   | { status: "FAILED" }
   | { status: "SKIPPED_ACTIVE" };
+
+function isGithubAuthenticationError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error &&
+    error.status === 401
+  );
+}
+
+function getReviewFailureReason(error: unknown): string {
+  if (isGithubAuthenticationError(error)) {
+    return "GitHub 인증이 만료되었습니다. GitHub 계정을 다시 연결해 주세요.";
+  }
+
+  if (error instanceof Error) {
+    return error.message.slice(0, 1000);
+  }
+
+  return "AI 리뷰 처리 중 알 수 없는 오류가 발생했습니다.";
+}
 
 function isActiveReviewConflict(error: unknown): boolean {
   return (
@@ -41,7 +62,8 @@ async function updateReviewStage(
 }
 
 export async function analyzeReview(
-  pullRequestId: string
+  pullRequestId: string,
+  preferredUserId?: string
 ): Promise<AnalyzeReviewResult> {
   let reviewId: string | null = null;
 
@@ -100,24 +122,45 @@ export async function analyzeReview(
       throw new Error(`Pull request not found: ${pullRequestId}`);
     }
 
-    const tokenUser = await getRepositoryPrimaryUser(pr.repo.id, {
-      requireGithubToken: true,
-    });
-    const githubToken = tokenUser?.githubToken ?? null;
-    const authorName = tokenUser?.name ?? null;
-
-    if (!githubToken) {
+    const tokenUsers = await getRepositoryGithubUsers(
+      pr.repo.id,
+      preferredUserId
+    );
+    if (tokenUsers.length === 0) {
       throw new Error("GitHub token not found for any connected repository user");
     }
 
     const [owner, repo] = pr.repo.fullName.split("/");
-    const octokit = new Octokit({ auth: githubToken });
-    const { data: files } = await octokit.rest.pulls.listFiles({
-      owner,
-      repo,
-      pull_number: pr.number,
-      per_page: 100,
-    });
+    let files: Array<{ filename: string; patch?: string | null }> | null = null;
+    let authorName: string | null = null;
+    let lastAuthenticationError: unknown = null;
+
+    for (const tokenUser of tokenUsers) {
+      try {
+        const octokit = new Octokit({ auth: tokenUser.githubToken });
+        const response = await octokit.rest.pulls.listFiles({
+          owner,
+          repo,
+          pull_number: pr.number,
+          per_page: 100,
+        });
+        files = response.data;
+        authorName = tokenUser.name;
+        break;
+      } catch (error) {
+        if (!isGithubAuthenticationError(error)) throw error;
+        lastAuthenticationError = error;
+        console.warn(
+          `[analyzeReview] GitHub token rejected for repository user ${tokenUser.id}; trying the next connected user.`
+        );
+      }
+    }
+
+    if (!files) {
+      throw lastAuthenticationError ?? new Error(
+        "No valid GitHub token found for any connected repository user"
+      );
+    }
 
     const maxDiffChars = 20000;
     let diff = "";
@@ -189,6 +232,7 @@ export async function analyzeReview(
         data: {
           status: "FAILED",
           stage: "FAILED",
+          failureReason: getReviewFailureReason(error),
         },
       });
     }

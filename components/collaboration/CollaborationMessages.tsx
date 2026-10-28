@@ -13,7 +13,7 @@ import {
   useCollaborationMessageEditor,
   useCreateCollaborationMessage,
 } from "@/hooks/useCollaborationMessages"
-import type { CollaborationCodeReference, CollaborationMessage } from "@/types/collaboration"
+import type { CollaborationCodeReference, CollaborationMessage, CollaborationReviewReference } from "@/types/collaboration"
 
 const MAX_MESSAGE_LENGTH = 4000
 
@@ -27,6 +27,7 @@ interface CollaborationMessagesProps {
   selectedCodeReference?: CollaborationCodeReference | null
   onClearSelection?: () => void
   onOpenCodeReference?: (reference: CollaborationCodeReference, messageId: string) => void
+  onOpenReviewReference?: (reference: CollaborationReviewReference) => void
   publishTyping: (anchor: CollaborationTypingAnchor | null, isTyping: boolean) => void
   typingNames: string[]
   messages: CollaborationMessage[]
@@ -43,6 +44,7 @@ export default function CollaborationMessages({
   selectedCodeReference,
   onClearSelection,
   onOpenCodeReference,
+  onOpenReviewReference,
   publishTyping,
   typingNames,
   messages,
@@ -187,8 +189,9 @@ export default function CollaborationMessages({
                     variant="bubble"
                     editor={messageEditor}
                     onOpenCodeReference={onOpenCodeReference}
+                    onOpenReviewReference={onOpenReviewReference}
                     showDeliveryStatus={isMine && (message.deliveryStatus === "sending" || message.deliveryStatus === "failed" || message.id === lastOwnMessageId)}
-                    onRetry={() => createMessage.mutate({ content: message.content, codeReference: message.codeReference ?? undefined, clientMessageId: message.clientMessageId! })}
+                    onRetry={() => createMessage.mutate({ content: message.content, codeReference: message.codeReference ?? undefined, reviewReference: message.reviewReference ?? undefined, clientMessageId: message.clientMessageId! })}
                   />
                 </div>
               )

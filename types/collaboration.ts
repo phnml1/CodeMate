@@ -80,9 +80,15 @@ export interface CollaborationMessage {
   content: string
   clientMessageId: string | null
   codeReference: CollaborationCodeReference | null
+  reviewReference?: CollaborationReviewReference | null
   createdAt: string
   updatedAt: string
   deliveryStatus?: "sending" | "failed"
+}
+
+export interface CollaborationReviewReference {
+  reviewId: string
+  issueIndex: number | null
 }
 
 export interface CollaborationCodeReference {
@@ -116,6 +122,10 @@ export interface CollaborationCodeThreadSummaryResponse {
 export interface CollaborationMessagesResponse {
   messages: CollaborationMessage[]
   nextCursor: string | null
+}
+
+export interface CollaborationReviewMessagesResponse {
+  messages: CollaborationMessage[]
 }
 
 export interface CollaborationMessageResponse {

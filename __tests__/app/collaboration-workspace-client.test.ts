@@ -5,6 +5,7 @@ import { useWorkspacePRFiles } from "@/hooks/usePRFiles"
 import { useCollaborationRoomSocket } from "@/hooks/useCollaborationRoomSocket"
 import { useCollaborationCodeThreads } from "@/hooks/useCollaborationCodeThreads"
 import { useCollaborationMessages } from "@/hooks/useCollaborationMessages"
+import { useReviewQuery } from "@/hooks/useReview"
 import type { CollaborationRoom } from "@/types/collaboration"
 import type { CollaborationCodeReference } from "@/types/collaboration"
 
@@ -12,6 +13,7 @@ jest.mock("@/hooks/usePRFiles", () => ({ useWorkspacePRFiles: jest.fn() }))
 jest.mock("@/hooks/useCollaborationRoomSocket", () => ({ useCollaborationRoomSocket: jest.fn() }))
 jest.mock("@/hooks/useCollaborationCodeThreads", () => ({ useCollaborationCodeThreads: jest.fn() }))
 jest.mock("@/hooks/useCollaborationMessages", () => ({ useCollaborationMessages: jest.fn() }))
+jest.mock("@/hooks/useReview", () => ({ useReviewQuery: jest.fn() }))
 jest.mock("@/components/collaboration/CollaborationMessages", () => () => null)
 jest.mock("react", () => ({ ...jest.requireActual("react"), useEffect: jest.fn() }))
 jest.mock("next/navigation", () => ({ useRouter: () => ({ replace: mockReplace }) }))
@@ -65,6 +67,7 @@ describe("CollaborationWorkspaceClient", () => {
     })
     ;(useCollaborationCodeThreads as jest.Mock).mockReturnValue({ data: undefined })
     ;(useCollaborationMessages as jest.Mock).mockReturnValue({ data: undefined })
+    ;(useReviewQuery as jest.Mock).mockReturnValue({ data: null })
   })
 
   function render() {

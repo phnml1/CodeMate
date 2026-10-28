@@ -37,6 +37,7 @@ export async function GET(
             issueCount: true,
             status: true,
             stage: true,
+            failureReason: true,
             reviewedAt: true,
           },
           take: 1,

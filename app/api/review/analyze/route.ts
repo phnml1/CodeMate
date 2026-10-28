@@ -87,7 +87,7 @@ export async function POST(request: Request) {
           status: "PENDING",
         });
 
-        const result = await analyzeReview(pr.id);
+        const result = await analyzeReview(pr.id, session.user.id);
         if (result.status === "SKIPPED_ACTIVE") {
           return;
         }

@@ -21,6 +21,9 @@ jest.mock("@/lib/prisma", () => ({
       create: jest.fn(),
       findUnique: jest.fn(),
     },
+    review: {
+      findFirst: jest.fn(),
+    },
   },
 }))
 
@@ -41,6 +44,7 @@ const mockedAuth = auth as jest.Mock
 const mockedFindRoom = prisma.collaborationRoom.findFirst as jest.Mock
 const mockedFindMember = prisma.collaborationRoomMember.findUnique as jest.Mock
 const mockedCreateMessage = prisma.collaborationMessage.create as jest.Mock
+const mockedFindReview = prisma.review.findFirst as jest.Mock
 const mockedEmitMessage = emitCollaborationMessage as jest.Mock
 const mockedRateLimit = checkCollaborationMessageRateLimit as jest.Mock
 const mockedBuildAccessiblePullRequestWhere =
@@ -208,6 +212,61 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
         }),
       })
     )
+  })
+
+  it("creates a message anchored to an AI review issue from the same pull request", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-2" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindRoom.mockResolvedValue(sampleRoom)
+    mockedFindMember.mockResolvedValue({ id: "member-2", leftAt: null })
+    mockedFindReview.mockResolvedValue({ aiSuggestions: { issues: [{ title: "Issue" }] } })
+    mockedCreateMessage.mockResolvedValue({
+      ...sampleMessage,
+      codeReference: null,
+      reviewReference: {
+        id: "review-ref-1",
+        reviewId: "review-1",
+        issueIndex: 0,
+        messageId: "message-1",
+        createdAt: now,
+      },
+    })
+
+    const response = await POST(createRequest({
+      content: "이 제안을 적용할까요?",
+      clientMessageId: "client-review-1",
+      reviewReference: { reviewId: "review-1", issueIndex: 0 },
+    }), createParams())
+
+    expect(response.status).toBe(201)
+    expect(mockedFindReview).toHaveBeenCalledWith({
+      where: { id: "review-1", pullRequestId: "pr-1" },
+      select: { aiSuggestions: true },
+    })
+    expect(mockedCreateMessage).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        reviewReference: {
+          create: { reviewId: "review-1", issueIndex: 0 },
+        },
+        reviewComment: expect.any(Object),
+      }),
+    }))
+  })
+
+  it("rejects an AI issue index that does not exist", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-2" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindRoom.mockResolvedValue(sampleRoom)
+    mockedFindMember.mockResolvedValue({ id: "member-2", leftAt: null })
+    mockedFindReview.mockResolvedValue({ aiSuggestions: { issues: [] } })
+
+    const response = await POST(createRequest({
+      content: "존재하지 않는 이슈",
+      reviewReference: { reviewId: "review-1", issueIndex: 3 },
+    }), createParams())
+
+    expect(response.status).toBe(404)
+    expect(mockedCreateMessage).not.toHaveBeenCalled()
   })
 
   it("does not create a PR review for a room-wide chat message", async () => {
