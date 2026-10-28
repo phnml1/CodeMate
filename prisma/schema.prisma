@@ -353,6 +353,7 @@ model Notification {
   title     String
   message   String?
   isRead    Boolean          @default(false)
+  readAt    DateTime?
 
   // Relations
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -365,6 +366,7 @@ model Notification {
   createdAt DateTime         @default(now())
 
   @@index([userId, isRead])
+  @@index([isRead, readAt])
 }
 
 model NotificationSetting {
