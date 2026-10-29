@@ -11,6 +11,7 @@ import {
 } from "@/hooks/useComments"
 import type { CommentWithAuthor, ReactionEmoji } from "@/types/comment"
 import ReactionBar from "./ReactionBar"
+import GitHubReviewStatus from "./GitHubReviewStatus"
 
 interface InlineCommentThreadProps {
   comments: CommentWithAuthor[]
@@ -66,7 +67,7 @@ export default function InlineCommentThread({
                     })}
                   </span>
                 </div>
-                {comment.authorId === currentUserId && (
+                {comment.authorId === currentUserId && comment.githubStatus !== "PUBLISHED" && comment.githubStatus !== "PUBLISHING" && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -81,6 +82,7 @@ export default function InlineCommentThread({
               <p className="mt-0.5 whitespace-pre-wrap text-xs text-slate-700 dark:text-slate-300">
                 {comment.content}
               </p>
+              <GitHubReviewStatus commentId={comment.id} status={comment.githubStatus} url={comment.githubReviewUrl} error={comment.githubError} statusUpdatedAt={comment.updatedAt} prId={prId} canRetry={comment.authorId === currentUserId} />
               <ReactionBar
                 reactions={comment.reactions ?? {}}
                 currentUserId={currentUserId}

@@ -1,8 +1,10 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { publishGitHubReview } from "@/lib/github-review-client"
 import {
   appendCommentToThread,
   findCommentInThread,
   normalizeComment,
+  replaceCommentInThread,
   toggleReactionForUser,
   updateCommentReactionsInThread,
 } from "@/lib/comments/cache"
@@ -64,6 +66,15 @@ export function useComments(prId: string) {
 
 export function useCreateComment(prId: string) {
   const queryClient = useQueryClient()
+  const upsertComment = (comment: CommentWithAuthor) => {
+    queryClient.setQueryData<CommentWithAuthor[]>(["comments", prId], (old) =>
+      old
+        ? findCommentInThread(old, comment.id)
+          ? replaceCommentInThread(old, comment)
+          : appendCommentToThread(old, comment)
+        : [comment]
+    )
+  }
 
   return useMutation({
     mutationFn: async (input: CreateCommentInput) => {
@@ -74,15 +85,33 @@ export function useCreateComment(prId: string) {
       })
       if (!res.ok) throw new Error("Failed to create comment.")
       const data = await res.json()
-      return normalizeComment(data.comment as CommentWithAuthor)
+      const comment = normalizeComment(data.comment as CommentWithAuthor)
+      if (!input.publishToGitHub) return comment
+      upsertComment({ ...comment, githubStatus: "PUBLISHING" })
+      try {
+        const published = await publishGitHubReview(comment.id)
+        return { ...comment, githubStatus: "PUBLISHED" as const, githubReviewUrl: published.url ?? null }
+      } catch (error) {
+        return { ...comment, githubStatus: "FAILED" as const, githubError: error instanceof Error ? error.message : "GitHub 리뷰 전송에 실패했습니다." }
+      }
     },
-    onSuccess: (comment) => {
-      queryClient.setQueryData<CommentWithAuthor[]>(["comments", prId], (old) =>
-        old ? appendCommentToThread(old, comment) : [comment]
-      )
-    },
+    onSuccess: upsertComment,
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["comments", prId] })
+    },
+  })
+}
+
+export function usePublishGitHubReview(prId?: string, roomId?: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: publishGitHubReview,
+    onSettled: () => {
+      if (prId) void queryClient.invalidateQueries({ queryKey: ["comments", prId] })
+      if (roomId) {
+        void queryClient.invalidateQueries({ queryKey: ["collaborationMessages", roomId] })
+        void queryClient.invalidateQueries({ queryKey: ["collaborationCodeThreads", roomId] })
+      }
     },
   })
 }

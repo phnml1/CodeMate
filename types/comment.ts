@@ -14,6 +14,9 @@ export interface Comment {
   lineNumber: number | null
   filePath: string | null
   isResolved: boolean
+  githubStatus?: "NOT_REQUESTED" | "PUBLISHING" | "PUBLISHED" | "FAILED"
+  githubReviewUrl?: string | null
+  githubError?: string | null
   pullRequestId: string
   authorId: string
   parentId: string | null
@@ -43,6 +46,7 @@ export interface CreateCommentInput {
   lineNumber?: number
   filePath?: string
   mentions?: string[]
+  publishToGitHub?: boolean
 }
 
 export interface UpdateCommentInput {

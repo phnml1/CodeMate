@@ -131,6 +131,7 @@ export default function CollaborationAIReviewPanel({
   const view = getCompletedReviewData(review, filterSeverity)
   const thread = (target: ThreadTarget) => {
     const issueIndex = target === "overall" ? null : target
+    const issue = issueIndex == null ? null : review.aiSuggestions?.issues?.[issueIndex]
     const targetMessages = messages.filter(
       (message) => (message.reviewReference?.issueIndex ?? null) === issueIndex
     )
@@ -139,6 +140,7 @@ export default function CollaborationAIReviewPanel({
         roomId={roomId}
         reviewId={review.id}
         issueIndex={issueIndex}
+        suggestedContent={issue ? `${issue.title}\n\n${issue.description}\n\n제안: ${issue.suggestion}` : undefined}
         currentUserId={currentUserId}
         canSend={canSend}
         messages={targetMessages}

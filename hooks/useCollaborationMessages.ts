@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { publishGitHubReview } from "@/lib/github-review-client"
 import {
   infiniteQueryOptions,
   useInfiniteQuery,
@@ -29,6 +30,7 @@ export interface CreateCollaborationMessageInput {
   codeReference?: CollaborationCodeReference
   reviewReference?: CollaborationReviewReference
   clientMessageId: string
+  publishToGitHub?: boolean
 }
 
 function codeThreadKey(message: CollaborationMessage) {
@@ -231,22 +233,34 @@ export function useCreateCollaborationMessage(roomId: string, currentUserId: str
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ content, codeReference, reviewReference, clientMessageId }: CreateCollaborationMessageInput) => {
+    mutationFn: async ({ content, codeReference, reviewReference, clientMessageId, publishToGitHub }: CreateCollaborationMessageInput) => {
       const response = await fetch(
         `/api/collaboration/rooms/${roomId}/messages`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content, codeReference, reviewReference, clientMessageId }),
+          body: JSON.stringify({ content, codeReference, reviewReference, clientMessageId, publishToGitHub }),
         }
       )
       if (!response.ok) {
         throw new Error("메시지를 보내지 못했습니다. 다시 시도해 주세요.")
       }
 
-      return (await response.json()) as CollaborationMessageResponse
+      const result = (await response.json()) as CollaborationMessageResponse
+      if (!publishToGitHub || !result.message.reviewCommentId) return result
+      appendCollaborationMessage(queryClient, {
+        ...result.message,
+        githubStatus: "PUBLISHING",
+        githubStatusUpdatedAt: new Date().toISOString(),
+      })
+      try {
+        const published = await publishGitHubReview(result.message.reviewCommentId)
+        return { message: { ...result.message, githubStatus: "PUBLISHED" as const, githubReviewUrl: published.url ?? null } }
+      } catch (error) {
+        return { message: { ...result.message, githubStatus: "FAILED" as const, githubError: error instanceof Error ? error.message : "GitHub 리뷰 전송에 실패했습니다." } }
+      }
     },
-    onMutate: async ({ content, codeReference, reviewReference, clientMessageId }) => {
+    onMutate: async ({ content, codeReference, reviewReference, clientMessageId, publishToGitHub }) => {
       const pending: CollaborationMessage = {
         id: `pending:${clientMessageId}`,
         roomId,
@@ -256,6 +270,7 @@ export function useCreateCollaborationMessage(roomId: string, currentUserId: str
         clientMessageId,
         codeReference: codeReference ?? null,
         reviewReference: reviewReference ?? null,
+        githubStatus: publishToGitHub ? "PUBLISHING" : "NOT_REQUESTED",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         deliveryStatus: "sending",

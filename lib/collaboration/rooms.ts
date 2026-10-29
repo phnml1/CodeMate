@@ -57,6 +57,7 @@ export const createCollaborationMessageSchema = z
   .object({
     content: z.string().trim().min(1).max(COLLABORATION_MESSAGE_MAX_LENGTH),
     clientMessageId: z.string().trim().min(1).max(120).optional(),
+    publishToGitHub: z.boolean().optional(),
     codeReference: codeReferenceSchema.optional(),
     reviewReference: reviewReferenceSchema.optional(),
   })
@@ -101,6 +102,7 @@ export const collaborationMessageInclude = {
   author: { select: { id: true, name: true, image: true } },
   codeReference: true,
   reviewReference: true,
+  reviewComment: { select: { id: true, githubStatus: true, githubReviewUrl: true, githubError: true, updatedAt: true } },
 } satisfies Prisma.CollaborationMessageInclude
 
 type CollaborationRoomWithRelations = Prisma.CollaborationRoomGetPayload<{
@@ -154,6 +156,11 @@ export function serializeCollaborationMessage(
           issueIndex: message.reviewReference.issueIndex,
         }
       : null,
+    reviewCommentId: message.reviewComment?.id ?? null,
+    githubStatus: message.reviewComment?.githubStatus ?? "NOT_REQUESTED",
+    githubReviewUrl: message.reviewComment?.githubReviewUrl ?? null,
+    githubError: message.reviewComment?.githubError ?? null,
+    githubStatusUpdatedAt: message.reviewComment?.updatedAt.toISOString() ?? null,
     createdAt: message.createdAt.toISOString(),
     updatedAt: message.updatedAt.toISOString(),
   }

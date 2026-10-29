@@ -43,6 +43,7 @@ function PRDiffViewer({
   const bodyRef = useRef<HTMLDivElement>(null);
   const [nearViewport, setNearViewport] = useState(false);
   const [bodyHeight, setBodyHeight] = useState<number | null>(null);
+  const [viewportWidth, setViewportWidth] = useState<number | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const renderBody = isActive || nearViewport || composerOpen;
   const estimatedHeight = useMemo(
@@ -74,6 +75,8 @@ function PRDiffViewer({
     const measure = () => {
       const height = Math.ceil(body.getBoundingClientRect().height);
       setBodyHeight((previous) => (previous === height ? previous : height));
+      const width = body.clientWidth;
+      if (width > 0) setViewportWidth((previous) => (previous === width ? previous : width));
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -134,6 +137,7 @@ function PRDiffViewer({
               filePath={file.filename}
               currentUserId={currentUserId}
               onComposerOpenChange={setComposerOpen}
+              viewportWidth={viewportWidth}
             />
           ) : (
             <div

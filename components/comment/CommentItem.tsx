@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { recordRender } from "@/lib/measurements/renderCounter"
 import ReactionBar from "./ReactionBar"
 import CommentInput from "./CommentInput"
+import GitHubReviewStatus from "./GitHubReviewStatus"
 import type { CommentWithAuthor, ReactionEmoji, MentionUser } from "@/types/comment"
 
 interface CommentItemProps {
@@ -82,6 +83,7 @@ export default function CommentItem({
             {comment.author.name?.[0]?.toUpperCase() ?? "?"}
           </div>
         )}
+
       </div>
 
       <div className="flex-1 min-w-0">
@@ -121,6 +123,7 @@ export default function CommentItem({
             {renderContent(comment.content)}
           </p>
         )}
+        <GitHubReviewStatus commentId={comment.id} status={comment.githubStatus} url={comment.githubReviewUrl} error={comment.githubError} statusUpdatedAt={comment.updatedAt} prId={comment.pullRequestId} canRetry={isOwner} />
 
         {/* 액션 바 */}
         {!editing && (
@@ -156,7 +159,7 @@ export default function CommentItem({
               >
                 <CheckCheck size={12} />
               </Button>
-              {isOwner && (
+              {isOwner && comment.githubStatus !== "PUBLISHED" && comment.githubStatus !== "PUBLISHING" && (
                 <>
                   <Button
                     variant="ghost"

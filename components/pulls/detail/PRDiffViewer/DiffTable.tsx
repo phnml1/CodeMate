@@ -22,6 +22,7 @@ interface DiffTableProps {
   filePath?: string
   currentUserId?: string
   onComposerOpenChange?: (open: boolean) => void
+  viewportWidth?: number | null
 }
 
 export default function DiffTable({
@@ -33,6 +34,7 @@ export default function DiffTable({
   filePath,
   currentUserId = "",
   onComposerOpenChange,
+  viewportWidth,
 }: DiffTableProps) {
   const [hoveredLine, setHoveredLine] = useState<number | null>(null)
   const [openFormLine, setOpenFormLine] = useState<number | null>(null)
@@ -114,11 +116,13 @@ export default function DiffTable({
               {lineComments.length > 0 && (
                 <tr>
                   <td colSpan={5} className="p-0">
-                    <InlineCommentThread
-                      comments={lineComments}
-                      currentUserId={currentUserId}
-                      prId={prId!}
-                    />
+                    <div className="sticky left-0 min-w-0" style={{ width: viewportWidth ?? "100%" }}>
+                      <InlineCommentThread
+                        comments={lineComments}
+                        currentUserId={currentUserId}
+                        prId={prId!}
+                      />
+                    </div>
                   </td>
                 </tr>
               )}
@@ -126,15 +130,17 @@ export default function DiffTable({
               {isFormOpen && canAddInlineComment && (
                 <tr>
                   <td colSpan={5} className="p-0">
-                    <InlineCommentForm
-                      prId={prId!}
-                      filePath={filePath!}
-                      lineNumber={line.newNum!}
-                      onClose={() => {
-                        setOpenFormLine(null)
-                        onComposerOpenChange?.(false)
-                      }}
-                    />
+                    <div className="sticky left-0 min-w-0" style={{ width: viewportWidth ?? "100%" }}>
+                      <InlineCommentForm
+                        prId={prId!}
+                        filePath={filePath!}
+                        lineNumber={line.newNum!}
+                        onClose={() => {
+                          setOpenFormLine(null)
+                          onComposerOpenChange?.(false)
+                        }}
+                      />
+                    </div>
                   </td>
                 </tr>
               )}

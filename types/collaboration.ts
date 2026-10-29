@@ -81,6 +81,11 @@ export interface CollaborationMessage {
   clientMessageId: string | null
   codeReference: CollaborationCodeReference | null
   reviewReference?: CollaborationReviewReference | null
+  reviewCommentId?: string | null
+  githubStatus?: "NOT_REQUESTED" | "PUBLISHING" | "PUBLISHED" | "FAILED"
+  githubReviewUrl?: string | null
+  githubError?: string | null
+  githubStatusUpdatedAt?: string | null
   createdAt: string
   updatedAt: string
   deliveryStatus?: "sending" | "failed"

@@ -182,7 +182,7 @@ export async function POST(request: Request, { params }: RouteContext) {
                 },
               }
             : {}),
-          ...(parsed.data.codeReference || parsed.data.reviewReference
+          ...(parsed.data.codeReference || parsed.data.reviewReference || parsed.data.publishToGitHub
             ? {
                 reviewComment: {
                   create: {
