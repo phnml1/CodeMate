@@ -4,6 +4,7 @@ import { useId, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useCreateComment } from "@/hooks/useComments"
+import GitHubReviewToggle from "@/components/comment/GitHubReviewToggle"
 
 interface InlineCommentFormProps {
   prId: string
@@ -19,6 +20,7 @@ export default function InlineCommentForm({
   onClose,
 }: InlineCommentFormProps) {
   const [content, setContent] = useState("")
+  const [publishToGitHub, setPublishToGitHub] = useState(false)
   const textareaId = useId()
   const createComment = useCreateComment(prId)
 
@@ -30,7 +32,7 @@ export default function InlineCommentForm({
     if (!content.trim()) return
 
     createComment.mutate(
-      { content: content.trim(), filePath, lineNumber },
+      { content: content.trim(), filePath, lineNumber, publishToGitHub },
       {
         onSuccess: () => {
           setContent("")
@@ -49,6 +51,7 @@ export default function InlineCommentForm({
         id={textareaId}
         autoFocus
         value={content}
+        disabled={createComment.isPending}
         onChange={(e) => {
           setContent(e.target.value)
         }}
@@ -65,13 +68,14 @@ export default function InlineCommentForm({
       />
 
       {createComment.isPending && (
-        <div className="mt-2 flex items-center gap-1.5 text-xs text-blue-700 dark:text-blue-300">
+        <div role="status" className="mt-2 flex items-center gap-1.5 text-xs text-blue-700 dark:text-blue-300">
           <Loader2 size={12} className="animate-spin" />
-          코멘트를 반영하는 중입니다...
+          {createComment.variables?.publishToGitHub ? "GitHub 리뷰 등록 중..." : "코멘트를 반영하는 중입니다..."}
         </div>
       )}
 
       <div className="mt-2 flex items-center justify-end gap-2">
+        <GitHubReviewToggle checked={publishToGitHub} onChange={setPublishToGitHub} disabled={createComment.isPending} />
         <Button variant="ghost" size="sm" onClick={handleClose} disabled={createComment.isPending}>
           취소
         </Button>
@@ -81,7 +85,7 @@ export default function InlineCommentForm({
           disabled={!content.trim() || createComment.isPending}
         >
           {createComment.isPending && <Loader2 size={14} className="animate-spin" />}
-          {createComment.isPending ? "반영 중..." : "리뷰 작성"}
+          {createComment.isPending ? createComment.variables?.publishToGitHub ? "GitHub 등록 중..." : "반영 중..." : "리뷰 작성"}
         </Button>
       </div>
     </div>

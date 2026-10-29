@@ -49,6 +49,9 @@ export async function PATCH(
     if (comment.authorId !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
+    if (comment.githubStatus === "PUBLISHED" || comment.githubStatus === "PUBLISHING") {
+      return NextResponse.json({ error: "GitHub에 전송한 리뷰는 여기서 수정할 수 없습니다." }, { status: 409 })
+    }
 
     const body = await request.json()
     const { content } = body as { content: string }
@@ -131,6 +134,9 @@ export async function DELETE(
     }
     if (comment.authorId !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+    if (comment.githubStatus === "PUBLISHED" || comment.githubStatus === "PUBLISHING") {
+      return NextResponse.json({ error: "GitHub에 전송한 리뷰는 여기서 삭제할 수 없습니다." }, { status: 409 })
     }
 
     if (comment.collaborationMessageId) {

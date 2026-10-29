@@ -27,6 +27,8 @@ import type {
   ReactionEmoji,
 } from "@/types/comment"
 import CommentRenderMetricsPanel from "./CommentRenderMetricsPanel"
+import GitHubReviewStatus from "./GitHubReviewStatus"
+import GitHubReviewToggle from "./GitHubReviewToggle"
 import ReactionBar from "./ReactionBar"
 
 interface CommentListProps {
@@ -164,7 +166,7 @@ function ChatBubble({
             </span>
           )}
 
-          {isOwn && !isPendingComment && (
+          {isOwn && !isPendingComment && comment.githubStatus !== "PUBLISHING" && comment.githubStatus !== "PUBLISHED" && (
             <button
               type="button"
               className="mb-1 shrink-0 text-slate-300 opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
@@ -177,6 +179,18 @@ function ChatBubble({
             </button>
           )}
         </div>
+
+        {!isPendingComment && (
+          <GitHubReviewStatus
+            commentId={comment.id}
+            status={comment.githubStatus}
+            url={comment.githubReviewUrl}
+            error={comment.githubError}
+            statusUpdatedAt={comment.updatedAt}
+            prId={prId}
+            canRetry={isOwn}
+          />
+        )}
 
         <span className={cn("px-2 text-[9px] text-slate-400", isOwn && "text-right")}>
           {formatDistanceToNow(new Date(comment.createdAt), {
@@ -261,6 +275,7 @@ export default function CommentList({
   const { data: pr } = usePRDetail(prId)
   const [open, setOpen] = useState(true)
   const [input, setInput] = useState("")
+  const [publishToGitHub, setPublishToGitHub] = useState(false)
   const commentsPanelId = `comments-panel-${prId}`
   const commentsInputId = `comment-input-${prId}`
   const chatEndRef = useRef<HTMLDivElement>(null)
@@ -308,16 +323,17 @@ export default function CommentList({
   }
 
   const handleSend = useCallback(() => {
-    if (!input.trim()) return
+    if (!input.trim() || createComment.isPending) return
 
     const mentions = mentionUsers
       .filter((user) => user.name && input.includes(`@${user.name}`))
       .map((user) => user.id)
 
-    createComment.mutate({ content: input.trim(), mentions })
+    createComment.mutate({ content: input.trim(), mentions, publishToGitHub })
     setInput("")
+    setPublishToGitHub(false)
     isAtBottomRef.current = true
-  }, [createComment, input, mentionUsers])
+  }, [createComment, input, mentionUsers, publishToGitHub])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -409,6 +425,7 @@ export default function CommentList({
               <textarea
                 id={commentsInputId}
                 value={input}
+                disabled={createComment.isPending}
                 onChange={(e) => {
                   setInput(e.target.value)
                   e.target.style.height = "auto"
@@ -420,6 +437,7 @@ export default function CommentList({
                 className="flex-1 resize-none overflow-hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 style={{ lineHeight: "1.5", minHeight: 38 }}
               />
+              <GitHubReviewToggle checked={publishToGitHub} onChange={setPublishToGitHub} disabled={createComment.isPending} />
               <button
                 type="button"
                 onClick={handleSend}
@@ -437,9 +455,9 @@ export default function CommentList({
             </div>
 
             {createComment.isPending && (
-              <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <div role="status" className="mt-2 flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300">
                 <Loader2 size={12} className="animate-spin" />
-                리뷰 저장 중...
+                {createComment.variables?.publishToGitHub ? "GitHub 리뷰 등록 중..." : "리뷰 저장 중..."}
               </div>
             )}
           </div>

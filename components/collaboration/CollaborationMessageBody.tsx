@@ -3,6 +3,7 @@
 import type { FormEvent } from "react"
 import { Check, Loader2, Pencil, RotateCcw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import GitHubReviewStatus from "@/components/comment/GitHubReviewStatus"
 import { Textarea } from "@/components/ui/textarea"
 import type { useCollaborationMessageEditor } from "@/hooks/useCollaborationMessages"
 import type { CollaborationCodeReference, CollaborationMessage, CollaborationReviewReference } from "@/types/collaboration"
@@ -20,7 +21,7 @@ export function CollaborationMessageActions({
   canManage: boolean
   editor: MessageEditor
 }) {
-  if (message.authorId !== currentUserId || !canManage || message.deliveryStatus || editor.editingMessageId === message.id) return null
+  if (message.authorId !== currentUserId || !canManage || message.deliveryStatus || editor.editingMessageId === message.id || message.githubStatus === "PUBLISHED" || message.githubStatus === "PUBLISHING") return null
 
   const deleting = editor.deletingMessageId === message.id
   return (
@@ -72,6 +73,17 @@ export default function CollaborationMessageBody({
         </button>
       ) : <><Check className="size-3" /> 전송됨</>}
     </span>
+  )
+  const githubStatus = message.reviewCommentId && (
+    <GitHubReviewStatus
+      commentId={message.reviewCommentId}
+      status={message.githubStatus}
+      url={message.githubReviewUrl}
+      error={message.githubError}
+      statusUpdatedAt={message.githubStatusUpdatedAt}
+      roomId={message.roomId}
+      canRetry={isMine}
+    />
   )
 
   return <>
@@ -127,11 +139,13 @@ export default function CollaborationMessageBody({
           </button>
         )}
         {deliveryStatus && <div className="mt-1 flex justify-end">{deliveryStatus}</div>}
+        {githubStatus && <div className="mt-1 flex justify-end">{githubStatus}</div>}
       </div>
     ) : (
       <div className="mt-0.5 flex min-w-0 flex-wrap items-end justify-between gap-x-3 gap-y-1">
         <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm text-slate-800 dark:text-slate-100">{message.content}</p>
         {deliveryStatus}
+        {githubStatus}
       </div>
     )}
     {editor.error?.messageId === message.id && <p role="alert" className="mt-1 text-xs text-rose-600">{editor.error.text}</p>}

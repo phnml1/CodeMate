@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react"
 import { Check, Loader2, RotateCcw, Send } from "lucide-react"
 import CollaborationMessageBody, { CollaborationMessageActions } from "@/components/collaboration/CollaborationMessageBody"
+import GitHubReviewToggle from "@/components/comment/GitHubReviewToggle"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -19,6 +20,7 @@ export default function CollaborationReviewThread({
   issueIndex,
   currentUserId,
   canSend,
+  suggestedContent,
   messages,
   isPending,
   isError,
@@ -29,12 +31,14 @@ export default function CollaborationReviewThread({
   issueIndex: number | null
   currentUserId: string
   canSend: boolean
+  suggestedContent?: string
   messages: CollaborationMessage[]
   isPending: boolean
   isError: boolean
   onRetry: () => void
 }) {
   const [draft, setDraft] = useState("")
+  const [publishToGitHub, setPublishToGitHub] = useState(false)
   const createMessage = useCreateCollaborationMessage(roomId, currentUserId)
   const messageEditor = useCollaborationMessageEditor(roomId)
   const reviewReference = { reviewId, issueIndex }
@@ -50,8 +54,10 @@ export default function CollaborationReviewThread({
       content,
       reviewReference,
       clientMessageId: crypto.randomUUID(),
+      publishToGitHub,
     })
     setDraft("")
+    setPublishToGitHub(false)
   }
 
   return (
@@ -127,6 +133,7 @@ export default function CollaborationReviewThread({
                           content: message.content,
                           reviewReference,
                           clientMessageId: message.clientMessageId!,
+                          publishToGitHub: message.githubStatus === "PUBLISHING",
                         })}
                         className="flex items-center gap-1 text-rose-600 hover:underline disabled:opacity-50"
                       >
@@ -143,6 +150,11 @@ export default function CollaborationReviewThread({
       </div>
 
       <form onSubmit={handleSubmit} className="mt-3 border-t border-violet-200 pt-3 dark:border-violet-900">
+        {suggestedContent && (
+          <Button type="button" size="xs" variant="ghost" className="mb-2" disabled={!canSend} onClick={() => setDraft(suggestedContent.slice(0, MAX_MESSAGE_LENGTH))}>
+            AI 제안 가져오기
+          </Button>
+        )}
         <label className="sr-only" htmlFor={`review-comment-${reviewId}-${issueIndex ?? "overall"}`}>
           AI 리뷰 코멘트
         </label>
@@ -162,11 +174,19 @@ export default function CollaborationReviewThread({
           }}
         />
         <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-xs text-slate-500">{draft.length}/{MAX_MESSAGE_LENGTH}</span>
+          <div className="flex items-center gap-2">
+            <GitHubReviewToggle checked={publishToGitHub} onChange={setPublishToGitHub} disabled={!canSend} />
+            <span className="text-xs text-slate-500">{draft.length}/{MAX_MESSAGE_LENGTH}</span>
+          </div>
           <Button type="submit" size="sm" disabled={!canSend || !draft.trim()}>
             <Send /> 보내기
           </Button>
         </div>
+        {createMessage.isPending && createMessage.variables?.publishToGitHub && (
+          <p role="status" className="mt-2 flex items-center gap-1.5 text-xs text-violet-700 dark:text-violet-300">
+            <Loader2 className="size-3 animate-spin" /> GitHub 리뷰 등록 중...
+          </p>
+        )}
       </form>
     </div>
   )

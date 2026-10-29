@@ -5,6 +5,7 @@ import { Loader2, MessageSquare, Send, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import CollaborationMessageBody, { CollaborationMessageActions } from "@/components/collaboration/CollaborationMessageBody"
+import GitHubReviewToggle from "@/components/comment/GitHubReviewToggle"
 import TypingIndicator from "@/components/comment/TypingIndicator"
 import { useCollaborationTyping } from "@/hooks/useCollaborationTyping"
 import type { CollaborationTypingAnchor } from "@/lib/socket/types"
@@ -51,6 +52,7 @@ export default function CollaborationMessages({
   messagesQuery,
 }: CollaborationMessagesProps) {
   const [draft, setDraft] = useState("")
+  const [publishToGitHub, setPublishToGitHub] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const previousNewestIdRef = useRef<string | undefined>(undefined)
@@ -106,9 +108,11 @@ export default function CollaborationMessages({
       content,
       clientMessageId: crypto.randomUUID(),
       ...(selectedCodeReference ? { codeReference: selectedCodeReference } : {}),
+      publishToGitHub,
     })
     stopTyping()
     setDraft("")
+    setPublishToGitHub(false)
   }
 
   return (
@@ -191,7 +195,7 @@ export default function CollaborationMessages({
                     onOpenCodeReference={onOpenCodeReference}
                     onOpenReviewReference={onOpenReviewReference}
                     showDeliveryStatus={isMine && (message.deliveryStatus === "sending" || message.deliveryStatus === "failed" || message.id === lastOwnMessageId)}
-                    onRetry={() => createMessage.mutate({ content: message.content, codeReference: message.codeReference ?? undefined, reviewReference: message.reviewReference ?? undefined, clientMessageId: message.clientMessageId! })}
+                    onRetry={() => createMessage.mutate({ content: message.content, codeReference: message.codeReference ?? undefined, reviewReference: message.reviewReference ?? undefined, clientMessageId: message.clientMessageId!, publishToGitHub: message.githubStatus === "PUBLISHING" })}
                   />
                 </div>
               )
@@ -235,14 +239,20 @@ export default function CollaborationMessages({
           }}
         />
         <div className="mt-2 flex items-center justify-between gap-3">
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            {draft.length}/{MAX_MESSAGE_LENGTH}
-          </span>
+          <div className="flex items-center gap-2">
+            <GitHubReviewToggle checked={publishToGitHub} onChange={setPublishToGitHub} disabled={!canSend} />
+            <span className="text-xs text-slate-500 dark:text-slate-400">{draft.length}/{MAX_MESSAGE_LENGTH}</span>
+          </div>
           <Button type="submit" size="sm" disabled={!canSend || !draft.trim()}>
             <Send />
             보내기
           </Button>
         </div>
+        {createMessage.isPending && createMessage.variables?.publishToGitHub && (
+          <p role="status" className="mt-2 flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-300">
+            <Loader2 className="size-3 animate-spin" /> GitHub 리뷰 등록 중...
+          </p>
+        )}
         {messagesQuery.isError && messages.length > 0 && (
           <p role="alert" className="mt-2 text-xs text-rose-600 dark:text-rose-400">
             메시지 갱신에 실패했습니다.

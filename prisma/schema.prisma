@@ -224,6 +224,11 @@ model Comment {
   filePath        String?
 
   isResolved      Boolean   @default(false)
+  githubStatus    GitHubReviewStatus @default(NOT_REQUESTED)
+  githubReviewId  String?
+  githubReviewCommentId String?
+  githubReviewUrl String?
+  githubError     String?    @db.Text
 
   // Relations
   pullRequest     PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
@@ -248,6 +253,13 @@ model Comment {
 
   @@index([pullRequestId])
   @@index([authorId])
+}
+
+enum GitHubReviewStatus {
+  NOT_REQUESTED
+  PUBLISHING
+  PUBLISHED
+  FAILED
 }
 
 model CollaborationRoom {

@@ -282,6 +282,29 @@ describe("POST /api/collaboration/rooms/[roomId]/messages", () => {
     expect(mockedCreateMessage.mock.calls.at(-1)?.[0].data).not.toHaveProperty("reviewComment")
   })
 
+  it("links a room-wide message to a PR review when GitHub publishing is selected", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "user-2" } })
+    mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })
+    mockedFindRoom.mockResolvedValue(sampleRoom)
+    mockedFindMember.mockResolvedValue({ id: "member-2", leftAt: null })
+    mockedCreateMessage.mockResolvedValue({
+      ...sampleMessage,
+      codeReference: null,
+      reviewComment: { id: "comment-1", githubStatus: "NOT_REQUESTED", githubReviewUrl: null, githubError: null, updatedAt: now },
+    })
+
+    const response = await POST(createRequest({ content: "전체 리뷰", publishToGitHub: true }), createParams())
+    const body = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(body.message.reviewCommentId).toBe("comment-1")
+    expect(mockedCreateMessage).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        reviewComment: { create: expect.objectContaining({ content: "전체 리뷰", pullRequestId: "pr-1" }) },
+      }),
+    }))
+  })
+
   it("rejects a limited user before writing or broadcasting", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "user-2" } })
     mockedBuildAccessiblePullRequestWhere.mockResolvedValue({ repoId: { in: ["repo-1"] } })

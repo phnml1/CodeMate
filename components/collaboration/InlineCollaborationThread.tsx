@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import CollaborationMessageBody, { CollaborationMessageActions } from "@/components/collaboration/CollaborationMessageBody"
 import TypingIndicator from "@/components/comment/TypingIndicator"
+import GitHubReviewToggle from "@/components/comment/GitHubReviewToggle"
 import { useCollaborationCodeThread } from "@/hooks/useCollaborationCodeThreads"
 import { useCollaborationMessageEditor, useCreateCollaborationMessage } from "@/hooks/useCollaborationMessages"
 import { useCollaborationTyping } from "@/hooks/useCollaborationTyping"
@@ -36,6 +37,7 @@ export default function InlineCollaborationThread({
   onClose: () => void
 }) {
   const [draft, setDraft] = useState("")
+  const [publishToGitHub, setPublishToGitHub] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const newestMessageRef = useRef<HTMLDivElement>(null)
@@ -101,9 +103,11 @@ export default function InlineCollaborationThread({
         baseSha: anchor.baseSha,
         headSha: anchor.headSha,
       },
+      publishToGitHub,
     })
     stopTyping()
     setDraft("")
+    setPublishToGitHub(false)
   }
 
   return (
@@ -158,7 +162,7 @@ export default function InlineCollaborationThread({
               variant="inline"
               editor={messageEditor}
               showDeliveryStatus={message.authorId === currentUserId && (message.deliveryStatus === "sending" || message.deliveryStatus === "failed" || message.id === lastOwnMessageId)}
-              onRetry={() => createMessage.mutate({ content: message.content, codeReference: message.codeReference ?? undefined, clientMessageId: message.clientMessageId! })}
+              onRetry={() => createMessage.mutate({ content: message.content, codeReference: message.codeReference ?? undefined, clientMessageId: message.clientMessageId!, publishToGitHub: message.githubStatus === "PUBLISHING" })}
             />
           </div>
         ))}
@@ -186,12 +190,20 @@ export default function InlineCollaborationThread({
           }}
         />
         <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-xs text-slate-500">{draft.length}/{MAX_MESSAGE_LENGTH}</span>
+          <div className="flex items-center gap-2">
+            <GitHubReviewToggle checked={publishToGitHub} onChange={setPublishToGitHub} disabled={!canSend} />
+            <span className="text-xs text-slate-500">{draft.length}/{MAX_MESSAGE_LENGTH}</span>
+          </div>
           <Button type="submit" size="sm" disabled={!canSend || !draft.trim()}>
             <Send />
             보내기
           </Button>
         </div>
+        {createMessage.isPending && createMessage.variables?.publishToGitHub && (
+          <p role="status" className="mt-2 flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-300">
+            <Loader2 className="size-3 animate-spin" /> GitHub 리뷰 등록 중...
+          </p>
+        )}
       </form>
     </section>
   )

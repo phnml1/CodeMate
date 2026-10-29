@@ -27,12 +27,12 @@ async function findOwnedMessage(roomId: string, messageId: string, userId: strin
 
   const message = await prisma.collaborationMessage.findFirst({
     where: { id: messageId, roomId: room.id },
-    select: { id: true, authorId: true, reviewComment: { select: { id: true } } },
+    select: { id: true, authorId: true, reviewComment: { select: { id: true, githubStatus: true } } },
   })
   if (!message) return { error: NextResponse.json({ error: "Message not found" }, { status: 404 }) }
   if (message.authorId !== userId) return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
 
-  return { roomId: room.id, reviewCommentId: message.reviewComment?.id }
+  return { roomId: room.id, reviewCommentId: message.reviewComment?.id, githubStatus: message.reviewComment?.githubStatus }
 }
 
 export async function PATCH(request: Request, { params }: RouteContext) {
@@ -43,6 +43,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const { roomId, messageId } = await params
     const access = await findOwnedMessage(roomId, messageId, session.user.id)
     if (access.error) return access.error
+    if (access.githubStatus === "PUBLISHED" || access.githubStatus === "PUBLISHING") {
+      return NextResponse.json({ error: "GitHub에 전송한 리뷰는 여기서 수정할 수 없습니다." }, { status: 409 })
+    }
 
     const parsed = updateCollaborationMessageSchema.safeParse(await request.json().catch(() => null))
     if (!parsed.success) return NextResponse.json({ error: "Invalid request body", issues: parsed.error.flatten() }, { status: 400 })
@@ -76,6 +79,9 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
     const { roomId, messageId } = await params
     const access = await findOwnedMessage(roomId, messageId, session.user.id)
     if (access.error) return access.error
+    if (access.githubStatus === "PUBLISHED" || access.githubStatus === "PUBLISHING") {
+      return NextResponse.json({ error: "GitHub에 전송한 리뷰는 여기서 삭제할 수 없습니다." }, { status: 409 })
+    }
 
     await prisma.collaborationMessage.delete({
       where: { id: messageId, roomId, authorId: session.user.id },
