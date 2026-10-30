@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/migrate-production.mjs",
     "dev:socket": "tsx --env-file=.env socket-server/index.ts",
     "test:socket:faults": "tsx scripts/test-socket-faults.ts",
     "build:socket": "tsc -p socket-server/tsconfig.json",
