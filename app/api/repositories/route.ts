@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth"
-import { getOctokit } from "@/lib/github"
+import { getOctokit, isGitHubReconnectRequiredError } from "@/lib/github"
 import { prisma } from "@/lib/prisma"
 import { syncRepositoryPullRequests } from "@/lib/pull-request-sync"
 import { getConnectedRepositoriesForUser } from "@/lib/dal/repositories"
@@ -45,16 +45,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { githubId, name, fullName, description, language, canAdminister } = body
-
-    if (!githubId || !name || !fullName) {
+    const body = await request.json().catch(() => null)
+    const githubId = body?.githubId
+    if (!Number.isSafeInteger(githubId) || githubId <= 0) {
       return NextResponse.json(
-        { error: "githubId, name, fullName are required" },
+        { error: "A valid githubId is required" },
         { status: 400 }
       )
     }
 
+    // The repository list in the browser is only a display hint. Recheck the
+    // authenticated user's explicit GitHub access before granting membership.
+    const octokit = await getOctokit(session.user.id)
+    const accessibleRepositories = await octokit.paginate(
+      octokit.rest.repos.listForAuthenticatedUser,
+      { per_page: 100 }
+    )
+    const githubRepository = accessibleRepositories.find((repo) => repo.id === githubId)
+    if (!githubRepository) {
+      return NextResponse.json({ error: "Repository not accessible" }, { status: 403 })
+    }
+
+    const { name, full_name: fullName, description, language } = githubRepository
+    const canAdminister = githubRepository.permissions?.admin === true
     const parsedGithubId = BigInt(githubId)
     let repository = await prisma.repository.findUnique({
       where: { githubId: parsedGithubId },
@@ -115,7 +128,6 @@ export async function POST(request: Request) {
 
     if (!repository.webhookId && canAdminister === true) {
       try {
-        const octokit = await getOctokit(session.user.id)
         const { data: hook } = await octokit.rest.repos.createWebhook({
           owner,
           repo,
@@ -147,8 +159,6 @@ export async function POST(request: Request) {
     }
 
     try {
-      const octokit = await getOctokit(session.user.id)
-
       await syncRepositoryPullRequests({
         octokit,
         owner,
@@ -166,6 +176,13 @@ export async function POST(request: Request) {
       { status: 201 }
     )
   } catch (error) {
+    if (isGitHubReconnectRequiredError(error)) {
+      return NextResponse.json(
+        { error: "GitHub authorization expired. Please reconnect GitHub." },
+        { status: 401 }
+      )
+    }
+
     if (isRepositoryMembershipMigrationError(error)) {
       return NextResponse.json(
         {
