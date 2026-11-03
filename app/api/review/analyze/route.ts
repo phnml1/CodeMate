@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { analyzeReview } from "@/lib/ai/analyze";
+import { isAiReviewLimitReached } from "@/lib/ai/review-quota";
 import { auth } from "@/lib/auth";
 import { invalidateDashboardForUsers } from "@/lib/dashboard-cache";
 import { getEnabledUserIds } from "@/lib/notification-settings";
@@ -74,6 +75,15 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Pull request not found" },
         { status: 404 }
+      );
+    }
+
+    if (await isAiReviewLimitReached()) {
+      const now = new Date();
+      const nextUtcDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+      return NextResponse.json(
+        { error: "오늘의 AI 리뷰 요청 한도에 도달했습니다. UTC 자정 이후 다시 시도해 주세요." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((nextUtcDay - now.getTime()) / 1000)) } }
       );
     }
 

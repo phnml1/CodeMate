@@ -1,6 +1,7 @@
 import { Octokit } from "@octokit/rest";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { getAnthropicClient, CLAUDE_MODEL } from "@/lib/ai/claude";
+import { reserveAiReviewSlot } from "@/lib/ai/review-quota";
 import { parseAIReviewResponse } from "@/lib/ai/parsers";
 import { SYSTEM_PROMPT, buildUserPrompt } from "@/lib/ai/prompts";
 import { prisma } from "@/lib/prisma";
@@ -178,6 +179,10 @@ export async function analyzeReview(
       status: "IN_PROGRESS",
       stage: "ANALYZING",
     });
+
+    if (!(await reserveAiReviewSlot(reviewId))) {
+      throw new Error("오늘의 AI 리뷰 요청 한도에 도달했습니다. UTC 자정 이후 다시 시도해 주세요.");
+    }
 
     const response = await getAnthropicClient().messages.create({
       model: CLAUDE_MODEL,

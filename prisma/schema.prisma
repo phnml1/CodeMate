@@ -173,6 +173,7 @@ model Review {
   status          ReviewStatus @default(PENDING)
   stage           ReviewStage  @default(QUEUED)
   failureReason   String?      @db.Text
+  aiRequestedAt   DateTime?
 
   // Relations
   pullRequest     PullRequest  @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
@@ -183,9 +184,25 @@ model Review {
 
   @@index([pullRequestId])
   @@index([status])
+  @@index([aiRequestedAt])
   // NOTE: PENDING/IN_PROGRESS 상태는 pullRequestId당 1개만 허용하는 partial unique index가
   // raw migration으로 적용되어 있음 (Prisma schema 문법으로 표현 불가).
   // → prisma/migrations/20260408000000_add_review_active_unique/migration.sql 참고
+}
+
+model GitHubWebhookDelivery {
+  id        String   @id
+  status    WebhookDeliveryStatus @default(PROCESSING)
+  updatedAt DateTime @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([status, updatedAt])
+}
+
+enum WebhookDeliveryStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 
 enum Severity {
