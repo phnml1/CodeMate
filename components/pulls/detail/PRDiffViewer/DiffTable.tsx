@@ -8,6 +8,7 @@ import type { DiffLine } from "@/lib/diff"
 import type { ReviewIssue } from "@/types/review"
 import type { CommentWithAuthor } from "@/types/comment"
 import { ISSUE_ICON } from "@/lib/review-ui"
+import InlineCodeText from "@/components/review/InlineCodeText"
 import InlineCommentForm from "../../../comment/InlineCommentForm"
 import InlineCommentThread from "../../../comment/InlineCommentThread"
 import { groupCommentsByLine } from "@/lib/pr-detail/commentUtils"
@@ -153,8 +154,13 @@ export default function DiffTable({
                       onClick={() => onIssueClick?.(issue)}
                       className={`w-full text-left mx-1 my-0.5 px-3 py-1.5 rounded-lg text-[11px] leading-relaxed border-l-2 hover:brightness-95 dark:hover:brightness-125 transition-all cursor-pointer ${ISSUE_INLINE_CLASS[issue.severity]}`}
                     >
-                      <span className="font-semibold">{issue.title}</span>
-                      <span className="opacity-75"> — {issue.description}</span>
+                      <span className="font-semibold">
+                        <InlineCodeText>{issue.title}</InlineCodeText>
+                      </span>
+                      <span className="opacity-75">
+                        {" — "}
+                        <InlineCodeText>{issue.description}</InlineCodeText>
+                      </span>
                     </button>
                   </td>
                 </tr>

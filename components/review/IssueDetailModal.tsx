@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import type { ReviewIssue } from "@/types/review";
 import ReviewBadge from "./ReviewBadge";
+import InlineCodeText from "./InlineCodeText";
 
 interface IssueDetailModalProps {
   issue: ReviewIssue | null;
@@ -35,7 +36,7 @@ export default function IssueDetailModal({ issue, onClose }: IssueDetailModalPro
               <div className="flex items-start gap-3 pr-6">
                 <div className="flex-1 min-w-0">
                   <DialogTitle className="text-base leading-snug">
-                    {issue.title}
+                    <InlineCodeText>{issue.title}</InlineCodeText>
                   </DialogTitle>
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
                     <ReviewBadge severity={issue.severity} category={issue.category} />
@@ -56,7 +57,7 @@ export default function IssueDetailModal({ issue, onClose }: IssueDetailModalPro
                   설명
                 </p>
                 <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                  {issue.description}
+                  <InlineCodeText>{issue.description}</InlineCodeText>
                 </p>
               </div>
 
@@ -65,7 +66,7 @@ export default function IssueDetailModal({ issue, onClose }: IssueDetailModalPro
                   제안
                 </p>
                 <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                  {issue.suggestion}
+                  <InlineCodeText>{issue.suggestion}</InlineCodeText>
                 </p>
               </div>
 

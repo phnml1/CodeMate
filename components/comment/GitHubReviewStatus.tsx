@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { Github, Loader2, RotateCcw } from "lucide-react"
 import { usePublishGitHubReview } from "@/hooks/useComments"
 
+const publishedBadgeClassName = "inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 transition-colors hover:border-slate-400 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-white"
+
 export default function GitHubReviewStatus({
   commentId,
   status,
@@ -34,10 +36,10 @@ export default function GitHubReviewStatus({
 
   if (status === "PUBLISHED") {
     return url ? (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-md border border-slate-900 bg-slate-900 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-700 hover:underline dark:border-slate-200 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white">
+      <a href={url} target="_blank" rel="noopener noreferrer" className={publishedBadgeClassName}>
         <Github className="size-3" /> GitHub에서 보기
       </a>
-    ) : <span className="inline-flex items-center gap-1 rounded-md border border-slate-900 bg-slate-900 px-2 py-1 text-xs font-semibold text-white dark:border-slate-200 dark:bg-slate-100 dark:text-slate-900"><Github className="size-3" /> GitHub 등록됨</span>
+    ) : <span className={publishedBadgeClassName}><Github className="size-3" /> GitHub 등록됨</span>
   }
 
   const stale = status === "PUBLISHING" && statusUpdatedAt &&

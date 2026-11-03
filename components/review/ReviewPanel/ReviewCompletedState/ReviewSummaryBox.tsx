@@ -1,3 +1,5 @@
+import InlineCodeText from "@/components/review/InlineCodeText";
+
 interface ReviewSummaryBoxProps {
   summary: string;
 }
@@ -9,7 +11,7 @@ export default function ReviewSummaryBox({ summary }: ReviewSummaryBoxProps) {
         요약
       </p>
       <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-        {summary}
+        <InlineCodeText>{summary}</InlineCodeText>
       </p>
     </div>
   );

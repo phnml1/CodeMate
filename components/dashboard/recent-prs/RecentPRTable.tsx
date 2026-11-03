@@ -1,3 +1,7 @@
+"use client"
+
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { textStyles } from "@/lib/styles"
 import { type DashboardRecentPR } from "@/lib/dashboard"
@@ -25,6 +29,8 @@ const STATUS_STYLE: Record<DashboardRecentPR["status"], string> = {
 }
 
 export default function RecentPRTable({ prs }: { prs: DashboardRecentPR[] }) {
+  const router = useRouter()
+
   if (prs.length === 0) {
     return (
       <div className="px-4 sm:px-8 py-12 text-center text-slate-400 text-sm">
@@ -58,6 +64,10 @@ export default function RecentPRTable({ prs }: { prs: DashboardRecentPR[] }) {
         {prs.map((pr, index) => (
           <TableRow
             key={pr.id}
+            onClick={(event) => {
+              if (event.target instanceof Element && event.target.closest("a")) return
+              router.push(`/pulls/${pr.id}`)
+            }}
             className={`hover:bg-slate-50 transition-colors cursor-pointer ${
               index % 2 === 1 ? "bg-slate-50/30" : "bg-white"
             }`}
@@ -69,9 +79,12 @@ export default function RecentPRTable({ prs }: { prs: DashboardRecentPR[] }) {
             </TableCell>
             <TableCell className="px-4 sm:px-6 md:px-8 py-4 sm:py-5 whitespace-normal">
               <div className="flex flex-col gap-1">
-                <span className="text-xs sm:text-sm text-slate-900 font-semibold">
+                <Link
+                  href={`/pulls/${pr.id}`}
+                  className="text-xs sm:text-sm text-slate-900 font-semibold hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                >
                   {pr.title}
-                </span>
+                </Link>
                 <span className="text-xs text-slate-500 md:hidden">{pr.repoName}</span>
               </div>
             </TableCell>
