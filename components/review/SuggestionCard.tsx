@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, MapPin } from "lucide-react";
 import type { ReviewIssue } from "@/types/review";
 import ReviewBadge from "./ReviewBadge";
 import SuggestionCodeBlock from "./SuggestionCodeBlock";
+import InlineCodeText from "./InlineCodeText";
 
 interface SuggestionCardProps {
   issue: ReviewIssue;
@@ -33,7 +34,7 @@ export default function SuggestionCard({
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold leading-snug text-slate-800 dark:text-slate-200">
-            {issue.title}
+            <InlineCodeText>{issue.title}</InlineCodeText>
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <ReviewBadge severity={issue.severity} category={issue.category} />
@@ -54,7 +55,7 @@ export default function SuggestionCard({
               설명
             </p>
             <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-              {issue.description}
+              <InlineCodeText>{issue.description}</InlineCodeText>
             </p>
           </div>
           <div>
@@ -62,7 +63,7 @@ export default function SuggestionCard({
               제안
             </p>
             <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-              {issue.suggestion}
+              <InlineCodeText>{issue.suggestion}</InlineCodeText>
             </p>
           </div>
           {issue.exampleCode && (

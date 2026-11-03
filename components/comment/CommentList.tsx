@@ -204,6 +204,7 @@ function ChatBubble({
           currentUserId={currentUserId}
           onToggle={(emoji) => onReaction(comment.id, emoji)}
           className={cn("px-2", isOwn && "justify-end")}
+          menuAlign={isOwn ? "end" : "start"}
         />
 
         {(comment.replies?.length ?? 0) > 0 && (
@@ -250,6 +251,7 @@ function ChatBubble({
                     currentUserId={currentUserId}
                     onToggle={(emoji) => onReaction(reply.id, emoji)}
                     className={cn("mt-2", isOwnReply && "justify-end")}
+                    menuAlign={isOwnReply ? "end" : "start"}
                   />
                 </div>
               )

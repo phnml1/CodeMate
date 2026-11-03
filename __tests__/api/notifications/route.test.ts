@@ -69,6 +69,7 @@ describe("GET /api/notifications", () => {
         title: "Fix bug",
         number: 42,
         repo: { fullName: "user/repo" },
+        reviews: [{ stage: "ANALYZING" }],
       },
     ]);
 
@@ -81,6 +82,7 @@ describe("GET /api/notifications", () => {
     expect(body.notifications[0].prTitle).toBe("Fix bug");
     expect(body.notifications[0].prNumber).toBe(42);
     expect(body.notifications[0].repoFullName).toBe("user/repo");
+    expect(body.notifications[0].reviewStage).toBe("ANALYZING");
     expect(body.unreadCount).toBe(1);
   });
 

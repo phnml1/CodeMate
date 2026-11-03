@@ -5,6 +5,7 @@ import {
 } from "@/lib/notifications/compat"
 import { prisma } from "@/lib/prisma"
 import type { NotificationType } from "@/types/notification"
+import type { ReviewStage } from "@/types/review"
 
 export async function GET(request: Request) {
   const session = await auth()
@@ -45,7 +46,12 @@ export async function GET(request: Request) {
   // PR 상세 정보를 배치로 조회
   const prIds = [...new Set(notifications.map((n) => n.prId).filter(Boolean))] as string[]
 
-  const prMap = new Map<string, { title: string; number: number; repoFullName: string }>()
+  const prMap = new Map<string, {
+    title: string
+    number: number
+    repoFullName: string
+    reviewStage: ReviewStage | null
+  }>()
 
   if (prIds.length > 0) {
     const prs = await prisma.pullRequest.findMany({
@@ -55,6 +61,11 @@ export async function GET(request: Request) {
         title: true,
         number: true,
         repo: { select: { fullName: true } },
+        reviews: {
+          select: { stage: true },
+          orderBy: { reviewedAt: "desc" },
+          take: 1,
+        },
       },
     })
     for (const pr of prs) {
@@ -62,6 +73,7 @@ export async function GET(request: Request) {
         title: pr.title,
         number: pr.number,
         repoFullName: pr.repo.fullName,
+        reviewStage: pr.reviews[0]?.stage ?? null,
       })
     }
   }
@@ -74,6 +86,7 @@ export async function GET(request: Request) {
         prTitle: pr?.title ?? null,
         prNumber: pr?.number ?? null,
         repoFullName: pr?.repoFullName ?? null,
+        reviewStage: pr?.reviewStage ?? null,
       }
     }),
     unreadCount,

@@ -1,3 +1,5 @@
+import type { ReviewStage } from "@/types/review"
+
 export type NotificationType = "MENTION" | "NEW_REVIEW" | "PR_MERGED" | "COMMENT_REPLY" | "REVIEW_FAILED"
 export type NotificationReviewStatus = "PENDING" | "COMPLETED" | "FAILED"
 
@@ -16,6 +18,7 @@ export interface BaseNotification {
   prTitle?: string | null
   prNumber?: number | null
   repoFullName?: string | null
+  reviewStage?: ReviewStage | null
 }
 
 /** API 응답에서 사용되는 확장 알림 타입 (PR 상세 정보 포함) */

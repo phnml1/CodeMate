@@ -11,6 +11,7 @@ interface ReactionBarProps {
   onToggle: (emoji: ReactionEmoji) => void
   className?: string
   disabled?: boolean
+  menuAlign?: "start" | "end"
 }
 
 export default function ReactionBar({
@@ -19,6 +20,7 @@ export default function ReactionBar({
   onToggle,
   className,
   disabled = false,
+  menuAlign = "start",
 }: ReactionBarProps) {
   return (
     <div className={cn("mt-1 flex flex-wrap items-center gap-1", className)}>
@@ -61,7 +63,12 @@ export default function ReactionBar({
           <span>+</span>
           <span>추가</span>
         </button>
-        <div className="absolute bottom-full left-0 z-10 mb-1 hidden gap-1 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg group-hover:flex group-focus-within:flex dark:border-slate-700 dark:bg-slate-800">
+        <div
+          className={cn(
+            "absolute bottom-full z-10 mb-1 hidden gap-1 whitespace-nowrap rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg group-hover:flex group-focus-within:flex dark:border-slate-700 dark:bg-slate-800",
+            menuAlign === "end" ? "right-0" : "left-0"
+          )}
+        >
           {EMOJIS.map((emoji) => (
             <button
               key={emoji}

@@ -82,13 +82,23 @@ export default function InlineCommentThread({
               <p className="mt-0.5 whitespace-pre-wrap text-xs text-slate-700 dark:text-slate-300">
                 {comment.content}
               </p>
-              <GitHubReviewStatus commentId={comment.id} status={comment.githubStatus} url={comment.githubReviewUrl} error={comment.githubError} statusUpdatedAt={comment.updatedAt} prId={prId} canRetry={comment.authorId === currentUserId} />
-              <ReactionBar
-                reactions={comment.reactions ?? {}}
-                currentUserId={currentUserId}
-                onToggle={(emoji) => handleReaction(comment.id, emoji)}
-                className="mt-2"
-              />
+              <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <ReactionBar
+                  reactions={comment.reactions ?? {}}
+                  currentUserId={currentUserId}
+                  onToggle={(emoji) => handleReaction(comment.id, emoji)}
+                  className="mt-0"
+                />
+                <GitHubReviewStatus
+                  commentId={comment.id}
+                  status={comment.githubStatus}
+                  url={comment.githubReviewUrl}
+                  error={comment.githubError}
+                  statusUpdatedAt={comment.updatedAt}
+                  prId={prId}
+                  canRetry={comment.authorId === currentUserId}
+                />
+              </div>
               {isDeletingComment && (
                 <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-300">
                   <Loader2 size={11} className="animate-spin" />
