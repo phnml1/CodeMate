@@ -111,6 +111,7 @@ export function usePublishGitHubReview(prId?: string, roomId?: string) {
       if (roomId) {
         void queryClient.invalidateQueries({ queryKey: ["collaborationMessages", roomId] })
         void queryClient.invalidateQueries({ queryKey: ["collaborationCodeThreads", roomId] })
+        void queryClient.invalidateQueries({ queryKey: ["collaborationReviewMessages", roomId] })
       }
     },
   })
