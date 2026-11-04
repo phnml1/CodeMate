@@ -6,6 +6,7 @@ import {
   updateCollaborationMessageCache,
 } from "@/hooks/useCollaborationMessages"
 import { collaborationCodeThreadsQueryKey } from "@/hooks/useCollaborationCodeThreads"
+import { collaborationReviewMessagesQueryKey } from "@/hooks/useCollaborationReviewThreads"
 import type {
   CollaborationMessage,
   CollaborationMessagesResponse,
@@ -100,6 +101,18 @@ it("updates a message in both room and code-thread caches", () => {
 
   expect(queryClient.getQueryData<InfiniteData<CollaborationMessagesResponse>>(roomKey)?.pages[0].messages).toEqual([updated])
   expect(queryClient.getQueryData<InfiniteData<CollaborationMessagesResponse>>(threadKey)?.pages[0].messages).toEqual([updated])
+})
+
+it("replaces a recipient's publishing state in the AI review thread cache", () => {
+  const queryClient = new QueryClient()
+  const reviewKey = collaborationReviewMessagesQueryKey("room-1", "review-1")
+  const publishing = { ...message, reviewReference: { reviewId: "review-1", issueIndex: 0 }, githubStatus: "PUBLISHING" as const }
+  queryClient.setQueryData(reviewKey, { messages: [publishing] })
+
+  const published = { ...publishing, githubStatus: "PUBLISHED" as const, githubReviewUrl: "https://github.com/review/1" }
+  updateCollaborationMessageCache(queryClient, published)
+
+  expect(queryClient.getQueryData(reviewKey)).toEqual({ messages: [published] })
 })
 
 it("removes a deleted message from both caches and refreshes thread markers", () => {
