@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server"
 import { analyzeReview } from "@/lib/ai/analyze"
+import { claimWebhookDelivery, finishWebhookDelivery } from "@/lib/github-webhook-delivery"
 import { getEnabledUserIds } from "@/lib/notification-settings"
 import { notificationCompatSelect } from "@/lib/notifications/compat"
 import { prisma } from "@/lib/prisma"
@@ -48,6 +49,7 @@ async function notifyUsers(params: {
 }
 
 export async function POST(request: Request) {
+  let claimedDeliveryId: string | null = null
   try {
     const payload = await request.text()
     const signature = request.headers.get("x-hub-signature-256") ?? ""
@@ -73,6 +75,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Action ignored" })
     }
 
+    const deliveryId = request.headers.get("x-github-delivery")
+    if (!deliveryId || !/^[a-f0-9-]{36}$/i.test(deliveryId)) {
+      return NextResponse.json({ error: "Invalid delivery ID" }, { status: 400 })
+    }
+
     const repository = await prisma.repository.findFirst({
       where: { githubId: BigInt(repo.id) },
       select: { id: true },
@@ -84,6 +91,11 @@ export async function POST(request: Request) {
         { status: 404 }
       )
     }
+
+    if (!(await claimWebhookDelivery(deliveryId))) {
+      return NextResponse.json({ message: "Delivery already processed" })
+    }
+    claimedDeliveryId = deliveryId
 
     const recipientIds = [...new Set(await getRepositoryMemberIds(repository.id))]
 
@@ -150,10 +162,14 @@ export async function POST(request: Request) {
         })
       }
 
+      await finishWebhookDelivery(deliveryId, "COMPLETED")
+      claimedDeliveryId = null
+
       return NextResponse.json({ message: "PR status processed" })
     }
 
     after(async () => {
+      let analysisHandled = false
       try {
         const pendingRecipients = await getEnabledUserIds(
           recipientIds,
@@ -169,9 +185,13 @@ export async function POST(request: Request) {
         })
 
         const result = await analyzeReview(pullRequest.id)
+        analysisHandled = true
         invalidateDashboardForUsers(recipientIds)
 
-        if (result.status === "SKIPPED_ACTIVE") return
+        if (result.status === "SKIPPED_ACTIVE") {
+          await finishWebhookDelivery(deliveryId, "COMPLETED")
+          return
+        }
 
         const targetRecipients =
           result.status === "FAILED"
@@ -185,13 +205,24 @@ export async function POST(request: Request) {
           prNumber: pr.number,
           status: result.status,
         })
+        await finishWebhookDelivery(deliveryId, "COMPLETED")
       } catch (error) {
         console.error("[webhook] analyzeReview failed:", error)
+        await finishWebhookDelivery(deliveryId, analysisHandled ? "COMPLETED" : "FAILED")
       }
     })
 
+    claimedDeliveryId = null
+
     return NextResponse.json({ message: "PR processed" })
   } catch {
+    if (claimedDeliveryId) {
+      try {
+        await finishWebhookDelivery(claimedDeliveryId, "FAILED")
+      } catch (error) {
+        console.error("[webhook] failed to mark delivery for retry:", error)
+      }
+    }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

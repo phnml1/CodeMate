@@ -2,6 +2,7 @@ import { POST } from "@/app/api/webhook/github/route"
 import { prisma } from "@/lib/prisma"
 import * as webhookValidator from "@/lib/webhook-validator"
 import * as analyzeModule from "@/lib/ai/analyze"
+import { claimWebhookDelivery, finishWebhookDelivery } from "@/lib/github-webhook-delivery"
 import { invalidateDashboardForUsers } from "@/lib/dashboard-cache"
 import { getRepositoryMemberIds } from "@/lib/repository-access"
 import * as reviewNotificationsModule from "@/lib/review-notifications"
@@ -41,6 +42,10 @@ jest.mock("@/lib/ai/analyze", () => ({
     status: "COMPLETED",
     reviewId: "review-1",
   }),
+}))
+jest.mock("@/lib/github-webhook-delivery", () => ({
+  claimWebhookDelivery: jest.fn(),
+  finishWebhookDelivery: jest.fn(),
 }))
 
 jest.mock("@/lib/dashboard-cache", () => ({
@@ -82,6 +87,7 @@ function createRequest(body: object, event = "pull_request", valid = true) {
       "content-type": "application/json",
       "x-hub-signature-256": valid ? makeSignature(payload) : "sha256=invalid",
       "x-github-event": event,
+      "x-github-delivery": "00000000-0000-4000-8000-000000000001",
     },
   })
 }
@@ -109,6 +115,8 @@ const prPayload = {
 
 describe("POST /api/webhook/github", () => {
   beforeEach(() => {
+    ;(claimWebhookDelivery as jest.Mock).mockResolvedValue(true)
+    ;(finishWebhookDelivery as jest.Mock).mockResolvedValue(undefined)
     mockedVerify.mockResolvedValue(true)
     mockedFindFirst.mockResolvedValue({ id: "repo-1" })
     mockedUpsert.mockResolvedValue({ id: "pr-1" })
@@ -195,6 +203,38 @@ describe("POST /api/webhook/github", () => {
     expect(response.status).toBe(401)
     expect(body.error).toBe("Invalid webhook signature")
     expect(invalidateDashboardForUsers).not.toHaveBeenCalled()
+    expect(claimWebhookDelivery).not.toHaveBeenCalled()
+  })
+
+  it("ignores a duplicate delivery before any PR or notification write", async () => {
+    ;(claimWebhookDelivery as jest.Mock).mockResolvedValue(false)
+    const response = await POST(createRequest(prPayload))
+
+    expect(response.status).toBe(200)
+    expect(mockedUpsert).not.toHaveBeenCalled()
+    expect(prisma.notification.create).not.toHaveBeenCalled()
+    expect(mockedAnalyzeReview).not.toHaveBeenCalled()
+  })
+
+  it("rejects a relevant event without a delivery ID", async () => {
+    const request = createRequest(prPayload)
+    const headers = new Headers(request.headers)
+    headers.delete("x-github-delivery")
+    const response = await POST(new Request(request, { headers }))
+
+    expect(response.status).toBe(400)
+    expect(claimWebhookDelivery).not.toHaveBeenCalled()
+    expect(mockedUpsert).not.toHaveBeenCalled()
+  })
+
+  it("marks an accepted delivery complete after background analysis", async () => {
+    await POST(createRequest(prPayload))
+    await flushAfter()
+
+    expect(finishWebhookDelivery).toHaveBeenCalledWith(
+      "00000000-0000-4000-8000-000000000001",
+      "COMPLETED"
+    )
   })
 
   it("ignores non pull_request events", async () => {

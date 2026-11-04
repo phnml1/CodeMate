@@ -3,6 +3,7 @@ import { after } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import * as analyzeModule from "@/lib/ai/analyze"
+import { isAiReviewLimitReached } from "@/lib/ai/review-quota"
 import { invalidateDashboardForUsers } from "@/lib/dashboard-cache"
 import {
   buildAccessiblePullRequestWhere,
@@ -26,6 +27,7 @@ jest.mock("@/lib/prisma", () => ({
 jest.mock("@/lib/ai/analyze", () => ({
   analyzeReview: jest.fn(),
 }))
+jest.mock("@/lib/ai/review-quota", () => ({ isAiReviewLimitReached: jest.fn() }))
 
 jest.mock("@/lib/dashboard-cache", () => ({
   invalidateDashboardForUsers: jest.fn(),
@@ -71,6 +73,7 @@ const mockPR = {
 
 describe("POST /api/review/analyze", () => {
   beforeEach(() => {
+    ;(isAiReviewLimitReached as jest.Mock).mockResolvedValue(false)
     mockedAuth.mockResolvedValue({ user: { id: "user-1" } })
     mockedBuildAccessiblePullRequestWhere.mockResolvedValue({
       repoId: { in: ["repo-1"] },
@@ -124,6 +127,17 @@ describe("POST /api/review/analyze", () => {
     expect(mockedBuildAccessiblePullRequestWhere).not.toHaveBeenCalled()
     expect(mockedAfter).not.toHaveBeenCalled()
     expect(invalidateDashboardForUsers).not.toHaveBeenCalled()
+  })
+
+  it("returns 429 with retry timing when the daily AI budget is exhausted", async () => {
+    mockedFindFirst.mockResolvedValue(mockPR)
+    ;(isAiReviewLimitReached as jest.Mock).mockResolvedValue(true)
+
+    const res = await POST(makeRequest({ pullRequestId: "pr-1" }))
+
+    expect(res.status).toBe(429)
+    expect(Number(res.headers.get("Retry-After"))).toBeGreaterThan(0)
+    expect(mockedAfter).not.toHaveBeenCalled()
   })
 
   it("returns 400 when pullRequestId is missing", async () => {

@@ -1,6 +1,7 @@
 import { Octokit } from "@octokit/rest"
 import { analyzeReview } from "@/lib/ai/analyze"
 import { getAnthropicClient } from "@/lib/ai/claude"
+import { reserveAiReviewSlot } from "@/lib/ai/review-quota"
 import { prisma } from "@/lib/prisma"
 import { getRepositoryGithubUsers } from "@/lib/repository-access"
 
@@ -14,6 +15,7 @@ jest.mock("@/lib/ai/claude", () => ({
   CLAUDE_MODEL: "test-model",
   getAnthropicClient: jest.fn(),
 }))
+jest.mock("@/lib/ai/review-quota", () => ({ reserveAiReviewSlot: jest.fn() }))
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     review: {
@@ -51,6 +53,7 @@ describe("analyzeReview", () => {
     mockedReview.findFirst.mockResolvedValue(null)
     mockedReview.create.mockResolvedValue({ id: "review-1" })
     mockedReview.update.mockResolvedValue({ id: "review-1" })
+    ;(reserveAiReviewSlot as jest.Mock).mockResolvedValue(true)
     mockedFindPullRequest.mockResolvedValue({
       id: "pr-1",
       number: 204,
@@ -122,6 +125,25 @@ describe("analyzeReview", () => {
       },
     })
     warning.mockRestore()
+    error.mockRestore()
+  })
+
+  it("fails the review without calling Anthropic when the daily quota is full", async () => {
+    listFiles.mockResolvedValue({ data: [{ filename: "app/page.tsx", patch: "+change" }] })
+    ;(reserveAiReviewSlot as jest.Mock).mockResolvedValue(false)
+    const error = jest.spyOn(console, "error").mockImplementation(() => {})
+
+    const result = await analyzeReview("pr-1")
+
+    expect(result).toEqual({ status: "FAILED" })
+    expect(getAnthropicClient).not.toHaveBeenCalled()
+    expect(mockedReview.update).toHaveBeenLastCalledWith({
+      where: { id: "review-1" },
+      data: expect.objectContaining({
+        status: "FAILED",
+        failureReason: expect.stringContaining("한도"),
+      }),
+    })
     error.mockRestore()
   })
 })
