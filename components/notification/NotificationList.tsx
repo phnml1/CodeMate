@@ -13,11 +13,8 @@ import {
   X,
 } from "lucide-react";
 import type { Notification } from "@/types/notification";
-import {
-  REVIEW_PROGRESS_STEPS,
-  REVIEW_STAGE_META,
-  getReviewStageIndex,
-} from "@/lib/reviewPanel";
+import { REVIEW_STAGE_META } from "@/lib/reviewPanel";
+import ReviewProgressState from "@/components/review/ReviewPanel/ReviewProgressState";
 
 const typeConfig: Record<
   string,
@@ -129,12 +126,11 @@ export default function NotificationList({
           const Icon = config.icon;
           const reviewProgress =
             notification.type === "NEW_REVIEW" &&
+            notification.reviewStatus === "PENDING" &&
             notification.reviewStage &&
-            notification.reviewStage !== "FAILED"
-              ? {
-                  activeIndex: getReviewStageIndex(notification.reviewStage),
-                  label: REVIEW_STAGE_META[notification.reviewStage].label,
-                }
+            notification.reviewStage !== "FAILED" &&
+            notification.reviewStage !== "COMPLETED"
+              ? notification.reviewStage
               : null;
 
           return (
@@ -186,28 +182,12 @@ export default function NotificationList({
                     </p>
                   )}
                   {reviewProgress && (
-                    <div className="mt-2" aria-label={`AI 리뷰 단계: ${reviewProgress.label}`}>
-                      <div className="mb-1 flex items-center justify-between gap-2 text-[10px]">
-                        <span className="font-medium text-slate-500">AI 리뷰 단계</span>
-                        <span className="font-semibold text-blue-600">
-                          {reviewProgress.activeIndex + 1}/{REVIEW_PROGRESS_STEPS.length} · {reviewProgress.label}
-                        </span>
-                      </div>
-                      <div className="flex gap-1" aria-hidden="true">
-                        {REVIEW_PROGRESS_STEPS.map((stage, index) => (
-                          <span
-                            key={stage}
-                            className={`h-1 flex-1 rounded-full ${
-                              index < reviewProgress.activeIndex
-                                ? "bg-emerald-400"
-                                : index === reviewProgress.activeIndex
-                                  ? "bg-blue-500"
-                                  : "bg-slate-200"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                    <ReviewProgressState
+                      stage={reviewProgress}
+                      startedAt={notification.createdAt}
+                      aiStartedAt={notification.aiRequestedAt}
+                      compact
+                    />
                   )}
                   <p className="mt-1 text-xs text-slate-300">
                     {formatDistanceToNow(new Date(notification.createdAt), {

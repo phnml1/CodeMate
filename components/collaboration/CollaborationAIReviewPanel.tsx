@@ -123,7 +123,11 @@ export default function CollaborationAIReviewPanel({
   if (review.status === "PENDING" || review.status === "IN_PROGRESS") {
     return (
       <div className="p-6">
-        <ReviewProgressState stage={review.stage} />
+        <ReviewProgressState
+          stage={review.stage}
+          startedAt={review.reviewedAt}
+          aiStartedAt={review.aiRequestedAt}
+        />
       </div>
     )
   }

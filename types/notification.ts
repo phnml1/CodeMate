@@ -19,6 +19,7 @@ export interface BaseNotification {
   prNumber?: number | null
   repoFullName?: string | null
   reviewStage?: ReviewStage | null
+  aiRequestedAt?: string | null
 }
 
 /** API 응답에서 사용되는 확장 알림 타입 (PR 상세 정보 포함) */

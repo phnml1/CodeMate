@@ -41,22 +41,6 @@ export const REVIEW_STAGE_META: Record<
   },
 };
 
-export const REVIEW_PROGRESS_STEPS: ReviewStage[] = [
-  "QUEUED",
-  "FETCHING_FILES",
-  "ANALYZING",
-  "FINALIZING",
-  "COMPLETED",
-];
-
-export function getNormalizedReviewStage(stage: ReviewStage) {
-  return REVIEW_PROGRESS_STEPS.includes(stage) ? stage : "QUEUED";
-}
-
-export function getReviewStageIndex(stage: ReviewStage) {
-  return REVIEW_PROGRESS_STEPS.indexOf(getNormalizedReviewStage(stage));
-}
-
 export function getCompletedReviewData(
   review: Review,
   filterSeverity: ReviewSeverityFilter

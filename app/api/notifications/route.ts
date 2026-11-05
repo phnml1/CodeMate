@@ -51,6 +51,7 @@ export async function GET(request: Request) {
     number: number
     repoFullName: string
     reviewStage: ReviewStage | null
+    aiRequestedAt: string | null
   }>()
 
   if (prIds.length > 0) {
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
         number: true,
         repo: { select: { fullName: true } },
         reviews: {
-          select: { stage: true },
+          select: { stage: true, aiRequestedAt: true },
           orderBy: { reviewedAt: "desc" },
           take: 1,
         },
@@ -74,6 +75,7 @@ export async function GET(request: Request) {
         number: pr.number,
         repoFullName: pr.repo.fullName,
         reviewStage: pr.reviews[0]?.stage ?? null,
+        aiRequestedAt: pr.reviews[0]?.aiRequestedAt?.toISOString() ?? null,
       })
     }
   }
@@ -87,6 +89,7 @@ export async function GET(request: Request) {
         prNumber: pr?.number ?? null,
         repoFullName: pr?.repoFullName ?? null,
         reviewStage: pr?.reviewStage ?? null,
+        aiRequestedAt: pr?.aiRequestedAt ?? null,
       }
     }),
     unreadCount,

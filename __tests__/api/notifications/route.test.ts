@@ -69,7 +69,7 @@ describe("GET /api/notifications", () => {
         title: "Fix bug",
         number: 42,
         repo: { fullName: "user/repo" },
-        reviews: [{ stage: "ANALYZING" }],
+        reviews: [{ stage: "ANALYZING", aiRequestedAt: new Date("2026-01-01T00:00:05.000Z") }],
       },
     ]);
 
@@ -83,6 +83,7 @@ describe("GET /api/notifications", () => {
     expect(body.notifications[0].prNumber).toBe(42);
     expect(body.notifications[0].repoFullName).toBe("user/repo");
     expect(body.notifications[0].reviewStage).toBe("ANALYZING");
+    expect(body.notifications[0].aiRequestedAt).toBe("2026-01-01T00:00:05.000Z");
     expect(body.unreadCount).toBe(1);
   });
 
