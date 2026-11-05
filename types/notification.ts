@@ -37,6 +37,7 @@ export interface NotificationsResponse {
 
 export interface NotificationSummaryResponse {
   unreadCount: number
+  recentNotifications: BaseNotification[]
 }
 
 export interface NotificationSetting {
