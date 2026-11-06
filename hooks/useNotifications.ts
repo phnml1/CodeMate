@@ -102,17 +102,23 @@ function showNotificationToast(notification: BaseNotification) {
   else toast(title, options)
 }
 
-export function useNotificationSummary() {
+export function useNotificationSummary(options: UseNotificationsOptions = {}) {
+  const enabled = options.enabled ?? true
   const previousNotificationsRef = useRef<BaseNotification[] | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: notificationSummaryQueryKey,
     queryFn: fetchNotificationSummary,
+    enabled,
     staleTime: NOTIFICATION_STALE_TIME_MS,
-    refetchInterval: NOTIFICATION_POLL_INTERVAL_MS,
+    refetchInterval: enabled ? NOTIFICATION_POLL_INTERVAL_MS : false,
   })
 
   useEffect(() => {
+    if (!enabled) {
+      previousNotificationsRef.current = null
+      return
+    }
     if (!data) return
 
     const recentNotifications = data.recentNotifications ?? []
@@ -122,12 +128,22 @@ export function useNotificationSummary() {
     )
     previousNotificationsRef.current = recentNotifications
     newEvents.forEach(showNotificationToast)
-  }, [data])
+  }, [data, enabled])
 
   return {
     unreadCount: data?.unreadCount ?? 0,
     isLoading,
   }
+}
+
+export function useNotificationSummaryCount() {
+  const { data } = useQuery({
+    queryKey: notificationSummaryQueryKey,
+    queryFn: fetchNotificationSummary,
+    enabled: false,
+  })
+
+  return data?.unreadCount ?? 0
 }
 
 export function useNotifications(
