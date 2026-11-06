@@ -5,26 +5,13 @@ import {
   createCollaborationServerTimer,
   timeCollaborationAuth,
 } from "@/lib/collaboration/server-performance"
+import { isProtectedPath } from "@/lib/protected-path"
 
 // 라우트
 const ROUTES = {
   LOGIN: '/auth/login',
   DASHBOARD: '/dashboard',
 } as const
-
-// 공개 경로
-const PUBLIC_PATHS = ['/auth', '/api-docs']
-const PUBLIC_EXACT_PATHS = ['/']
-
-/**
- * 주어진 경로가 보호되는 경로인지 확인
- */
-function isProtectedPath(pathname: string): boolean {
-  return (
-    !PUBLIC_EXACT_PATHS.includes(pathname) &&
-    !PUBLIC_PATHS.some((path) => pathname.startsWith(path))
-  )
-}
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
