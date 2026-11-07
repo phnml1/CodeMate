@@ -8,6 +8,7 @@ import {
   getRepositoryMemberIds,
 } from "@/lib/repository-access"
 import { NextResponse } from "next/server"
+import { enforceUserRateLimit, RATE_LIMIT_POLICIES } from "@/lib/rate-limit"
 
 function getSyncErrorResponse(error: unknown) {
   if (
@@ -67,6 +68,12 @@ export async function POST(
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const rateLimited = await enforceUserRateLimit(
+      RATE_LIMIT_POLICIES.repositorySync,
+      session.user.id
+    )
+    if (rateLimited) return rateLimited
 
     const { id } = await params
     const repositoryWhere = await buildAccessibleRepositoryWhere(session.user.id, id)

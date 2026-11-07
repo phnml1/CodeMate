@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { NextResponse } from "next/server"
 import type { ReactionEmoji, Reactions } from "@/types/comment"
+import { enforceUserRateLimit, RATE_LIMIT_POLICIES } from "@/lib/rate-limit"
 
 const VALID_EMOJIS: ReactionEmoji[] = ["👍", "❤️", "🎉", "🚀", "👀"]
 
@@ -40,6 +41,12 @@ export async function POST(
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const rateLimited = await enforceUserRateLimit(
+      RATE_LIMIT_POLICIES.reactionWrite,
+      session.user.id
+    )
+    if (rateLimited) return rateLimited
 
     const { id } = await params
 

@@ -13,6 +13,8 @@ const ROUTES = {
   DASHBOARD: '/dashboard',
 } as const
 
+const AUTH_REDIRECT_PATHS = ["/", ROUTES.LOGIN]
+
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const timer = pathname.startsWith("/collaboration/rooms/")
@@ -32,7 +34,7 @@ export default async function proxy(request: NextRequest) {
   }
 
   // 인증된 사용자가 공개 페이지 접근 → 대시보드로 리다이렉트
-  if (!isProtected && isLoggedIn) {
+  if (!isProtected && isLoggedIn && AUTH_REDIRECT_PATHS.includes(pathname)) {
     return NextResponse.redirect(new URL(ROUTES.DASHBOARD, request.url))
   }
 
