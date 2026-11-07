@@ -104,3 +104,14 @@ export function decryptGithubToken(storedValue: string): {
 
   throw new GitHubTokenDecryptionError()
 }
+
+export function inspectGithubTokenForMigration(
+  storedValue: string,
+  hasAccountCopy: boolean
+): { token: string; needsMigration: boolean } {
+  const result = decryptGithubToken(storedValue)
+  return {
+    token: result.token,
+    needsMigration: result.needsMigration || hasAccountCopy,
+  }
+}

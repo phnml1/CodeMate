@@ -18,7 +18,7 @@ export async function linkAccountWithoutPersistingGithubToken<
     ? account.access_token
     : undefined
   const safeAccount = { ...account }
-  if (accessToken) {
+  if (account.provider === "github") {
     delete safeAccount.access_token
     delete safeAccount.refresh_token
   }

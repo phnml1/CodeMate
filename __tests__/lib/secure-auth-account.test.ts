@@ -45,3 +45,24 @@ it("does not strip tokens from non-GitHub providers", async () => {
   expect(linkAccount).toHaveBeenCalledWith(account)
   expect(tokenStore).not.toHaveBeenCalled()
 })
+
+it("does not persist a GitHub refresh token when no access token is returned", async () => {
+  const linkAccount = jest.fn().mockResolvedValue(undefined)
+  const tokenStore = jest.fn().mockResolvedValue(undefined)
+
+  await linkAccountWithoutPersistingGithubToken(
+    {
+      provider: "github",
+      userId: "user-1",
+      refresh_token: "ghr_secret",
+    },
+    linkAccount,
+    tokenStore
+  )
+
+  expect(linkAccount).toHaveBeenCalledWith({
+    provider: "github",
+    userId: "user-1",
+  })
+  expect(tokenStore).not.toHaveBeenCalled()
+})
