@@ -4,6 +4,7 @@ import {
   encryptGithubToken,
   GitHubTokenDecryptionError,
   GitHubTokenEncryptionConfigurationError,
+  inspectGithubTokenForMigration,
   isEncryptedGithubToken,
 } from "@/lib/github-token-crypto"
 
@@ -32,8 +33,9 @@ it("encrypts and decrypts a GitHub token with AES-GCM", () => {
 it("rejects a tampered encrypted token", () => {
   process.env.GITHUB_TOKEN_ENCRYPTION_KEY = key()
   const encrypted = encryptGithubToken("gho_secret_token")
-  const replacement = encrypted.endsWith("A") ? "B" : "A"
-  const tampered = `${encrypted.slice(0, -1)}${replacement}`
+  const parts = encrypted.split(":")
+  parts[2] = `${parts[2][0] === "A" ? "B" : "A"}${parts[2].slice(1)}`
+  const tampered = parts.join(":")
 
   expect(() => decryptGithubToken(tampered)).toThrow(GitHubTokenDecryptionError)
 })
@@ -48,6 +50,26 @@ it("decrypts with the previous key and requests rotation", () => {
 
   expect(decryptGithubToken(encrypted)).toEqual({
     token: "gho_rotating_token",
+    needsMigration: true,
+  })
+  expect(inspectGithubTokenForMigration(encrypted, false)).toEqual({
+    token: "gho_rotating_token",
+    needsMigration: true,
+  })
+
+  const rotated = encryptGithubToken("gho_rotating_token")
+  expect(inspectGithubTokenForMigration(rotated, false).needsMigration).toBe(false)
+  delete process.env.GITHUB_TOKEN_ENCRYPTION_KEY_PREVIOUS
+  expect(decryptGithubToken(rotated).token).toBe("gho_rotating_token")
+  expect(() => decryptGithubToken(encrypted)).toThrow(GitHubTokenDecryptionError)
+})
+
+it("clears a legacy account token copy even when the user token has the current key", () => {
+  process.env.GITHUB_TOKEN_ENCRYPTION_KEY = key()
+  const encrypted = encryptGithubToken("gho_token")
+
+  expect(inspectGithubTokenForMigration(encrypted, true)).toEqual({
+    token: "gho_token",
     needsMigration: true,
   })
 })

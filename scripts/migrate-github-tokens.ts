@@ -1,4 +1,4 @@
-import { decryptGithubToken, isEncryptedGithubToken } from "../lib/github-token-crypto"
+import { inspectGithubTokenForMigration } from "../lib/github-token-crypto"
 import { storeGithubAccessToken } from "../lib/github-token-store"
 import { prisma } from "../lib/prisma"
 
@@ -29,15 +29,15 @@ async function main() {
   for (const [userId, storedValue] of storedByUser) {
     if (!storedValue) continue
     const hasAccountCopy = accounts.some((account) => account.userId === userId)
-    if (isEncryptedGithubToken(storedValue) && !hasAccountCopy) {
+    const result = inspectGithubTokenForMigration(storedValue, hasAccountCopy)
+    if (!result.needsMigration) {
       encrypted += 1
       continue
     }
 
     pending += 1
     if (apply) {
-      const token = decryptGithubToken(storedValue).token
-      await storeGithubAccessToken(userId, token)
+      await storeGithubAccessToken(userId, result.token)
       migrated += 1
     }
   }
