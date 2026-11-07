@@ -10,7 +10,7 @@ export default function TermsPage() {
   return (
     <LegalPage
       title="서비스 이용약관"
-      effectiveDate="2026년 11월 7일"
+      effectiveDate="2026년 11월 8일"
       sections={[
         {
           title: "1. 약관의 적용",
@@ -58,8 +58,9 @@ export default function TermsPage() {
         {
           title: "7. 문의와 약관 변경",
           paragraphs: [
-            "서비스 또는 약관 문의는 https://github.com/phnml1/CodeMate/issues 에서 접수합니다. 민감한 정보나 토큰은 공개 이슈에 작성하지 마세요. 중요한 약관 변경이 있을 때에는 서비스 화면 또는 저장소를 통해 시행일 전에 알립니다.",
+            "서비스 또는 약관에 관한 비공개 문의는 아래 이메일로 보내주세요. 일반 버그와 기능 제안은 GitHub 이슈에서 접수합니다. 중요한 약관 변경이 있을 때에는 서비스 화면 또는 저장소를 통해 시행일 전에 알립니다.",
           ],
+          email: "juyung0903@naver.com",
         },
       ]}
     />

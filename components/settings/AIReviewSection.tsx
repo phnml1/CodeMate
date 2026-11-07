@@ -72,6 +72,10 @@ export default function AIReviewSection() {
             <p className="text-xs text-slate-400 mt-0.5">PR 생성 시 AI 리뷰를 자동으로 실행합니다.</p>
           </div>
           <button
+            type="button"
+            role="switch"
+            aria-label="자동 리뷰"
+            aria-checked={settings.autoReview}
             onClick={() => save({ ...settings, autoReview: !settings.autoReview })}
             className={`relative w-10 h-5 rounded-full transition-colors ${
               settings.autoReview ? "bg-blue-500" : "bg-slate-300"
@@ -95,6 +99,8 @@ export default function AIReviewSection() {
             {(["ko", "en"] as const).map((lang) => (
               <button
                 key={lang}
+                type="button"
+                aria-pressed={settings.language === lang}
                 onClick={() => save({ ...settings, language: lang })}
                 className={cn(controlStyles.filterButton, "rounded-lg border",
                   settings.language === lang
@@ -124,6 +130,8 @@ export default function AIReviewSection() {
             ).map((opt) => (
               <button
                 key={opt.value}
+                type="button"
+                aria-pressed={settings.severityLevel === opt.value}
                 onClick={() => save({ ...settings, severityLevel: opt.value })}
                 className={cn("flex-1 rounded-lg border px-3 py-2 text-center text-xs font-medium transition-colors",
                   settings.severityLevel === opt.value

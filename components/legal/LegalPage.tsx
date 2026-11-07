@@ -4,6 +4,7 @@ type LegalSection = {
   title: string
   paragraphs?: string[]
   items?: string[]
+  email?: string
 }
 
 export function LegalPage({
@@ -37,6 +38,11 @@ export function LegalPage({
                   {paragraph}
                 </p>
               ))}
+              {section.email ? (
+                <a className="inline-block text-blue-600 underline-offset-2 hover:underline focus-visible:underline" href={`mailto:${section.email}`}>
+                  {section.email}
+                </a>
+              ) : null}
               {section.items ? (
                 <ul className="list-disc space-y-2 pl-5 leading-7 text-slate-600 dark:text-slate-300">
                   {section.items.map((item) => <li key={item}>{item}</li>)}

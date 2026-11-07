@@ -33,6 +33,12 @@ export default function Footer() {
           >
             이용약관
           </a>
+          <a
+            className="font-body text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-all hover:underline"
+            href="mailto:juyung0903@naver.com"
+          >
+            비공개 문의
+          </a>
         </div>
       </div>
     </footer>
