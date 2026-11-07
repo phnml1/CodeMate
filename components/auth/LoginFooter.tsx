@@ -16,6 +16,12 @@ export function LoginFooter() {
         </a>
         에 동의하게 됩니다
       </p>
+      <p className="text-slate-400 text-xs text-center leading-relaxed">
+        개인정보·계정 문의: {" "}
+        <a href="mailto:juyung0903@naver.com" className="text-blue-600 hover:underline">
+          juyung0903@naver.com
+        </a>
+      </p>
     </>
   )
 }

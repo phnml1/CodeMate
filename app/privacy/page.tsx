@@ -10,7 +10,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="개인정보처리방침"
-      effectiveDate="2026년 11월 7일"
+      effectiveDate="2026년 11월 8일"
       sections={[
         {
           title: "1. 처리하는 정보",
@@ -59,8 +59,9 @@ export default function PrivacyPage() {
         {
           title: "6. 문의",
           paragraphs: [
-            "개인정보 처리와 삭제 요청은 CodeMate GitHub 저장소의 공개 이슈를 통해 문의할 수 있습니다. 민감한 정보나 토큰은 이슈에 작성하지 마세요: https://github.com/phnml1/CodeMate/issues",
+            "개인정보 처리와 삭제 요청은 아래 이메일로 비공개 문의해 주세요. 비밀번호, 접근 토큰, 비공개 코드 원문은 보내지 마세요.",
           ],
+          email: "juyung0903@naver.com",
         },
       ]}
     />
