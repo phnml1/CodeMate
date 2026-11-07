@@ -1,7 +1,7 @@
 import { isProtectedPath } from "@/lib/protected-path"
 
 describe("isProtectedPath", () => {
-  it.each(["/", "/auth/login", "/api-docs"])(
+  it.each(["/", "/auth/login", "/api-docs", "/privacy", "/terms"])(
     "does not poll notifications on public path %s",
     (pathname) => {
       expect(isProtectedPath(pathname)).toBe(false)

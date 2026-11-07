@@ -4,6 +4,7 @@ import { GitHubReviewPublicationError, publishCommentToGitHub } from "@/lib/gith
 import { prisma } from "@/lib/prisma"
 import { emitCollaborationMessageUpdated } from "@/lib/socket/emitter"
 import { NextResponse } from "next/server"
+import { enforceUserRateLimit, RATE_LIMIT_POLICIES } from "@/lib/rate-limit"
 
 export async function POST(
   _request: Request,
@@ -13,6 +14,12 @@ export async function POST(
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  const rateLimited = await enforceUserRateLimit(
+    RATE_LIMIT_POLICIES.githubReviewPublish,
+    session.user.id
+  )
+  if (rateLimited) return rateLimited
 
   const { id } = await params
   try {

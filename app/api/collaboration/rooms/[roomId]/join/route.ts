@@ -10,6 +10,7 @@ import {
 import { prisma } from "@/lib/prisma"
 import { CollaborationPresenceUnavailableError } from "@/lib/socket/presence"
 import { NextResponse } from "next/server"
+import { enforceUserRateLimit, RATE_LIMIT_POLICIES } from "@/lib/rate-limit"
 
 type RouteContext = {
   params: Promise<{ roomId: string }>
@@ -21,6 +22,12 @@ export async function POST(_request: Request, { params }: RouteContext) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const rateLimited = await enforceUserRateLimit(
+      RATE_LIMIT_POLICIES.collaborationRoomJoin,
+      session.user.id
+    )
+    if (rateLimited) return rateLimited
 
     const { roomId } = await params
     const room = await findAccessibleCollaborationRoom(session.user.id, roomId)

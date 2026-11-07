@@ -1,5 +1,5 @@
 const PUBLIC_PATHS = ["/auth", "/api-docs"]
-const PUBLIC_EXACT_PATHS = ["/"]
+const PUBLIC_EXACT_PATHS = ["/", "/privacy", "/terms"]
 
 export function isProtectedPath(pathname: string): boolean {
   return (

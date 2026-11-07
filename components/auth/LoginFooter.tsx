@@ -7,11 +7,11 @@ export function LoginFooter() {
 
       <p className="text-slate-400 text-xs text-center leading-relaxed">
         로그인하면{" "}
-        <a href="#" className="text-blue-600 hover:underline">
+        <a href="/terms" className="text-blue-600 hover:underline">
           서비스 약관
         </a>{" "}
         및{" "}
-        <a href="#" className="text-blue-600 hover:underline">
+        <a href="/privacy" className="text-blue-600 hover:underline">
           개인정보처리방침
         </a>
         에 동의하게 됩니다

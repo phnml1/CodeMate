@@ -10,6 +10,7 @@ import {
   isRepositoryMembershipMigrationError,
 } from "@/lib/repository-access"
 import { NextResponse } from "next/server"
+import { enforceUserRateLimit, RATE_LIMIT_POLICIES } from "@/lib/rate-limit"
 
 export async function GET() {
   try {
@@ -44,6 +45,12 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const rateLimited = await enforceUserRateLimit(
+      RATE_LIMIT_POLICIES.repositoryConnect,
+      session.user.id
+    )
+    if (rateLimited) return rateLimited
 
     const body = await request.json().catch(() => null)
     const githubId = body?.githubId

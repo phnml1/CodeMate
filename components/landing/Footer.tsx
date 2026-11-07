@@ -23,13 +23,13 @@ export default function Footer() {
           </a>
           <a
             className="font-body text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-all hover:underline"
-            href="#"
+            href="/privacy"
           >
             개인정보 처리방침
           </a>
           <a
             className="font-body text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-all hover:underline"
-            href="#"
+            href="/terms"
           >
             이용약관
           </a>
