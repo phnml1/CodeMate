@@ -7,6 +7,7 @@ const sectionTitles: Record<string, string> = {
   repositories: "저장소",
   pulls: "Pull Requests",
   comments: "리뷰",
+  reviews: "리뷰",
   notifications: "알림",
   stats: "통계",
   settings: "설정",

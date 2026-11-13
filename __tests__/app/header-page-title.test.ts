@@ -11,6 +11,8 @@ it.each([
   ["/pulls/pr-1", "PR 상세"],
   ["/repositories", "저장소"],
   ["/comments", "리뷰"],
+  ["/reviews", "리뷰"],
+  ["/reviews/review-1", "리뷰"],
   ["/notifications", "알림"],
   ["/stats", "통계"],
   ["/settings", "설정"],
