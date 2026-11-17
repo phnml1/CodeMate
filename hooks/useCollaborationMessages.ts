@@ -25,29 +25,48 @@ const CONNECTED_MESSAGE_POLL_INTERVAL_MS = 20_000
 export const collaborationMessagesQueryKey = (roomId: string) =>
   ["collaborationMessages", roomId] as const
 
-async function cancelCollaborationMessageQueries(queryClient: QueryClient, roomId: string) {
-  const prefixes = [
-    collaborationMessagesQueryKey(roomId),
-    collaborationCodeThreadsQueryKey(roomId),
-    collaborationReviewMessagesQueryKey(roomId),
-  ]
-  const initialQueries = prefixes.flatMap((queryKey) =>
-    queryClient.getQueryCache().findAll({ queryKey })
-      .filter((query) => query.state.fetchStatus === "fetching" && query.state.data === undefined)
-      .map((query) => query.queryKey)
-  )
-  await Promise.all([
-    queryClient.cancelQueries({ queryKey: collaborationMessagesQueryKey(roomId) }),
-    queryClient.cancelQueries({ queryKey: collaborationCodeThreadsQueryKey(roomId) }),
-    queryClient.cancelQueries({ queryKey: collaborationReviewMessagesQueryKey(roomId) }),
-  ])
-  return initialQueries
+const MESSAGE_QUERY_ROOTS = new Set([
+  "collaborationMessages",
+  "collaborationCodeThreads",
+  "collaborationReviewMessages",
+])
+
+function isRoomMessageQuery(queryKey: readonly unknown[], roomId: string) {
+  return queryKey[1] === roomId && typeof queryKey[0] === "string" && MESSAGE_QUERY_ROOTS.has(queryKey[0])
 }
 
-function refetchInitialQueries(queryClient: QueryClient, queryKeys: readonly (readonly unknown[])[]) {
-  return Promise.all(queryKeys.map((queryKey) =>
+function cancelCollaborationMessageQueries(queryClient: QueryClient, roomId: string) {
+  const matchesRoom = ({ queryKey }: { queryKey: readonly unknown[] }) => isRoomMessageQuery(queryKey, roomId)
+  const fetchingQueries = queryClient.getQueryCache().findAll({ predicate: matchesRoom })
+    .filter((query) => query.state.fetchStatus === "fetching")
+  // A first GET may have only a Socket message in its cache. Restart it until full history loads.
+  const queriesToRefetch = fetchingQueries
+    .filter((query) => query.state.data === undefined || query.state.isInvalidated)
+    .map((query) => query.queryKey)
+  const cancelled = fetchingQueries.length
+    ? queryClient.cancelQueries({ predicate: matchesRoom })
+    : Promise.resolve()
+  return { cancelled, queriesToRefetch }
+}
+
+function markQueriesStale(queryClient: QueryClient, queryKeys: readonly (readonly unknown[])[]) {
+  for (const queryKey of queryKeys) {
+    void queryClient.invalidateQueries({ queryKey, exact: true, refetchType: "none" })
+  }
+}
+
+function refreshInterruptedQueries(queryClient: QueryClient, queryKeys: readonly (readonly unknown[])[], afterCancellation: Promise<unknown> = Promise.resolve()) {
+  if (queryKeys.length === 0) return
+  markQueriesStale(queryClient, queryKeys)
+  void afterCancellation.then(() => Promise.all(queryKeys.map((queryKey) =>
     queryClient.refetchQueries({ queryKey, exact: true, type: "all" })
-  ))
+  )))
+}
+
+function applyMessageCacheChange(queryClient: QueryClient, roomId: string, change: () => void) {
+  const cancelled = cancelCollaborationMessageQueries(queryClient, roomId)
+  change()
+  refreshInterruptedQueries(queryClient, cancelled.queriesToRefetch, cancelled.cancelled)
 }
 
 export interface CreateCollaborationMessageInput {
@@ -114,7 +133,7 @@ function upsertMessage(
 }
 
 function markMessageFailed(queryClient: QueryClient, pending: CollaborationMessage) {
-  void cancelCollaborationMessageQueries(queryClient, pending.roomId)
+  void cancelCollaborationMessageQueries(queryClient, pending.roomId).cancelled
   const queryKeys = [collaborationMessagesQueryKey(pending.roomId), codeThreadKey(pending)]
   for (const queryKey of queryKeys) {
     if (!queryKey) continue
@@ -205,19 +224,19 @@ function changeCachedMessage(
 }
 
 export function updateCollaborationMessageCache(queryClient: QueryClient, message: CollaborationMessage) {
-  const initialQueries = cancelCollaborationMessageQueries(queryClient, message.roomId)
-  changeCachedMessage(queryClient, message.roomId, message.id, message)
-  changeCachedReviewMessage(queryClient, message.roomId, message.id, message)
-  void initialQueries.then((keys) => refetchInitialQueries(queryClient, keys))
+  applyMessageCacheChange(queryClient, message.roomId, () => {
+    changeCachedMessage(queryClient, message.roomId, message.id, message)
+    changeCachedReviewMessage(queryClient, message.roomId, message.id, message)
+  })
 }
 
 export function deleteCollaborationMessageCache(queryClient: QueryClient, roomId: string, messageId: string) {
-  const initialQueries = cancelCollaborationMessageQueries(queryClient, roomId)
-  changeCachedMessage(queryClient, roomId, messageId)
-  changeCachedReviewMessage(queryClient, roomId, messageId)
-  void queryClient.invalidateQueries({ queryKey: collaborationCodeThreadsQueryKey(roomId) })
-  void queryClient.invalidateQueries({ queryKey: collaborationMessagesQueryKey(roomId) })
-  void initialQueries.then((keys) => refetchInitialQueries(queryClient, keys))
+  applyMessageCacheChange(queryClient, roomId, () => {
+    changeCachedMessage(queryClient, roomId, messageId)
+    changeCachedReviewMessage(queryClient, roomId, messageId)
+    void queryClient.invalidateQueries({ queryKey: collaborationCodeThreadsQueryKey(roomId) })
+    void queryClient.invalidateQueries({ queryKey: collaborationMessagesQueryKey(roomId) })
+  })
 }
 
 async function fetchMessages(roomId: string, cursor: string | null) {
@@ -247,18 +266,20 @@ export function appendCollaborationMessage(
   queryClient: QueryClient,
   message: CollaborationMessage
 ) {
-  const initialQueries = cancelCollaborationMessageQueries(queryClient, message.roomId)
-  const queryKey = collaborationMessagesQueryKey(message.roomId)
-  upsertMessage(queryClient, queryKey, message)
-  const threadKey = codeThreadKey(message)
-  if (threadKey) upsertMessage(queryClient, threadKey, message)
-  if (message.codeReference) {
-    void queryClient.invalidateQueries({
-      queryKey: collaborationCodeThreadsQueryKey(message.roomId),
-    })
-  }
-  upsertReviewMessage(queryClient, message)
-  void initialQueries.then((keys) => refetchInitialQueries(queryClient, keys))
+  applyMessageCacheChange(queryClient, message.roomId, () => {
+    const queryKey = collaborationMessagesQueryKey(message.roomId)
+    if (queryClient.getQueryState(queryKey)) upsertMessage(queryClient, queryKey, message)
+    const threadKey = codeThreadKey(message)
+    if (threadKey && queryClient.getQueryState(threadKey)) upsertMessage(queryClient, threadKey, message)
+    if (message.codeReference) {
+      void queryClient.invalidateQueries({
+        queryKey: collaborationCodeThreadsQueryKey(message.roomId),
+      })
+    }
+    if (message.reviewReference && queryClient.getQueryState(collaborationReviewMessagesQueryKey(message.roomId, message.reviewReference.reviewId))) {
+      upsertReviewMessage(queryClient, message)
+    }
+  })
 }
 
 export function useCollaborationMessages(
@@ -322,19 +343,33 @@ export function useCreateCollaborationMessage(roomId: string, currentUserId: str
         updatedAt: new Date().toISOString(),
         deliveryStatus: "sending",
       }
-      const initialQueries = await cancelCollaborationMessageQueries(queryClient, roomId)
       const threadKey = codeThreadKey(pending)
+      const optimisticKeys = [
+        collaborationMessagesQueryKey(roomId),
+        threadKey,
+        reviewReference ? collaborationReviewMessagesQueryKey(roomId, reviewReference.reviewId) : null,
+      ].filter((key): key is NonNullable<typeof key> => key !== null)
+      const optimisticOnlyKeys = optimisticKeys.filter((key) =>
+        queryClient.getQueryData(key) === undefined && queryClient.getQueryState(key)?.fetchStatus !== "fetching"
+      )
+      const cancelled = cancelCollaborationMessageQueries(queryClient, roomId)
+      await cancelled.cancelled
       upsertMessage(queryClient, collaborationMessagesQueryKey(roomId), pending)
       if (threadKey) upsertMessage(queryClient, threadKey, pending)
       upsertReviewMessage(queryClient, pending)
-      return { pending, initialQueries }
+      return { pending, queriesToRefetch: cancelled.queriesToRefetch, optimisticOnlyKeys }
     },
     onSuccess: ({ message }, _input, context) => {
       appendCollaborationMessage(queryClient, message)
-      void refetchInitialQueries(queryClient, context.initialQueries)
+      refreshInterruptedQueries(queryClient, context.queriesToRefetch)
+      for (const queryKey of context.optimisticOnlyKeys) {
+        void queryClient.invalidateQueries({ queryKey, exact: true })
+      }
     },
     onError: (_error, _input, context) => {
-      if (context) markMessageFailed(queryClient, context.pending)
+      if (!context) return
+      markMessageFailed(queryClient, context.pending)
+      markQueriesStale(queryClient, [...context.queriesToRefetch, ...context.optimisticOnlyKeys])
     },
   })
 }

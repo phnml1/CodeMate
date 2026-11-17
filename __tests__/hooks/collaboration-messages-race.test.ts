@@ -50,6 +50,93 @@ function delayedGet() {
 
 afterEach(() => { global.fetch = originalFetch })
 
+it("loads full history when a socket event precedes the room query", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { staleTime: 60_000 } } })
+  appendCollaborationMessage(client, newest)
+  expect(client.getQueryData(roomKey)).toBeUndefined()
+  const fetchMock = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ messages: [older, newest], nextCursor: null }),
+  })
+  global.fetch = fetchMock as typeof fetch
+
+  await client.fetchInfiniteQuery(collaborationMessagesQueryOptions(roomId))
+
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  expect(client.getQueryData(roomKey)).toEqual(pages([older, newest]))
+  client.clear()
+})
+
+it("does not create partial code or review thread caches for unopened threads", () => {
+  const client = new QueryClient()
+  const reference = { filePath: "src/app.ts", baseSha: "a".repeat(40), headSha: "b".repeat(40), side: "RIGHT" as const, startLine: 42, endLine: 42 }
+  const anchored = { ...newest, codeReference: reference, reviewReference: { reviewId: "review-1", issueIndex: 0 } }
+
+  appendCollaborationMessage(client, anchored)
+
+  expect(client.getQueryData(collaborationCodeThreadQueryKey(roomId, reference))).toBeUndefined()
+  expect(client.getQueryData(collaborationReviewMessagesQueryKey(roomId, "review-1"))).toBeUndefined()
+  client.clear()
+})
+
+it("does not cancel an in-flight GET for another room", async () => {
+  const client = new QueryClient()
+  const otherKey = collaborationMessagesQueryKey("room-2")
+  const other = { ...older, roomId: "room-2" }
+  client.setQueryData(roomKey, pages([older]))
+  client.setQueryData(otherKey, pages([other]))
+  const get = delayedGet()
+  const refetch = client.fetchInfiniteQuery(collaborationMessagesQueryOptions("room-2"))
+
+  appendCollaborationMessage(client, newest)
+
+  expect(client.getQueryState(otherKey)?.fetchStatus).toBe("fetching")
+  get.complete([other])
+  await refetch
+  expect(client.getQueryData(otherKey)).toEqual(pages([other]))
+  client.clear()
+})
+
+it("updates an already loaded room without requesting its full list again", async () => {
+  const client = new QueryClient()
+  client.setQueryData(roomKey, pages([older]))
+  const fetchMock = jest.fn()
+  global.fetch = fetchMock as typeof fetch
+
+  appendCollaborationMessage(client, newest)
+  await new Promise((resolve) => setTimeout(resolve, 0))
+
+  expect(fetchMock).not.toHaveBeenCalled()
+  expect(client.getQueryData(roomKey)).toEqual(pages([older, newest]))
+  client.clear()
+})
+
+it("restarts the first full-history GET when another socket event interrupts its refetch", async () => {
+  const client = new QueryClient()
+  const responses: Array<(value: Response) => void> = []
+  const fetchMock = jest.fn().mockImplementation(() => new Promise<Response>((resolve) => { responses.push(resolve) }))
+  global.fetch = fetchMock as typeof fetch
+  const firstGet = client.fetchInfiniteQuery(collaborationMessagesQueryOptions(roomId))
+
+  appendCollaborationMessage(client, newest)
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(fetchMock).toHaveBeenCalledTimes(2)
+
+  const later = { ...newest, id: "message-3", content: "later" }
+  appendCollaborationMessage(client, later)
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(fetchMock).toHaveBeenCalledTimes(3)
+
+  responses[0]({ ok: true, json: async () => ({ messages: [older], nextCursor: null }) } as Response)
+  responses[1]({ ok: true, json: async () => ({ messages: [older, newest], nextCursor: null }) } as Response)
+  responses[2]({ ok: true, json: async () => ({ messages: [older, newest, later], nextCursor: null }) } as Response)
+  await firstGet
+  await client.getQueryCache().find({ queryKey: roomKey })?.promise
+
+  expect(client.getQueryData(roomKey)).toEqual(pages([older, newest, later]))
+  client.clear()
+})
+
 it("refetches full history when a socket message interrupts the first GET", async () => {
   const client = new QueryClient()
   let finishOld!: (value: Response) => void
