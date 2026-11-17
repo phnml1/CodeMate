@@ -25,6 +25,31 @@ const CONNECTED_MESSAGE_POLL_INTERVAL_MS = 20_000
 export const collaborationMessagesQueryKey = (roomId: string) =>
   ["collaborationMessages", roomId] as const
 
+async function cancelCollaborationMessageQueries(queryClient: QueryClient, roomId: string) {
+  const prefixes = [
+    collaborationMessagesQueryKey(roomId),
+    collaborationCodeThreadsQueryKey(roomId),
+    collaborationReviewMessagesQueryKey(roomId),
+  ]
+  const initialQueries = prefixes.flatMap((queryKey) =>
+    queryClient.getQueryCache().findAll({ queryKey })
+      .filter((query) => query.state.fetchStatus === "fetching" && query.state.data === undefined)
+      .map((query) => query.queryKey)
+  )
+  await Promise.all([
+    queryClient.cancelQueries({ queryKey: collaborationMessagesQueryKey(roomId) }),
+    queryClient.cancelQueries({ queryKey: collaborationCodeThreadsQueryKey(roomId) }),
+    queryClient.cancelQueries({ queryKey: collaborationReviewMessagesQueryKey(roomId) }),
+  ])
+  return initialQueries
+}
+
+function refetchInitialQueries(queryClient: QueryClient, queryKeys: readonly (readonly unknown[])[]) {
+  return Promise.all(queryKeys.map((queryKey) =>
+    queryClient.refetchQueries({ queryKey, exact: true, type: "all" })
+  ))
+}
+
 export interface CreateCollaborationMessageInput {
   content: string
   codeReference?: CollaborationCodeReference
@@ -41,6 +66,21 @@ function codeThreadKey(message: CollaborationMessage) {
     baseSha: reference.baseSha,
     headSha: reference.headSha,
   })
+}
+
+function reconcileMessage(current: CollaborationMessage, incoming: CollaborationMessage) {
+  if (current.id !== incoming.id) return incoming
+  if (current.updatedAt > incoming.updatedAt) return current
+  if (incoming.githubStatus === "NOT_REQUESTED" && current.githubStatus && current.githubStatus !== "NOT_REQUESTED") {
+    return {
+      ...incoming,
+      githubStatus: current.githubStatus,
+      githubStatusUpdatedAt: current.githubStatusUpdatedAt,
+      githubReviewUrl: current.githubReviewUrl,
+      githubError: current.githubError,
+    }
+  }
+  return incoming
 }
 
 function upsertMessage(
@@ -65,7 +105,7 @@ function upsertMessage(
         pages: current.pages.map((page, index) => ({
           ...page,
           messages: found
-            ? page.messages.map((item) => matches(item) ? message : item)
+            ? page.messages.map((item) => matches(item) ? reconcileMessage(item, message) : item)
             : index === 0 ? [...page.messages, message] : page.messages,
         })),
       }
@@ -74,6 +114,7 @@ function upsertMessage(
 }
 
 function markMessageFailed(queryClient: QueryClient, pending: CollaborationMessage) {
+  void cancelCollaborationMessageQueries(queryClient, pending.roomId)
   const queryKeys = [collaborationMessagesQueryKey(pending.roomId), codeThreadKey(pending)]
   for (const queryKey of queryKeys) {
     if (!queryKey) continue
@@ -111,7 +152,7 @@ function upsertReviewMessage(queryClient: QueryClient, message: CollaborationMes
       const found = current.messages.some(matches)
       return {
         messages: found
-          ? current.messages.map((item) => matches(item) ? message : item)
+          ? current.messages.map((item) => matches(item) ? reconcileMessage(item, message) : item)
           : [...current.messages, message],
       }
     }
@@ -131,7 +172,7 @@ function changeCachedReviewMessage(
     if (!data?.messages) continue
     queryClient.setQueryData<CollaborationReviewMessagesResponse>(queryKey, {
       messages: replacement
-        ? data.messages.map((message) => message.id === messageId ? replacement : message)
+        ? data.messages.map((message) => message.id === messageId ? reconcileMessage(message, replacement) : message)
         : data.messages.filter((message) => message.id !== messageId),
     })
   }
@@ -155,7 +196,7 @@ function changeCachedMessage(
         pages: current.pages.map((page) => ({
           ...page,
           messages: replacement
-            ? page.messages.map((message) => message.id === messageId ? replacement : message)
+            ? page.messages.map((message) => message.id === messageId ? reconcileMessage(message, replacement) : message)
             : page.messages.filter((message) => message.id !== messageId),
         })),
       }
@@ -164,15 +205,19 @@ function changeCachedMessage(
 }
 
 export function updateCollaborationMessageCache(queryClient: QueryClient, message: CollaborationMessage) {
+  const initialQueries = cancelCollaborationMessageQueries(queryClient, message.roomId)
   changeCachedMessage(queryClient, message.roomId, message.id, message)
   changeCachedReviewMessage(queryClient, message.roomId, message.id, message)
+  void initialQueries.then((keys) => refetchInitialQueries(queryClient, keys))
 }
 
 export function deleteCollaborationMessageCache(queryClient: QueryClient, roomId: string, messageId: string) {
+  const initialQueries = cancelCollaborationMessageQueries(queryClient, roomId)
   changeCachedMessage(queryClient, roomId, messageId)
   changeCachedReviewMessage(queryClient, roomId, messageId)
   void queryClient.invalidateQueries({ queryKey: collaborationCodeThreadsQueryKey(roomId) })
   void queryClient.invalidateQueries({ queryKey: collaborationMessagesQueryKey(roomId) })
+  void initialQueries.then((keys) => refetchInitialQueries(queryClient, keys))
 }
 
 async function fetchMessages(roomId: string, cursor: string | null) {
@@ -202,6 +247,7 @@ export function appendCollaborationMessage(
   queryClient: QueryClient,
   message: CollaborationMessage
 ) {
+  const initialQueries = cancelCollaborationMessageQueries(queryClient, message.roomId)
   const queryKey = collaborationMessagesQueryKey(message.roomId)
   upsertMessage(queryClient, queryKey, message)
   const threadKey = codeThreadKey(message)
@@ -212,6 +258,7 @@ export function appendCollaborationMessage(
     })
   }
   upsertReviewMessage(queryClient, message)
+  void initialQueries.then((keys) => refetchInitialQueries(queryClient, keys))
 }
 
 export function useCollaborationMessages(
@@ -275,19 +322,19 @@ export function useCreateCollaborationMessage(roomId: string, currentUserId: str
         updatedAt: new Date().toISOString(),
         deliveryStatus: "sending",
       }
-      await queryClient.cancelQueries({ queryKey: collaborationMessagesQueryKey(roomId) })
+      const initialQueries = await cancelCollaborationMessageQueries(queryClient, roomId)
       const threadKey = codeThreadKey(pending)
-      if (threadKey) await queryClient.cancelQueries({ queryKey: threadKey })
       upsertMessage(queryClient, collaborationMessagesQueryKey(roomId), pending)
       if (threadKey) upsertMessage(queryClient, threadKey, pending)
       upsertReviewMessage(queryClient, pending)
-      return pending
+      return { pending, initialQueries }
     },
-    onSuccess: ({ message }) => {
+    onSuccess: ({ message }, _input, context) => {
       appendCollaborationMessage(queryClient, message)
+      void refetchInitialQueries(queryClient, context.initialQueries)
     },
-    onError: (_error, _input, pending) => {
-      if (pending) markMessageFailed(queryClient, pending)
+    onError: (_error, _input, context) => {
+      if (context) markMessageFailed(queryClient, context.pending)
     },
   })
 }
