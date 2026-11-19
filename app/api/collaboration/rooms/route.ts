@@ -12,6 +12,7 @@ import { buildAccessiblePullRequestWhere } from "@/lib/repository-access"
 import { CollaborationPresenceUnavailableError, getCollaborationPresence } from "@/lib/socket/presence"
 import { NextResponse } from "next/server"
 import { getCollaborationPresenceScope } from "@/lib/collaboration/presence-scope"
+import { enforceUserRateLimit, RATE_LIMIT_POLICIES } from "@/lib/rate-limit"
 
 const ROOM_JOIN_GRACE_MS = 45_000
 
@@ -86,6 +87,12 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const rateLimited = await enforceUserRateLimit(
+      RATE_LIMIT_POLICIES.collaborationRoomCreate,
+      session.user.id
+    )
+    if (rateLimited) return rateLimited
 
     const json = await request.json().catch(() => null)
     const parsed = createCollaborationRoomSchema.safeParse(json)

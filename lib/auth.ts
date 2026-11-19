@@ -4,6 +4,8 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import GitHub from "next-auth/providers/github"
 import { prisma } from "./prisma"
 import { timeCollaborationAuthQuery } from "./collaboration/server-performance"
+import { storeGithubAccessToken } from "./github-token-store"
+import { linkAccountWithoutPersistingGithubToken } from "./secure-auth-account"
 
 // PrismaPg driver adapter usage changes the inferred adapter signature.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -12,6 +14,12 @@ const prismaAdapter = PrismaAdapter(prisma as any)
 export const authConfig = {
   adapter: {
     ...prismaAdapter,
+    async linkAccount(account) {
+      await linkAccountWithoutPersistingGithubToken(
+        account,
+        (safeAccount) => Promise.resolve(prismaAdapter.linkAccount!(safeAccount))
+      )
+    },
     getSessionAndUser(sessionToken) {
       return timeCollaborationAuthQuery("sessionLookup", async () =>
         prismaAdapter.getSessionAndUser!(sessionToken)
@@ -37,17 +45,16 @@ export const authConfig = {
   ],
   events: {
     async signIn({ user, account }) {
-      // 마지막 로그인마다 최신 access_token으로 갱신
+      // 마지막 로그인마다 최신 access_token을 암호화하고 Adapter 복사본을 제거한다.
       if (account?.provider === 'github' && account.access_token) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { githubToken: account.access_token },
-        })
+        if (!user.id) throw new Error("GitHub user ID is missing")
+        await storeGithubAccessToken(user.id, account.access_token)
       }
     },
     async linkAccount({ user, account, profile }) {
       // 최초 연동 시 githubId, email 초기 세팅
       if (account.provider === 'github') {
+        if (!user.id) throw new Error("GitHub user ID is missing")
         await prisma.user.update({
           where: { id: user.id },
           data: {

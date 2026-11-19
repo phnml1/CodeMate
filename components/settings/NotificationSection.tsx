@@ -54,6 +54,10 @@ export default function NotificationSection() {
               <p className="text-xs text-slate-400 mt-0.5">{item.description}</p>
             </div>
             <button
+              type="button"
+              role="switch"
+              aria-label={item.label}
+              aria-checked={settings[item.key]}
               onClick={() => saveSettings({ ...settings, [item.key]: !settings[item.key] })}
               className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
                 settings[item.key] ? "bg-blue-500" : "bg-slate-300"

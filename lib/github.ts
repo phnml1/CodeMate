@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest"
-import { prisma } from "./prisma"
 import { auth } from "./auth"
+import { getGithubAccessToken } from "./github-token-store"
 
 export class GitHubReconnectRequiredError extends Error {
   constructor(message = "GitHub authorization expired. Please reconnect GitHub.") {
@@ -26,18 +26,15 @@ export function isGitHubReconnectRequiredError(error: unknown): boolean {
  * userId로 DB에서 githubToken을 조회하여 인증된 Octokit 인스턴스를 생성한다.
  */
 export async function getOctokit(userId: string): Promise<Octokit> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { githubToken: true },
-  })
+  const githubToken = await getGithubAccessToken(userId)
 
-  if (!user?.githubToken) {
+  if (!githubToken) {
     throw new GitHubReconnectRequiredError(
       "GitHub 토큰이 없습니다. GitHub 계정을 다시 연동해주세요."
     )
   }
 
-  return new Octokit({ auth: user.githubToken })
+  return new Octokit({ auth: githubToken })
 }
 
 /**

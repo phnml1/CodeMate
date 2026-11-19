@@ -11,6 +11,7 @@ import {
 } from "@/lib/repository-access";
 import { upsertReviewNotifications } from "@/lib/review-notifications";
 import type { NotificationReviewStatus } from "@/types/notification";
+import { enforceUserRateLimit, RATE_LIMIT_POLICIES } from "@/lib/rate-limit";
 
 export const maxDuration = 300;
 
@@ -47,6 +48,12 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const rateLimited = await enforceUserRateLimit(
+      RATE_LIMIT_POLICIES.aiReviewStart,
+      session.user.id
+    );
+    if (rateLimited) return rateLimited;
 
     const body = (await request.json().catch(() => null)) as
       | { pullRequestId?: unknown }

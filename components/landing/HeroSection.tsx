@@ -29,8 +29,8 @@ export default function HeroSection() {
             <Button size="lg" className="rounded-full" asChild>
               <Link href="/auth/login">GitHub로 무료 시작하기</Link>
             </Button>
-            <Button size="lg" variant="outline" className="rounded-full">
-              기능 살펴보기
+            <Button size="lg" variant="outline" className="rounded-full" asChild>
+              <a href="#features">기능 살펴보기</a>
             </Button>
           </div>
         </div>

@@ -30,6 +30,8 @@ export function SidebarLogo() {
         </SidebarMenuItem>
       </SidebarMenu>
       <button
+        type="button"
+        aria-label="사이드바 닫기"
         onClick={toggleSidebar}
         className="text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors p-1.5 rounded-md hover:bg-sidebar-accent group-data-[collapsible=icon]:hidden"
       >

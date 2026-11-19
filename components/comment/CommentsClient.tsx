@@ -7,6 +7,7 @@ import AllCommentList from "@/components/comment/AllCommentList"
 import CommentFilter from "@/components/comment/CommentFilter"
 import CommentsHeader from "@/components/comment/CommentsHeader"
 import { PageContainer } from "@/components/layout/PageContainer"
+import ReviewTabs from "@/components/reviews/ReviewTabs"
 import type { CommentWithPR } from "@/types/comment"
 import type { ConnectedRepository } from "@/types/repos"
 
@@ -53,6 +54,7 @@ export default function CommentsClient({ repos, userId }: CommentsClientProps) {
   return (
     <PageContainer>
       <CommentsHeader totalCount={totalCount} isLoading={isLoading} />
+      <ReviewTabs active="comments" />
       <CommentFilter
         repos={repos}
         selectedRepoId={selectedRepoId}

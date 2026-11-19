@@ -45,7 +45,13 @@ export default function ReviewPanel({ prId, onIssueClick }: ReviewPanelProps) {
   }
 
   if (review.status === "PENDING" || review.status === "IN_PROGRESS") {
-    return <ReviewProgressState stage={review.stage} />;
+    return (
+      <ReviewProgressState
+        stage={review.stage}
+        startedAt={review.reviewedAt}
+        aiStartedAt={review.aiRequestedAt}
+      />
+    );
   }
 
   return (

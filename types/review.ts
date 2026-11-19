@@ -24,4 +24,5 @@ export interface Review {
   failureReason?: string | null;
   aiSuggestions: AIReviewResponse;
   reviewedAt: string;
+  aiRequestedAt?: string | null;
 }

@@ -1,29 +1,33 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Manrope, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import Providers from "@/lib/providers";
 import "./globals.css";
 
-const geistSans = Geist({
+const geistSans = localFont({
+  src: "./fonts/geist-latin.woff2",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: "100 900",
   display: "swap",
 });
 
-const inter = Inter({
+const geistMono = localFont({
+  src: "./fonts/geist-mono-latin.woff2",
+  variable: "--font-geist-mono",
+  weight: "100 900",
+  display: "swap",
+});
+
+const manrope = localFont({
+  src: "./fonts/manrope-latin.woff2",
+  variable: "--font-manrope",
+  weight: "200 800",
+  display: "swap",
+});
+
+const inter = localFont({
+  src: "./fonts/inter-latin.woff2",
   variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: "100 900",
   display: "swap",
 });
 

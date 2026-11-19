@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Bell } from "lucide-react"
-import { useNotificationSummary, useNotifications } from "@/hooks/useNotifications"
+import { useNotificationSummaryCount, useNotifications } from "@/hooks/useNotifications"
 import { getNotificationLink } from "@/lib/notification-link"
 import NotificationList from "./NotificationList"
 import type { Notification } from "@/types/notification"
@@ -12,7 +12,7 @@ export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const router = useRouter()
-  const { unreadCount } = useNotificationSummary()
+  const unreadCount = useNotificationSummaryCount()
   const { notifications, isLoading, markAsRead, deleteNotification } = useNotifications(
     "ALL",
     "unread",

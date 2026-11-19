@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useLayoutEffect, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import NotificationWatcher from "@/components/notification/NotificationWatcher";
 import { installUnauthorizedFetchInterceptor } from "@/lib/client-auth";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -22,6 +23,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <NotificationWatcher />
       {children}
       <Toaster position="bottom-right" richColors closeButton />
     </QueryClientProvider>

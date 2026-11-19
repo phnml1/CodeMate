@@ -9,10 +9,13 @@ import type {
   NotificationSummaryResponse,
   NotificationFilterType,
   NotificationFilterRead,
+  BaseNotification,
 } from "@/types/notification"
+import { getNewNotificationEvents } from "@/lib/notifications/events"
+import { getNotificationLink } from "@/lib/notification-link"
 
 const NOTIFICATION_STALE_TIME_MS = 30_000
-const NOTIFICATION_POLL_INTERVAL_MS = 10_000
+const NOTIFICATION_POLL_INTERVAL_MS = 5_000
 const notificationSummaryQueryKey = ["notifications", "summary"] as const
 const notificationListQueryKey = (
   type?: NotificationFilterType,
@@ -25,7 +28,7 @@ type UseNotificationsOptions = {
 
 async function fetchNotificationSummary(): Promise<NotificationSummaryResponse> {
   const res = await fetch("/api/notifications/summary")
-  if (!res.ok) return { unreadCount: 0 }
+  if (!res.ok) throw new Error("알림 정보를 불러오지 못했습니다.")
   return res.json()
 }
 
@@ -69,46 +72,78 @@ function patchNotificationLists(
   }
 }
 
-function showPollingNotificationToast() {
-  toast("New notification", {
-    description: "Open notifications to see the latest updates.",
+function showNotificationToast(notification: BaseNotification) {
+  if (notification.type === "NEW_REVIEW" && notification.reviewStatus === "PENDING") {
+    return
+  }
+
+  const isReviewComplete =
+    notification.type === "NEW_REVIEW" && notification.reviewStatus === "COMPLETED"
+  const isReviewFailed =
+    notification.type === "REVIEW_FAILED" ||
+    (notification.type === "NEW_REVIEW" && notification.reviewStatus === "FAILED")
+  const title = isReviewComplete
+    ? "AI 리뷰 완료"
+    : isReviewFailed
+      ? "AI 리뷰 실패"
+      : notification.title
+  const link = getNotificationLink(notification) ?? "/notifications"
+  const options = {
+    description: notification.message ?? undefined,
     duration: 5000,
     action: {
-      label: "View",
-      onClick: () => {
-        window.location.assign("/notifications")
-      },
+      label: isReviewComplete ? "결과 보기" : "확인하기",
+      onClick: () => window.location.assign(link),
     },
-  })
+  }
+
+  if (isReviewComplete) toast.success(title, options)
+  else if (isReviewFailed) toast.error(title, options)
+  else toast(title, options)
 }
 
-export function useNotificationSummary() {
-  const previousUnreadCountRef = useRef<number | null>(null)
+export function useNotificationSummary(options: UseNotificationsOptions = {}) {
+  const enabled = options.enabled ?? true
+  const previousNotificationsRef = useRef<BaseNotification[] | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: notificationSummaryQueryKey,
     queryFn: fetchNotificationSummary,
+    enabled,
     staleTime: NOTIFICATION_STALE_TIME_MS,
-    refetchInterval: NOTIFICATION_POLL_INTERVAL_MS,
+    refetchInterval: enabled ? NOTIFICATION_POLL_INTERVAL_MS : false,
   })
 
   useEffect(() => {
+    if (!enabled) {
+      previousNotificationsRef.current = null
+      return
+    }
     if (!data) return
 
-    const unreadCount = data.unreadCount
-    const previousUnreadCount = previousUnreadCountRef.current
-    previousUnreadCountRef.current = unreadCount
-
-    if (previousUnreadCount == null) return
-    if (unreadCount <= previousUnreadCount) return
-
-    showPollingNotificationToast()
-  }, [data])
+    const recentNotifications = data.recentNotifications ?? []
+    const newEvents = getNewNotificationEvents(
+      previousNotificationsRef.current,
+      recentNotifications
+    )
+    previousNotificationsRef.current = recentNotifications
+    newEvents.forEach(showNotificationToast)
+  }, [data, enabled])
 
   return {
     unreadCount: data?.unreadCount ?? 0,
     isLoading,
   }
+}
+
+export function useNotificationSummaryCount() {
+  const { data } = useQuery({
+    queryKey: notificationSummaryQueryKey,
+    queryFn: fetchNotificationSummary,
+    enabled: false,
+  })
+
+  return data?.unreadCount ?? 0
 }
 
 export function useNotifications(
@@ -149,11 +184,13 @@ export function useNotifications(
       })
       queryClient.setQueryData<NotificationSummaryResponse>(
         notificationSummaryQueryKey,
-        (old) => ({
-          unreadCount: ids
-            ? Math.max(0, (old?.unreadCount ?? 0) - ids.length)
-            : 0,
-        })
+        (old) =>
+          old
+            ? {
+                ...old,
+                unreadCount: ids ? Math.max(0, old.unreadCount - ids.length) : 0,
+              }
+            : old
       )
     },
     onSettled: () => {
@@ -185,9 +222,13 @@ export function useNotifications(
       if (shouldDecrementUnread) {
         queryClient.setQueryData<NotificationSummaryResponse>(
           notificationSummaryQueryKey,
-          (old) => ({
-            unreadCount: Math.max(0, (old?.unreadCount ?? 0) - 1),
-          })
+          (old) =>
+            old
+              ? {
+                  ...old,
+                  unreadCount: Math.max(0, old.unreadCount - 1),
+                }
+              : old
         )
       }
     },

@@ -9,19 +9,19 @@ function getReviewNotificationContent(
   switch (status) {
     case "PENDING":
       return {
-        title: "AI review in progress",
-        message: `Waiting for the AI review of "${prTitle}".`,
+        title: "AI 리뷰 진행 중",
+        message: `"${prTitle}"의 변경 사항을 분석하고 있습니다.`,
       };
     case "FAILED":
       return {
-        title: "AI review failed",
-        message: `The AI review for "${prTitle}" could not be completed.`,
+        title: "AI 리뷰 실패",
+        message: `"${prTitle}"의 AI 리뷰를 완료하지 못했습니다.`,
       };
     case "COMPLETED":
     default:
       return {
-        title: "AI review is ready",
-        message: `The AI review for "${prTitle}" is complete.`,
+        title: "AI 리뷰 완료",
+        message: `"${prTitle}"의 리뷰 결과가 준비됐습니다.`,
       };
   }
 }
@@ -57,6 +57,7 @@ export async function upsertReviewNotifications(params: {
           data: {
             title: content.title,
             message: content.message,
+            reviewStatus: params.status,
             isRead: false,
             readAt: null,
             createdAt: new Date(),
@@ -71,6 +72,7 @@ export async function upsertReviewNotifications(params: {
           type: "NEW_REVIEW",
           title: content.title,
           message: content.message,
+          reviewStatus: params.status,
           isRead: false,
           userId,
           prId: params.prId,

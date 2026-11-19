@@ -6,6 +6,7 @@ import type {
 export const notificationCompatSelect = {
   id: true,
   type: true,
+  reviewStatus: true,
   title: true,
   message: true,
   isRead: true,
@@ -15,7 +16,7 @@ export const notificationCompatSelect = {
   createdAt: true,
 } as const
 
-type NotificationCompatRecord = Omit<BaseNotification, "createdAt" | "reviewStatus"> & {
+type NotificationCompatRecord = Omit<BaseNotification, "createdAt"> & {
   createdAt: Date
 }
 
@@ -38,7 +39,7 @@ export function toBaseNotification(
 ): BaseNotification {
   return {
     ...notification,
-    reviewStatus: reviewStatus ?? inferReviewStatus(notification),
+    reviewStatus: reviewStatus ?? notification.reviewStatus ?? inferReviewStatus(notification),
     createdAt: notification.createdAt.toISOString(),
   }
 }

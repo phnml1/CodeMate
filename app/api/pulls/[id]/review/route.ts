@@ -37,6 +37,7 @@ export async function GET(
             issueCount: true,
             status: true,
             stage: true,
+            aiRequestedAt: true,
             failureReason: true,
             reviewedAt: true,
           },
@@ -63,6 +64,7 @@ export async function GET(
       ...review,
       aiSuggestions: review.aiSuggestions as AIReviewResponse,
       reviewedAt: review.reviewedAt.toISOString(),
+      aiRequestedAt: review.aiRequestedAt?.toISOString() ?? null,
     };
 
     return NextResponse.json(response);

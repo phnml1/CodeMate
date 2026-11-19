@@ -1,5 +1,6 @@
 import type { Prisma } from "@/lib/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
+import { revealGithubAccessTokenForUser } from "@/lib/github-token-store"
 
 type MembershipTableRow = {
   exists: boolean
@@ -181,7 +182,15 @@ export async function getRepositoryPrimaryUser(
     },
   })
 
-  return membership?.user ?? null
+  const user = membership?.user
+  if (!user) return null
+
+  return {
+    ...user,
+    githubToken: user.githubToken
+      ? await revealGithubAccessTokenForUser(user.id, user.githubToken)
+      : null,
+  }
 }
 
 export async function getRepositoryGithubUsers(
@@ -214,7 +223,14 @@ export async function getRepositoryGithubUsers(
     },
   })
 
-  const users = memberships.map((membership) => membership.user)
+  const users = await Promise.all(
+    memberships.map(async ({ user }) => ({
+      ...user,
+      githubToken: user.githubToken
+        ? await revealGithubAccessTokenForUser(user.id, user.githubToken)
+        : null,
+    }))
+  )
   if (!preferredUserId) return users
 
   return [...users].sort((left, right) => {
